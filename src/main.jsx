@@ -18,6 +18,7 @@ const demoEntries = [
 ];
 
 const defaultSettings = {
+  welcomeSeen: false,
   onboardingComplete: false,
   profileName: "",
   profileAge: "",
@@ -708,6 +709,10 @@ function App() {
     { id: "mobile", label: "Mobile", icon: Home }
   ];
 
+  if (!settings.welcomeSeen) {
+    return <div className={settings.darkMode ? "app dark" : "app"}><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onReturn={() => updateSettings({ welcomeSeen: true, onboardingComplete: true })} /></div>;
+  }
+
   if (!settings.onboardingComplete) {
     return <div className={settings.darkMode ? "app dark" : "app"}><OnboardingScreen onboarding={onboarding} setOnboarding={setOnboarding} completeOnboarding={completeOnboarding} skipOnboarding={skipOnboarding} message={message} /></div>;
   }
@@ -734,7 +739,7 @@ function App() {
       <div className="container">
         <header className="header">
           <div>
-            <div className="pill"><ShieldCheck size={16} /> Private browser-based prototype</div>
+            <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
             <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
           </div>
@@ -766,13 +771,63 @@ function App() {
   );
 }
 
+
+function WelcomeScreen({ onStart, onReturn }) {
+  return (
+    <div className="welcome-screen">
+      <div className="welcome-shell">
+        <div className="welcome-logo">
+          <div className="welcome-petal">
+            <span />
+          </div>
+        </div>
+
+        <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
+
+        <h1>Welcome to 4Sara</h1>
+
+        <p className="welcome-lead">
+          Your private cycle companion for tracking menstruation, symptoms, moods, phases, and patterns — all in one simple place.
+        </p>
+
+        <div className="welcome-highlights">
+          <div>
+            <Lock size={20} />
+            <strong>Private by design</strong>
+            <p>Your data stays on this device unless you choose to export it.</p>
+          </div>
+          <div>
+            <CalendarDays size={20} />
+            <strong>Track every phase</strong>
+            <p>See menstruation, follicular, fertile, ovulation, and luteal estimates.</p>
+          </div>
+          <div>
+            <Sparkles size={20} />
+            <strong>Understand patterns</strong>
+            <p>Use check-ins to uncover symptoms, moods, and helpful suggestions.</p>
+          </div>
+        </div>
+
+        <div className="welcome-actions">
+          <Button onClick={onStart}><Plus size={16} /> Get Started</Button>
+          <Button onClick={onReturn} variant="secondary">I already use 4Sara</Button>
+        </div>
+
+        <p className="welcome-note">
+          4Sara provides estimates and wellness tracking only. It should not be used as birth control or medical advice.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipOnboarding, message }) {
   return (
     <div className="screen-center">
       <Card className="onboarding-card">
         <div className="pill"><Sparkles size={16} /> First-time setup</div>
         <h1>Welcome to 4Sara</h1>
-        <p className="muted">Answer a few quick questions so 4Sara can personalize the app and create a starting prediction. You can change these later in Settings.</p>
+        <p className="muted">Answer a few quick questions so 4Sara can personalize your tracker and create a starting prediction. You can change these later in Settings.</p>
         {message && <div className="message">{message}</div>}
         <div className="form">
           <label><span>Name</span><input value={onboarding.profileName} onChange={(e) => setOnboarding({ ...onboarding, profileName: e.target.value })} placeholder="Enter name" /></label>
@@ -782,8 +837,8 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
           <label><span>Average menstruation length</span><input type="number" min="1" max="15" value={onboarding.averagePeriodLength} onChange={(e) => setOnboarding({ ...onboarding, averagePeriodLength: e.target.value })} /><small>Most people start with 5 days if they are unsure.</small></label>
         </div>
         <div className="two-actions">
-          <Button onClick={completeOnboarding}><Save size={16} /> Finish setup</Button>
-          <Button onClick={skipOnboarding} variant="secondary">Skip for now</Button>
+          <Button onClick={completeOnboarding}><Save size={16} /> Create my tracker</Button>
+          <Button onClick={skipOnboarding} variant="secondary">Skip setup</Button>
         </div>
       </Card>
     </div>

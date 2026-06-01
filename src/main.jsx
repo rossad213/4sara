@@ -739,7 +739,13 @@ function App() {
       <div className="container">
         <header className="header">
           <div>
-            <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
+            <div className="brand-row">
+              <button className="brand-home-btn" onClick={() => updateSettings({ welcomeSeen: false })} aria-label="Return to welcome screen">
+                <span className="brand-mini-logo"><span /></span>
+                <span>4Sara</span>
+              </button>
+              <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
+            </div>
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
             <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
           </div>

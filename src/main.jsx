@@ -28,7 +28,7 @@ const STORAGE_KEY = "4sara_entries_final";
 const SETTINGS_KEY = "4sara_settings_final";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDKzvyYKKGnj65WP-Yu24a_6NMypghFcU",
+  apiKey: "AIzaSyDKzvyWKKGnj65WP-Yu24a_6NMypghFcU",
   authDomain: "sara-e6444.firebaseapp.com",
   projectId: "sara-e6444",
   storageBucket: "sara-e6444.firebasestorage.app",

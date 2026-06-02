@@ -1,16 +1,37 @@
 
 import React, { useEffect, useMemo, useState } from "react";
+import { initializeApp } from "firebase/app";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut
+} from "firebase/auth";
 import { createRoot } from "react-dom/client";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell, CalendarDays, ChevronLeft, ChevronRight, Download, Droplet, EyeOff,
-  HeartPulse, Home, KeyRound, Lock, Moon, Pencil, Plus, Save, Settings,
+  HeartPulse, Home, KeyRound, Lock, Mail, Moon, Pencil, Plus, Save, Settings,
   ShieldCheck, Smile, Sparkles, Trash2, X
 } from "lucide-react";
 import "./styles.css";
 
 const STORAGE_KEY = "4sara_entries_final";
 const SETTINGS_KEY = "4sara_settings_final";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDKzvyYKKGnj65WP-Yu24a_6NMypghFcU",
+  authDomain: "sara-e6444.firebaseapp.com",
+  projectId: "sara-e6444",
+  storageBucket: "sara-e6444.firebasestorage.app",
+  messagingSenderId: "906937325627",
+  appId: "1:906937325627:web:12b1468db2d201912e241e"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+
 
 const demoEntries = [
   { id: 1, type: "period", startDate: "2026-04-28", endDate: "2026-05-02", flow: "Medium", mood: "Calm", symptoms: ["Cramps", "Fatigue"], notes: "Mild cramps on day one." },
@@ -480,11 +501,27 @@ function App() {
   const [pinAttempt, setPinAttempt] = useState("");
   const [selectedCalendarDay, setSelectedCalendarDay] = useState(null);
   const [importText, setImportText] = useState("");
+  const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
   const [customSymptomInput, setCustomSymptomInput] = useState("");
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A" });
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }, [entries]);
   useEffect(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }, [settings]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      setAuthLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
   useEffect(() => { if (settings.pinEnabled && settings.pin) setLocked(true); }, []);
 
   const updateSettings = (patch) => setSettings((current) => ({ ...current, ...patch }));
@@ -497,6 +534,39 @@ function App() {
   const showMessage = (text) => {
     setMessage(text);
     setTimeout(() => setMessage(""), 2600);
+  };
+
+  const handleAuthSubmit = async () => {
+    setAuthError("");
+
+    if (!authEmail.trim()) {
+      setAuthError("Enter an email address.");
+      return;
+    }
+
+    if (!authPassword || authPassword.length < 6) {
+      setAuthError("Password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      if (authMode === "signup") {
+        await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+        showMessage("Account created. Cloud sync will be added in the next phase.");
+      } else {
+        await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+        showMessage("Signed in. Cloud sync will be added in the next phase.");
+      }
+
+      setAuthPassword("");
+    } catch (error) {
+      setAuthError(error.message?.replace("Firebase: ", "") || "Authentication failed.");
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    showMessage("Signed out.");
   };
 
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)), [entries]);
@@ -866,6 +936,7 @@ function App() {
     { id: "insights", label: "Insights", icon: Sparkles },
     { id: "settings", label: "Settings", icon: Settings },
     { id: "privacy", label: "Privacy", icon: Lock },
+    { id: "account", label: "Account", icon: Mail },
     { id: "mobile", label: "Mobile", icon: Home }
   ];
 
@@ -931,6 +1002,7 @@ function App() {
             {activeTab === "insights" && <Insights stats={stats} settings={settings} setLocked={setLocked} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} handleAuthSubmit={handleAuthSubmit} handleSignOut={handleSignOut} />}
             {activeTab === "mobile" && <MobileSetupPage />}
           </motion.div>
         </AnimatePresence>
@@ -1393,6 +1465,70 @@ function PrivacyPage({ settings, setLocked, clearData, exportJson, exportCsv }) 
         <InfoTile title="Cloud account" value="Not active" />
         <InfoTile title="PIN lock" value={settings.pinEnabled && settings.pin ? "Available" : "Off"} />
         {settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}
+      </Card>
+    </main>
+  );
+}
+
+
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, handleAuthSubmit, handleSignOut }) {
+  return (
+    <main className="layout">
+      <Card className="pad main-col">
+        <h2><Mail size={20} /> Account</h2>
+
+        {authLoading ? (
+          <p className="muted">Checking account status...</p>
+        ) : authUser ? (
+          <div className="account-signed-in">
+            <div className="info-box green-box">
+              <h3>Signed in</h3>
+              <p>You are signed in as:</p>
+              <strong>{authUser.email}</strong>
+            </div>
+
+            <div className="info-box amber-box">
+              <h3>Cloud sync is coming next</h3>
+              <p>This phase adds login only. Your 4Sara data is still saved on this device until cloud sync is added in the next update.</p>
+            </div>
+
+            <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
+          </div>
+        ) : (
+          <div className="auth-panel">
+            <div className="auth-mode-tabs">
+              <button className={authMode === "signin" ? "active" : ""} onClick={() => setAuthMode("signin")}>Log in</button>
+              <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>Create account</button>
+            </div>
+
+            <div className="form">
+              <label>
+                <span>Email</span>
+                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
+              </label>
+
+              <label>
+                <span>Password</span>
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" />
+              </label>
+
+              {authError && <p className="auth-error">{authError}</p>}
+
+              <Button onClick={handleAuthSubmit} className="full">
+                {authMode === "signup" ? "Create account" : "Log in"}
+              </Button>
+            </div>
+
+            <p className="auth-note">This first phase only adds account access. Cloud syncing for entries and settings will be added after login is tested.</p>
+          </div>
+        )}
+      </Card>
+
+      <Card className="pad side-col">
+        <h3>What accounts will unlock</h3>
+        <div className="mini-card"><strong>Device sync</strong><p>Use 4Sara on a phone, laptop, or new browser.</p></div>
+        <div className="mini-card"><strong>Safer backup</strong><p>Reduce the risk of losing data if browser storage is cleared.</p></div>
+        <div className="mini-card"><strong>Cloud controls</strong><p>Next steps should include export, delete data, and privacy controls.</p></div>
       </Card>
     </main>
   );

@@ -1163,3 +1163,73 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   color: #f8fafc;
   box-shadow: none;
 }
+
+
+/* Account / Firebase login */
+.auth-panel {
+  max-width: 520px;
+}
+
+.auth-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: rgba(241,245,249,.82);
+  border-radius: 18px;
+  padding: 6px;
+  margin-bottom: 16px;
+}
+
+.auth-mode-tabs button {
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 900;
+  padding: 10px;
+}
+
+.auth-mode-tabs button.active {
+  background: var(--rose);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(225,29,72,.16);
+}
+
+.auth-error {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 800;
+  font-size: 13px;
+  margin: 0;
+}
+
+.auth-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+.account-signed-in {
+  display: grid;
+  gap: 14px;
+}
+
+.account-signed-in strong {
+  display: block;
+  font-size: 18px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.dark .auth-mode-tabs {
+  background: rgba(30,41,59,.9);
+}
+
+.dark .auth-error {
+  background: rgba(127,29,29,.28);
+  color: #fecaca;
+  border-color: rgba(248,113,113,.35);
+}

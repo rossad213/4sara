@@ -40,6 +40,7 @@ const demoEntries = [
 
 const defaultSettings = {
   welcomeSeen: false,
+  accountPromptSeen: false,
   onboardingComplete: false,
   profileName: "",
   profileAge: "",
@@ -941,7 +942,27 @@ function App() {
   ];
 
   if (!settings.welcomeSeen) {
-    return <div className={settings.darkMode ? "app dark" : "app"}><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onReturn={() => updateSettings({ welcomeSeen: true, onboardingComplete: true })} /></div>;
+    return <div className={settings.darkMode ? "app dark" : "app"}><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onReturn={() => updateSettings({ welcomeSeen: true, accountPromptSeen: true, onboardingComplete: true })} /></div>;
+  }
+
+  if (!settings.accountPromptSeen) {
+    return (
+      <div className={settings.darkMode ? "app dark" : "app"}>
+        <AccountPromptScreen
+          authUser={authUser}
+          authLoading={authLoading}
+          authMode={authMode}
+          setAuthMode={setAuthMode}
+          authEmail={authEmail}
+          setAuthEmail={setAuthEmail}
+          authPassword={authPassword}
+          setAuthPassword={setAuthPassword}
+          authError={authError}
+          handleAuthSubmit={handleAuthSubmit}
+          onContinue={() => updateSettings({ accountPromptSeen: true })}
+        />
+      </div>
+    );
   }
 
   if (!settings.onboardingComplete) {
@@ -971,7 +992,7 @@ function App() {
         <header className="header">
           <div>
             <div className="brand-row">
-              <button className="brand-home-btn" onClick={() => updateSettings({ welcomeSeen: false })} aria-label="Return to welcome screen">
+              <button className="brand-home-btn" onClick={() => updateSettings({ welcomeSeen: false, accountPromptSeen: false })} aria-label="Return to welcome screen">
                 <span className="brand-mini-logo" aria-hidden="true">
                   <img src="/icons/icon-192.png" alt="" />
                 </span>
@@ -1054,6 +1075,75 @@ function WelcomeScreen({ onStart, onReturn }) {
         <p className="welcome-note">
           4Sara provides estimates and wellness tracking only. It should not be used as birth control or medical advice.
         </p>
+      </div>
+    </div>
+  );
+}
+
+
+function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, handleAuthSubmit, onContinue }) {
+  useEffect(() => {
+    if (authUser) {
+      const timer = setTimeout(() => onContinue(), 900);
+      return () => clearTimeout(timer);
+    }
+  }, [authUser, onContinue]);
+
+  return (
+    <div className="welcome-screen">
+      <div className="welcome-shell account-prompt-shell">
+        <div className="welcome-logo" aria-hidden="true">
+          <img src="/icons/icon-192.png" alt="" />
+        </div>
+
+        <div className="pill"><Mail size={16} /> Optional account setup</div>
+
+        <h1>Save 4Sara for later</h1>
+
+        <p className="welcome-lead">
+          Create an account now so 4Sara can support cloud syncing in the next step. You can also continue without an account and keep your data on this device.
+        </p>
+
+        {authLoading ? (
+          <p className="muted">Checking account status...</p>
+        ) : authUser ? (
+          <div className="account-created-card">
+            <strong>Signed in as {authUser.email}</strong>
+            <p>Taking you to setup...</p>
+          </div>
+        ) : (
+          <div className="auth-panel account-prompt-panel">
+            <div className="auth-mode-tabs">
+              <button className={authMode === "signin" ? "active" : ""} onClick={() => setAuthMode("signin")}>Log in</button>
+              <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>Create account</button>
+            </div>
+
+            <div className="form">
+              <label>
+                <span>Email</span>
+                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
+              </label>
+
+              <label>
+                <span>Password</span>
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" />
+              </label>
+
+              {authError && <p className="auth-error">{authError}</p>}
+
+              <div className="welcome-actions">
+                <Button onClick={handleAuthSubmit}>
+                  {authMode === "signup" ? "Create account" : "Log in"}
+                </Button>
+                <Button onClick={onContinue} variant="secondary">Continue without account</Button>
+              </div>
+            </div>
+
+            <p className="auth-note">
+              This step is optional. Cloud sync will be added next; for now, your tracking data still saves locally on this device.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1480,19 +1570,23 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
         {authLoading ? (
           <p className="muted">Checking account status...</p>
         ) : authUser ? (
-          <div className="account-signed-in">
-            <div className="info-box green-box">
-              <h3>Signed in</h3>
-              <p>You are signed in as:</p>
-              <strong>{authUser.email}</strong>
+          <div className="account-signed-in account-only-view">
+            <div className="account-status-card">
+              <div>
+                <p className="account-eyebrow">Signed in</p>
+                <h3>{authUser.email}</h3>
+                <p>Your account is active. Cloud sync will be added in the next phase.</p>
+              </div>
             </div>
 
             <div className="info-box amber-box">
-              <h3>Cloud sync is coming next</h3>
+              <h3>Cloud sync is not active yet</h3>
               <p>This phase adds login only. Your 4Sara data is still saved on this device until cloud sync is added in the next update.</p>
             </div>
 
-            <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
+            <div className="account-actions">
+              <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
+            </div>
           </div>
         ) : (
           <div className="auth-panel">
@@ -1519,16 +1613,27 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               </Button>
             </div>
 
-            <p className="auth-note">This first phase only adds account access. Cloud syncing for entries and settings will be added after login is tested.</p>
+            <p className="auth-note">Create an account or log in here. Cloud syncing for entries and settings will be added after login is tested.</p>
           </div>
         )}
       </Card>
 
       <Card className="pad side-col">
-        <h3>What accounts will unlock</h3>
-        <div className="mini-card"><strong>Device sync</strong><p>Use 4Sara on a phone, laptop, or new browser.</p></div>
-        <div className="mini-card"><strong>Safer backup</strong><p>Reduce the risk of losing data if browser storage is cleared.</p></div>
-        <div className="mini-card"><strong>Cloud controls</strong><p>Next steps should include export, delete data, and privacy controls.</p></div>
+        {authUser ? (
+          <>
+            <h3>Account status</h3>
+            <div className="mini-card"><strong>Logged in</strong><p>Your account is connected as {authUser.email}.</p></div>
+            <div className="mini-card"><strong>Local data still active</strong><p>Your current cycle data remains on this device until cloud sync is added.</p></div>
+            <div className="mini-card"><strong>Next step</strong><p>Cloud sync will connect your entries and settings to this account.</p></div>
+          </>
+        ) : (
+          <>
+            <h3>What accounts will unlock</h3>
+            <div className="mini-card"><strong>Device sync</strong><p>Use 4Sara on a phone, laptop, or new browser.</p></div>
+            <div className="mini-card"><strong>Safer backup</strong><p>Reduce the risk of losing data if browser storage is cleared.</p></div>
+            <div className="mini-card"><strong>Cloud controls</strong><p>Next steps should include export, delete data, and privacy controls.</p></div>
+          </>
+        )}
       </Card>
     </main>
   );

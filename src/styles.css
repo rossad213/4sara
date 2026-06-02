@@ -1233,3 +1233,105 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   color: #fecaca;
   border-color: rgba(248,113,113,.35);
 }
+
+
+/* Account prompt between Welcome and Onboarding */
+.account-prompt-shell {
+  max-width: 860px;
+}
+
+.account-prompt-panel {
+  margin: 0 auto;
+  text-align: left;
+}
+
+.account-prompt-panel .welcome-actions {
+  justify-content: flex-start;
+}
+
+.account-created-card {
+  max-width: 540px;
+  margin: 20px auto 0;
+  border-radius: 24px;
+  padding: 18px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  text-align: center;
+}
+
+.account-created-card strong {
+  display: block;
+  color: #065f46;
+  margin-bottom: 6px;
+}
+
+.account-created-card p {
+  margin: 0;
+  color: #047857;
+}
+
+.dark .account-created-card {
+  background: rgba(20,83,45,.32);
+  border-color: rgba(74,222,128,.35);
+}
+
+.dark .account-created-card strong,
+.dark .account-created-card p {
+  color: #bbf7d0;
+}
+
+@media (max-width: 640px) {
+  .account-prompt-panel .welcome-actions {
+    justify-content: stretch;
+  }
+}
+
+
+/* Logged-in Account tab cleanup */
+.account-only-view {
+  max-width: 720px;
+}
+
+.account-status-card {
+  border-radius: 26px;
+  padding: 20px;
+  border: 1px solid #a7f3d0;
+  background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+}
+
+.account-eyebrow {
+  margin: 0 0 5px;
+  color: #047857;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 900;
+}
+
+.account-status-card h3 {
+  margin: 0 0 6px;
+  color: #064e3b;
+  word-break: break-word;
+}
+
+.account-status-card p {
+  margin: 0;
+  color: #047857;
+}
+
+.account-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dark .account-status-card {
+  background: rgba(20,83,45,.32);
+  border-color: rgba(74,222,128,.35);
+}
+
+.dark .account-eyebrow,
+.dark .account-status-card h3,
+.dark .account-status-card p {
+  color: #bbf7d0;
+}

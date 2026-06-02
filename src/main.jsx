@@ -33,7 +33,7 @@ const defaultSettings = {
 };
 
 const presetSymptoms = ["Cramps", "Headache", "Bloating", "Fatigue", "Acne", "Back pain", "Cravings", "Mood swings", "Nausea", "Tender breasts"];
-const moods = ["Calm", "Happy", "Sensitive", "Irritable", "Sad", "Anxious", "Energetic", "Tired"];
+const moods = ["N/A", "Calm", "Happy", "Sensitive", "Irritable", "Sad", "Anxious", "Energetic", "Tired"];
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const formatDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
@@ -63,7 +63,30 @@ function inRange(day, start, end) {
 }
 
 function blankForm() {
-  return { type: "period", startDate: todayKey(), endDate: "", flow: "Medium", mood: "Calm", symptoms: [], notes: "" };
+  return { type: "period", startDate: todayKey(), endDate: "", flow: "N/A", mood: "N/A", moods: ["N/A"], symptoms: [], notes: "" };
+}
+
+function normalizeMoods(entry) {
+  if (Array.isArray(entry.moods) && entry.moods.length) return entry.moods;
+  if (entry.mood) return [entry.mood];
+  return ["N/A"];
+}
+
+function moodLabel(entry) {
+  return normalizeMoods(entry).filter((mood) => mood !== "N/A").join(", ") || "N/A";
+}
+
+function toggleMoodSelection(currentMoods, mood) {
+  const list = Array.isArray(currentMoods) && currentMoods.length ? currentMoods : ["N/A"];
+
+  if (mood === "N/A") return ["N/A"];
+
+  const withoutNA = list.filter((item) => item !== "N/A");
+  const next = withoutNA.includes(mood)
+    ? withoutNA.filter((item) => item !== mood)
+    : [...withoutNA, mood];
+
+  return next.length ? next : ["N/A"];
 }
 
 function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
@@ -287,7 +310,7 @@ function downloadCsv(entries) {
     entry.endDate || "",
     entry.type || "period",
     entry.flow || "",
-    entry.mood || "",
+    moodLabel(entry),
     (entry.symptoms || []).join("; "),
     entry.notes || ""
   ]);
@@ -328,7 +351,7 @@ function printReport(entries, stats) {
       <td>${(entry.type || "period") === "checkin" ? "Daily check-in" : "Menstruation"}</td>
       <td>${entry.endDate || ""}</td>
       <td>${entry.flow || ""}</td>
-      <td>${entry.mood || ""}</td>
+      <td>${moodLabel(entry)}</td>
       <td>${(entry.symptoms || []).join("; ")}</td>
       <td>${entry.notes || ""}</td>
     </tr>
@@ -434,7 +457,7 @@ function App() {
   const [selectedCalendarDay, setSelectedCalendarDay] = useState(null);
   const [importText, setImportText] = useState("");
   const [customSymptomInput, setCustomSymptomInput] = useState("");
-  const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5" });
+  const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A" });
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }, [entries]);
   useEffect(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }, [settings]);
@@ -496,7 +519,9 @@ function App() {
         phaseSymptoms[phase][symptom] = (phaseSymptoms[phase][symptom] || 0) + 1;
       });
 
-      if (entry.mood) phaseMoods[phase][entry.mood] = (phaseMoods[phase][entry.mood] || 0) + 1;
+      normalizeMoods(entry).forEach((mood) => {
+        if (mood !== "N/A") phaseMoods[phase][mood] = (phaseMoods[phase][mood] || 0) + 1;
+      });
     });
 
     const phaseInsights = Object.entries(phaseSymptoms)
@@ -529,9 +554,11 @@ function App() {
           checkInPhaseData[key].symptoms[symptom] = (checkInPhaseData[key].symptoms[symptom] || 0) + 1;
         });
 
-        if (entry.mood && entry.mood !== "N/A") {
-          checkInPhaseData[key].moods[entry.mood] = (checkInPhaseData[key].moods[entry.mood] || 0) + 1;
-        }
+        normalizeMoods(entry).forEach((mood) => {
+          if (mood !== "N/A") {
+            checkInPhaseData[key].moods[mood] = (checkInPhaseData[key].moods[mood] || 0) + 1;
+          }
+        });
       });
 
     const checkInPhaseInsights = Object.values(checkInPhaseData)
@@ -637,8 +664,9 @@ function App() {
       type: "period",
       startDate: onboarding.lastPeriodStart,
       endDate: addDays(onboarding.lastPeriodStart, periodLength - 1),
-      flow: "Medium",
-      mood: "Calm",
+      flow: onboarding.firstFlow || "N/A",
+      mood: onboarding.firstMood || "N/A",
+      moods: onboarding.firstMood && onboarding.firstMood !== "N/A" ? [onboarding.firstMood] : ["N/A"],
       symptoms: [],
       notes: "Created during first-time setup."
     }]);
@@ -690,10 +718,13 @@ function App() {
     if (!form.startDate) return showMessage("Start date is required.");
     if (form.type === "period" && form.endDate && daysBetween(form.startDate, form.endDate) < 0) return showMessage("End date cannot be before start date.");
 
+    const selectedMoods = Array.isArray(form.moods) && form.moods.length ? form.moods : normalizeMoods(form);
     const cleanForm = {
       ...form,
+      moods: selectedMoods,
+      mood: selectedMoods.filter((item) => item !== "N/A").join(", ") || "N/A",
       endDate: form.type === "checkin" ? "" : form.endDate,
-      flow: form.type === "checkin" ? "" : form.flow
+      flow: form.type === "checkin" ? "N/A" : (form.flow || "N/A")
     };
 
     if (editingId) {
@@ -715,7 +746,8 @@ function App() {
       startDate: entry.startDate,
       endDate: entry.endDate || "",
       flow: entry.flow || "Medium",
-      mood: entry.mood || "Calm",
+      mood: entry.mood || "N/A",
+      moods: normalizeMoods(entry),
       symptoms: entry.symptoms || [],
       notes: entry.notes || ""
     });
@@ -776,7 +808,8 @@ function App() {
         startDate: entry.startDate,
         endDate: entry.endDate || "",
         flow: entry.flow || "Medium",
-        mood: entry.mood || "Calm",
+        mood: entry.mood || "N/A",
+        moods: Array.isArray(entry.moods) && entry.moods.length ? entry.moods : (entry.mood ? [entry.mood] : ["N/A"]),
         symptoms: Array.isArray(entry.symptoms) ? entry.symptoms : [],
         notes: entry.notes || ""
       })));
@@ -939,6 +972,14 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
           <label><span>When did the last menstruation start?</span><input type="date" value={onboarding.lastPeriodStart} onChange={(e) => setOnboarding({ ...onboarding, lastPeriodStart: e.target.value })} /></label>
           <label><span>Average cycle length</span><input type="number" min="15" max="60" value={onboarding.averageCycleLength} onChange={(e) => setOnboarding({ ...onboarding, averageCycleLength: e.target.value })} /><small>Most people start with 28 days if they are unsure.</small></label>
           <label><span>Average menstruation length</span><input type="number" min="1" max="15" value={onboarding.averagePeriodLength} onChange={(e) => setOnboarding({ ...onboarding, averagePeriodLength: e.target.value })} /><small>Most people start with 5 days if they are unsure.</small></label>
+
+          <div className="onboarding-optional">
+            <p>Optional first-entry details</p>
+            <small>You can choose N/A if you do not want to add these now.</small>
+          </div>
+
+          <label><span>Flow level</span><select value={onboarding.firstFlow} onChange={(e) => setOnboarding({ ...onboarding, firstFlow: e.target.value })}><option>N/A</option><option>N/A</option><option>Light</option><option>Medium</option><option>Heavy</option><option>Spotting</option></select></label>
+          <label><span>Mood</span><select value={onboarding.firstMood} onChange={(e) => setOnboarding({ ...onboarding, firstMood: e.target.value })}>{moods.map((mood) => <option key={mood}>{mood}</option>)}</select></label>
         </div>
         <div className="two-actions">
           <Button onClick={completeOnboarding}><Save size={16} /> Create my tracker</Button>
@@ -1103,9 +1144,26 @@ function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdi
           </div>
         )}
         {form.type !== "checkin" && <label><span>End date</span><input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></label>}
-        {form.type !== "checkin" && <label><span>Flow level</span><select value={form.flow} onChange={(e) => setForm({ ...form, flow: e.target.value })}><option>Light</option><option>Medium</option><option>Heavy</option><option>Spotting</option></select></label>}
+        {form.type !== "checkin" && <label><span>Flow level</span><select value={form.flow} onChange={(e) => setForm({ ...form, flow: e.target.value })}><option>N/A</option><option>Light</option><option>Medium</option><option>Heavy</option><option>Spotting</option></select></label>}
 
-        <div><span className="label">Mood</span><div className="choice-grid">{moods.map((mood) => <button key={mood} onClick={() => setForm({ ...form, mood })} className={`choice ${form.mood === mood ? "active" : ""}`}>{mood}</button>)}</div></div>
+        <div>
+          <span className="label">Mood</span>
+          <div className="choice-grid">
+            {moods.map((mood) => (
+              <button
+                key={mood}
+                onClick={() => {
+                  const nextMoods = toggleMoodSelection(form.moods, mood);
+                  setForm({ ...form, moods: nextMoods, mood: nextMoods.filter((item) => item !== "N/A").join(", ") || "N/A" });
+                }}
+                className={`choice ${normalizeMoods(form).includes(mood) ? "active" : ""}`}
+              >
+                {mood}
+              </button>
+            ))}
+          </div>
+          <small className="field-help">Select one or more moods. Choose N/A if you do not want to track mood today.</small>
+        </div>
 
         <div>
           <span className="label">Symptoms</span>
@@ -1132,7 +1190,7 @@ function EntryList({ entries, onEdit, onDelete, compact = false }) {
           <div className="entry-head">
             <div>
               <strong>{formatDate(entry.startDate)} {entry.endDate && (entry.type || "period") !== "checkin" ? `- ${formatDate(entry.endDate)}` : ""}</strong>
-              <p className="muted">{(entry.type || "period") === "checkin" ? "Daily check-in" : `Flow: ${entry.flow}`} • Mood: {entry.mood}</p>
+              <p className="muted">{(entry.type || "period") === "checkin" ? "Daily check-in" : `Flow: ${entry.flow || "N/A"}`} • Mood: {moodLabel(entry)}</p>
             </div>
             <div>
               <button onClick={() => onEdit(entry)} className="icon-btn"><Pencil size={16} /></button>

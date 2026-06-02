@@ -990,3 +990,45 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .dark .blue-box {
   background: rgba(30,41,59,.9);
 }
+
+
+/* Onboarding optional first-entry details */
+.onboarding-optional {
+  margin-top: 4px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: #fff1f2;
+  border: 1px solid #ffe4e6;
+}
+
+.onboarding-optional p {
+  margin: 0 0 3px;
+  font-weight: 900;
+  color: #be123c;
+}
+
+.onboarding-optional small {
+  color: #64748b;
+}
+
+.dark .onboarding-optional {
+  background: rgba(30,41,59,.9);
+  border-color: rgba(148,163,184,.35);
+}
+
+.dark .onboarding-optional p {
+  color: #fecdd3;
+}
+
+.dark .onboarding-optional small {
+  color: #cbd5e1;
+}
+
+
+/* Multi-mood helper text */
+.field-help {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}

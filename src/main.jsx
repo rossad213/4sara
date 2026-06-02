@@ -137,7 +137,7 @@ function validateStrongPassword(password) {
 }
 
 function passwordRequirementMessage() {
-  return "Password must be at least 8 characters and include at least 1 number and 1 special symbol.";
+  return "Password must be at least 8 characters and include at least 1 number and 1 special character.";
 }
 
 function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
@@ -1489,7 +1489,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 symbol" />
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 special character" />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}
@@ -1592,7 +1592,7 @@ function PasswordRequirements({ password }) {
       <ul>
         <li className={result.hasMinLength ? "met" : ""}>At least 8 characters</li>
         <li className={result.hasNumber ? "met" : ""}>At least 1 number</li>
-        <li className={result.hasSymbol ? "met" : ""}>At least 1 special symbol</li>
+        <li className={result.hasSymbol ? "met" : ""}>At least 1 special character</li>
       </ul>
     </div>
   );
@@ -1643,7 +1643,7 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 symbol" />
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 special character" />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   getAuth,
   onAuthStateChanged,
   sendEmailVerification,
@@ -395,43 +396,45 @@ function printReport(entries, stats) {
   const menstruationEntries = entries.filter((entry) => (entry.type || "period") === "period");
   const checkIns = entries.filter((entry) => (entry.type || "period") === "checkin");
 
-  const symptomCounts = entries.flatMap((entry) => entry.symptoms || []).reduce((acc, symptom) => {
-    acc[symptom] = (acc[symptom] || 0) + 1;
-    return acc;
-  }, {});
+  const displayMoods = (entry) => {
+    const moods = Array.isArray(entry.moods) && entry.moods.length ? entry.moods : (entry.mood ? [entry.mood] : ["N/A"]);
+    return moods.filter((mood) => mood && mood !== "N/A").join(", ") || "N/A";
+  };
 
-  const symptoms = Object.entries(symptomCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([symptom, count]) => `${symptom} (${count})`).join(", ") || "No symptoms logged yet";
+  const displaySymptoms = (entry) => {
+    const symptoms = Array.isArray(entry.symptoms) ? entry.symptoms : [];
+    return symptoms.length ? symptoms.join(", ") : "None listed";
+  };
 
-  const phaseRows = (stats.phaseInsights || []).map((item) => `
+  const phaseRows = (stats.checkInPhaseInsights || []).map((item) => `
     <tr>
       <td>${item.phase}</td>
-      <td>${item.topSymptoms.length ? item.topSymptoms.map(([symptom, count]) => `${symptom} (${count})`).join(", ") : "No symptom pattern yet"}</td>
-      <td>${item.topMood ? item.topMood[0] : "No mood pattern yet"}</td>
+      <td>${item.count}</td>
+      <td>${item.topSymptoms?.length ? item.topSymptoms.map(([symptom, count]) => `${symptom} (${count})`).join(", ") : "None listed"}</td>
+      <td>${item.topMood ? item.topMood[0] : "None listed"}</td>
     </tr>
   `).join("");
 
-  const suggestionRows = (stats.dynamicSuggestions || []).map((suggestion) => `
-    <div class="suggestion">
-      <h3>${suggestion.title}</h3>
-      <p><strong>Food:</strong> ${suggestion.food}</p>
-      <p><strong>Movement:</strong> ${suggestion.movement}</p>
-      <p><strong>Comfort:</strong> ${suggestion.comfort}</p>
-    </div>
-  `).join("");
-
-  const entryRows = entries.map((entry) => `
+  const symptomRows = (stats.symptomStats || []).slice(0, 10).map(([symptom, count]) => `
     <tr>
-      <td>${entry.startDate}</td>
-      <td>${(entry.type || "period") === "checkin" ? "Daily check-in" : "Menstruation"}</td>
-      <td>${entry.endDate || ""}</td>
-      <td>${entry.flow || ""}</td>
-      <td>${moodLabel(entry)}</td>
-      <td>${(entry.symptoms || []).join("; ")}</td>
-      <td>${entry.notes || ""}</td>
+      <td>${symptom}</td>
+      <td>${count}</td>
     </tr>
   `).join("");
 
-  const notes = entries.filter((entry) => entry.notes).slice(0, 12).map((entry) => `<li><strong>${entry.startDate}</strong> — ${entry.notes}</li>`).join("");
+  const recentRows = [...entries]
+    .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
+    .slice(0, 25)
+    .map((entry) => `
+      <tr>
+        <td>${formatDate(entry.startDate)}${entry.endDate ? ` - ${formatDate(entry.endDate)}` : ""}</td>
+        <td>${(entry.type || "period") === "checkin" ? "Daily check-in" : "Menstruation"}</td>
+        <td>${(entry.type || "period") === "checkin" ? "N/A" : (entry.flow || "N/A")}</td>
+        <td>${displayMoods(entry)}</td>
+        <td>${displaySymptoms(entry)}</td>
+        <td>${entry.notes || ""}</td>
+      </tr>
+    `).join("");
 
   const html = `<!doctype html>
   <html>
@@ -439,66 +442,59 @@ function printReport(entries, stats) {
       <title>4Sara Doctor Summary Report</title>
       <style>
         body{font-family:Arial,sans-serif;color:#1f2937;padding:32px;line-height:1.45}
-        h1{color:#be123c}
-        h2{margin-top:28px;color:#374151}
-        .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-        .card,.suggestion{border:1px solid #fecdd3;border-radius:14px;padding:14px;background:#fff1f2;margin-bottom:10px}
-        .alt{background:#faf5ff;border-color:#e9d5ff}
-        .label{color:#6b7280;font-size:12px}
-        .value{font-weight:700;font-size:16px}
-        table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}
-        th,td{border:1px solid #e5e7eb;padding:8px;vertical-align:top;text-align:left}
-        th{background:#fff1f2}
-        .disclaimer{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px;font-size:12px;color:#78350f;margin-top:22px}
-        button{padding:10px 16px;border-radius:10px;border:1px solid #ddd;background:white;margin-bottom:20px;font-weight:700}
-        @media print{button{display:none}body{padding:0}.card,.suggestion{break-inside:avoid}}
+        h1{color:#be123c;margin-bottom:4px}
+        h2{margin-top:26px;color:#9f1239}
+        .muted{color:#6b7280}
+        .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0 20px}
+        .card{border:1px solid #fecdd3;border-radius:14px;background:#fff1f2;padding:12px}
+        .label{font-size:12px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+        .value{font-size:18px;font-weight:800;margin-top:4px}
+        table{width:100%;border-collapse:collapse;margin:12px 0 24px;font-size:13px}
+        th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}
+        th{background:#fff1f2;color:#9f1239}
+        .disclaimer{border:1px solid #fde68a;background:#fffbeb;border-radius:14px;padding:14px;margin-top:24px;font-size:13px}
+        button{border:1px solid #ddd;border-radius:999px;background:white;padding:10px 14px;margin-bottom:20px;font-weight:700}
+        @media print{button{display:none}body{padding:0}.card{break-inside:avoid}}
       </style>
     </head>
     <body>
       <button onclick="window.print()">Print / Save as PDF</button>
       <h1>4Sara Doctor Summary Report</h1>
-      <p>Generated ${new Date().toLocaleString()}</p>
+      <p class="muted">Generated ${new Date().toLocaleString()}</p>
 
       <h2>Cycle Summary</h2>
       <div class="grid">
-        <div class="card"><div class="label">Logged menstruation cycles</div><div class="value">${menstruationEntries.length}</div></div>
+        <div class="card"><div class="label">Average cycle length</div><div class="value">${stats.averageCycle || "N/A"} days</div></div>
+        <div class="card"><div class="label">Average menstruation length</div><div class="value">${stats.averagePeriod || "N/A"} days</div></div>
+        <div class="card"><div class="label">Last menstruation</div><div class="value">${stats.last?.startDate ? formatDate(stats.last.startDate) : "N/A"}</div></div>
+        <div class="card"><div class="label">Next predicted menstruation</div><div class="value">${stats.nextPeriod ? formatDate(stats.nextPeriod) : "N/A"}</div></div>
+        <div class="card"><div class="label">Estimated fertile window</div><div class="value">${stats.fertileStart && stats.fertileEnd ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "N/A"}</div></div>
+        <div class="card"><div class="label">Estimated ovulation</div><div class="value">${stats.ovulationDay ? formatDate(stats.ovulationDay) : "N/A"}</div></div>
+        <div class="card"><div class="label">Menstruation entries</div><div class="value">${menstruationEntries.length}</div></div>
         <div class="card"><div class="label">Daily check-ins</div><div class="value">${checkIns.length}</div></div>
-        <div class="card"><div class="label">Average cycle length</div><div class="value">${stats.averageCycle} days</div></div>
-        <div class="card"><div class="label">Average menstruation length</div><div class="value">${stats.averagePeriod} days</div></div>
-        <div class="card alt"><div class="label">Next predicted menstruation</div><div class="value">${stats.nextPeriod ? formatDate(stats.nextPeriod) : "Not enough data"}</div></div>
-        <div class="card alt"><div class="label">Fertile window estimate</div><div class="value">${stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"}</div></div>
       </div>
 
-      <h2>Symptom Summary</h2>
-      <div class="card"><div class="label">Most logged symptoms</div><div class="value">${symptoms}</div></div>
+      <h2>Common Symptoms</h2>
+      ${symptomRows ? `<table><thead><tr><th>Symptom</th><th>Times logged</th></tr></thead><tbody>${symptomRows}</tbody></table>` : `<p class="muted">No symptom patterns recorded yet.</p>`}
 
-      <h2>Phase Patterns</h2>
-      <table>
-        <thead><tr><th>Phase</th><th>Top symptoms</th><th>Common mood</th></tr></thead>
-        <tbody>${phaseRows || `<tr><td colspan="3">No phase patterns yet.</td></tr>`}</tbody>
-      </table>
+      <h2>Daily Check-ins by Estimated Phase</h2>
+      ${phaseRows ? `<table><thead><tr><th>Estimated phase</th><th>Check-ins</th><th>Common symptoms</th><th>Common mood</th></tr></thead><tbody>${phaseRows}</tbody></table>` : `<p class="muted">No phase-based check-in patterns recorded yet.</p>`}
 
-      <h2>4Sara Suggestions</h2>
-      ${suggestionRows || "<p>No suggestions yet. Add symptoms and daily check-ins to unlock suggestions.</p>"}
+      <h2>Recent Entries</h2>
+      ${recentRows ? `<table><thead><tr><th>Date</th><th>Type</th><th>Flow</th><th>Mood(s)</th><th>Symptoms</th><th>Notes</th></tr></thead><tbody>${recentRows}</tbody></table>` : `<p class="muted">No entries recorded yet.</p>`}
 
-      <h2>Notes Summary</h2>
-      ${notes ? `<ul>${notes}</ul>` : "<p>No notes logged yet.</p>"}
-
-      <h2>Full Entry History</h2>
-      <table>
-        <thead><tr><th>Date</th><th>Type</th><th>End Date</th><th>Flow</th><th>Mood</th><th>Symptoms</th><th>Notes</th></tr></thead>
-        <tbody>${entryRows || `<tr><td colspan="7">No entries logged.</td></tr>`}</tbody>
-      </table>
-
-      <div class="disclaimer">This report is for personal tracking and discussion with a healthcare professional. Phase labels, fertile window, ovulation, and menstruation predictions are estimates. Suggestions are general wellness ideas, not medical advice.</div>
+      <div class="disclaimer">
+        <strong>Important disclaimer:</strong>
+        This report is for personal tracking and discussion with a healthcare professional. 4Sara is not medical advice, not a medical device, and should not be used as birth control. Cycle phases, fertile windows, ovulation dates, and menstruation predictions are estimates only.
+      </div>
     </body>
   </html>`;
 
-  const win = window.open("", "_blank", "width=950,height=750");
-  if (!win) return false;
-  win.document.write(html);
-  win.document.close();
-  win.focus();
+  const reportWindow = window.open("", "_blank");
+  if (!reportWindow) return false;
+  reportWindow.document.open();
+  reportWindow.document.write(html);
+  reportWindow.document.close();
   return true;
 }
 
@@ -543,11 +539,13 @@ function App() {
   const [lastCloudSave, setLastCloudSave] = useState("");
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudCheckedForAccount, setCloudCheckedForAccount] = useState(false);
+  const [cloudSyncAllowed, setCloudSyncAllowed] = useState(false);
   const [cloudHasData, setCloudHasData] = useState(false);
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [customSymptomInput, setCustomSymptomInput] = useState("");
-  const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A" });
+  const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A", consentAccepted: false });
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }, [entries]);
   useEffect(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }, [settings]);
@@ -558,8 +556,10 @@ function App() {
       setAuthLoading(false);
       setCloudReady(Boolean(user));
       setCloudCheckedForAccount(false);
+      setCloudSyncAllowed(false);
       setCloudHasData(false);
       setCloudUpdatedAt("");
+      setConfirmDeleteAccount(false);
       setSyncStatus(user ? "Signed in. Cloud sync is ready." : "Signed out. Data is saved locally on this device.");
     });
 
@@ -574,7 +574,7 @@ function App() {
   }, [authUser, cloudCheckedForAccount]);
 
   useEffect(() => {
-    if (!authUser || !autoSyncEnabled || !cloudReady || !cloudCheckedForAccount) return;
+    if (!authUser || !autoSyncEnabled || !cloudReady || !cloudCheckedForAccount || !cloudSyncAllowed) return;
 
     const timer = setTimeout(() => {
       saveToCloudSilent().catch((error) => {
@@ -583,7 +583,7 @@ function App() {
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [entries, settings, authUser, autoSyncEnabled, cloudReady, cloudCheckedForAccount]);
+  }, [entries, settings, authUser, autoSyncEnabled, cloudReady, cloudCheckedForAccount, cloudSyncAllowed]);
 
 
   const updateSettings = (patch) => setSettings((current) => ({ ...current, ...patch }));
@@ -691,12 +691,56 @@ function App() {
       await deleteDoc(doc(db, "users", authUser.uid));
       setCloudHasData(false);
       setCloudUpdatedAt("");
+      setCloudSyncAllowed(false);
+      setAutoSyncEnabled(false);
       setConfirmDeleteCloud(false);
-      setSyncStatus("Cloud data deleted. Local data on this device was not deleted.");
+      setSyncStatus("Cloud data deleted. Auto-sync was turned off so the cloud copy is not recreated automatically. Local data on this device was not deleted.");
       showMessage("Cloud data deleted.");
     } catch (error) {
       setSyncStatus("Cloud delete failed.");
       showMessage(error.message || "Cloud delete failed.");
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!authUser || !auth.currentUser) {
+      showMessage("Log in first to delete your account.");
+      return;
+    }
+
+    if (!confirmDeleteAccount) {
+      setConfirmDeleteAccount(true);
+      setSyncStatus("Click Delete account again to confirm.");
+      return;
+    }
+
+    setSyncBusy(true);
+    setSyncStatus("Deleting account...");
+
+    try {
+      await deleteDoc(doc(db, "users", authUser.uid));
+      await deleteUser(auth.currentUser);
+
+      setCloudHasData(false);
+      setCloudUpdatedAt("");
+      setCloudSyncAllowed(false);
+      setAutoSyncEnabled(false);
+      setConfirmDeleteCloud(false);
+      setConfirmDeleteAccount(false);
+      setSyncStatus("Account deleted. Local data on this device was not deleted.");
+      showMessage("Account deleted.");
+    } catch (error) {
+      const message = error.message || "Account deletion failed.";
+
+      if (message.includes("requires-recent-login")) {
+        setSyncStatus("For security, log out, log back in, then delete the account again.");
+        showMessage("Log in again before deleting account.");
+      } else {
+        setSyncStatus("Account deletion failed.");
+        showMessage(message);
+      }
     } finally {
       setSyncBusy(false);
     }
@@ -725,22 +769,46 @@ function App() {
 
       if (snapshot.exists()) {
         const cloudData = snapshot.data()?.data || {};
-        setCloudHasData(Boolean(Array.isArray(cloudData.entries) && cloudData.entries.length));
+        const cloudEntries = Array.isArray(cloudData.entries) ? cloudData.entries : [];
+        const cloudSettings = cloudData.settings || {};
+        const hasCloudEntries = cloudEntries.length > 0;
+        const hasLocalEntries = entries.length > 0;
+
+        setCloudHasData(hasCloudEntries);
         setCloudUpdatedAt(cloudData.updatedAt || "");
-        setSyncStatus("Cloud data found. Choose whether to load it or keep this device’s data.");
+
+        if (hasCloudEntries && !hasLocalEntries) {
+          setEntries(cloudEntries);
+          setSettings((current) => ({
+            ...current,
+            ...cloudSettings,
+            pin: current.pin,
+            pinEnabled: current.pinEnabled
+          }));
+          setCloudSyncAllowed(true);
+          setSyncStatus("Cloud data loaded automatically because this device had no local data.");
+          showMessage("Cloud data loaded.");
+        } else if (hasCloudEntries && hasLocalEntries) {
+          setCloudSyncAllowed(false);
+          setSyncStatus("Cloud data found. Auto-sync is paused until you choose whether to load cloud data or save this device’s data.");
+        } else {
+          setCloudSyncAllowed(true);
+          setSyncStatus("No cloud data found yet. This device can save data to cloud.");
+        }
       } else {
         setCloudHasData(false);
         setCloudUpdatedAt("");
-        setSyncStatus("No cloud data found yet. You can save this device’s data to cloud.");
+        setCloudSyncAllowed(true);
+        setSyncStatus("No cloud data found yet. This device can save data to cloud.");
       }
 
       setCloudCheckedForAccount(true);
     } catch (error) {
       setSyncStatus(error.message || "Could not check cloud data.");
       setCloudCheckedForAccount(true);
+      setCloudSyncAllowed(false);
     }
   };
-
 
   const saveToCloudSilent = async () => {
     if (!auth.currentUser) return;
@@ -783,6 +851,7 @@ function App() {
       const savedTime = new Date().toLocaleTimeString();
       setLastCloudSave(savedTime);
       setCloudCheckedForAccount(true);
+      setCloudSyncAllowed(true);
       setCloudHasData(true);
       setSyncStatus(`Saved to cloud at ${savedTime}.`);
       showMessage("Saved to cloud.");
@@ -825,6 +894,7 @@ function App() {
       }));
 
       setCloudCheckedForAccount(true);
+      setCloudSyncAllowed(true);
       setCloudHasData(true);
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}.`);
       showMessage("Loaded cloud data.");
@@ -1019,6 +1089,7 @@ function App() {
     if (!onboarding.profileName.trim()) return showMessage("Enter a name first.");
     if (!onboarding.profileAge) return showMessage("Enter an age first.");
     if (!onboarding.lastPeriodStart) return showMessage("Enter the last menstruation start date first.");
+    if (!onboarding.consentAccepted) return showMessage("Please accept the privacy and wellness tracking acknowledgment before continuing.");
 
     const cycleLength = Number(onboarding.averageCycleLength) || 28;
     const periodLength = Number(onboarding.averagePeriodLength) || 5;
@@ -1290,8 +1361,8 @@ function App() {
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
             {activeTab === "insights" && <Insights stats={stats} settings={settings} setLocked={setLocked} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
-            {activeTab === "privacy" && <PrivacyPage settings={settings} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} />}
+            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} />}
             {activeTab === "mobile" && <MobileSetupPage />}
           </motion.div>
         </AnimatePresence>
@@ -1300,6 +1371,168 @@ function App() {
   );
 }
 
+
+
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount }) {
+  return (
+    <main className="layout">
+      <Card className="pad main-col">
+        <h2><Mail size={20} /> Account</h2>
+
+        {authLoading ? (
+          <p className="muted">Checking account status...</p>
+        ) : authUser ? (
+          <div className="account-signed-in account-only-view">
+            <div className="account-status-card">
+              <div>
+                <p className="account-eyebrow">Signed in</p>
+                <h3>{authUser.email}</h3>
+                <p>Your account is active. Cloud sync is available for this account.</p>
+                <span className={authUser.emailVerified ? "verify-badge verified" : "verify-badge unverified"}>
+                  {authUser.emailVerified ? "Email verified" : "Email not verified"}
+                </span>
+              </div>
+            </div>
+
+            {!authUser.emailVerified && (
+              <div className="email-verification-card">
+                <h3>Confirm your email</h3>
+                <p>Please verify your email address so the account is confirmed.</p>
+                <Button onClick={handleResendVerification} variant="secondary">Resend verification email</Button>
+                {authNotice && <p className="auth-notice">{authNotice}</p>}
+                {authError && <p className="auth-error">{authError}</p>}
+              </div>
+            )}
+
+            <div className="cloud-migration-card">
+              <h3>Cloud data check</h3>
+              {!cloudCheckedForAccount ? (
+                <p>Checking for existing cloud data...</p>
+              ) : cloudHasData ? (
+                <>
+                  <p>Cloud data was found for this account{cloudUpdatedAt ? `, last updated ${new Date(cloudUpdatedAt).toLocaleString()}` : ""}.</p>
+                  <div className="migration-actions">
+                    <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load cloud data to this device</Button>
+                    <Button onClick={saveToCloud} disabled={syncBusy}>Save this device’s data to cloud</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>No cloud data was found yet. You can save this device’s current 4Sara data to your account.</p>
+                  <div className="migration-actions">
+                    <Button onClick={saveToCloud} disabled={syncBusy}>Save this device’s data to cloud</Button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="info-box amber-box">
+              <h3>Cloud sync</h3>
+              <p>{syncStatus}</p>
+              {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
+            </div>
+
+            <label className="setting-row autosync-row">
+              <span>Auto-save changes to cloud</span>
+              <input type="checkbox" checked={autoSyncEnabled} onChange={(event) => setAutoSyncEnabled(event.target.checked)} />
+            </label>
+            {authUser && cloudCheckedForAccount && !cloudSyncAllowed && (
+              <p className="sync-paused-note">Auto-sync is paused to protect existing data. Choose Load cloud data or Save this device’s data to cloud to continue syncing.</p>
+            )}
+
+            <div className="account-actions">
+              <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
+              <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
+              <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
+            </div>
+
+            <div className="danger-zone">
+              <h3>Cloud data controls</h3>
+              <p>Delete the cloud copy of your 4Sara data from this account. This does not delete the local data saved on this device.</p>
+              {confirmDeleteCloud && (
+                <p className="danger-confirm">Confirm delete: click the button again to permanently remove the cloud copy.</p>
+              )}
+              <div className="account-actions">
+                <Button onClick={deleteCloudData} variant="secondary" disabled={syncBusy}>
+                  {confirmDeleteCloud ? "Confirm delete cloud data" : "Delete cloud data"}
+                </Button>
+                {confirmDeleteCloud && <Button onClick={() => setConfirmDeleteCloud(false)} variant="secondary">Cancel</Button>}
+              </div>
+            </div>
+
+            <div className="danger-zone account-delete-zone">
+              <h3>Delete account</h3>
+              <p>This deletes your Firebase account and the cloud copy of your 4Sara data. Local data on this device is not deleted unless you clear it separately in Privacy.</p>
+              {confirmDeleteAccount && (
+                <p className="danger-confirm">Confirm delete: click the button again to permanently delete this account. You may need to log in again first.</p>
+              )}
+              <div className="account-actions">
+                <Button onClick={deleteAccount} variant="secondary" disabled={syncBusy}>
+                  {confirmDeleteAccount ? "Confirm delete account" : "Delete account"}
+                </Button>
+                {confirmDeleteAccount && <Button onClick={() => setConfirmDeleteAccount(false)} variant="secondary">Cancel</Button>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="auth-panel">
+            <div className="auth-mode-tabs">
+              <button className={authMode === "signin" ? "active" : ""} onClick={() => setAuthMode("signin")}>Log in</button>
+              <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>Create account</button>
+            </div>
+
+            <div className="form">
+              <label>
+                <span>Email</span>
+                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
+              </label>
+
+              <label>
+                <span>Password</span>
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 symbol" />
+              </label>
+
+              {authMode === "signup" && <PasswordRequirements password={authPassword} />}
+              {authError && <p className="auth-error">{authError}</p>}
+              {authNotice && <p className="auth-notice">{authNotice}</p>}
+
+              {authMode === "signin" && (
+                <button type="button" className="link-button" onClick={handlePasswordReset}>Forgot password?</button>
+              )}
+
+              <Button onClick={handleAuthSubmit} className="full">
+                {authMode === "signup" ? "Create account" : "Log in"}
+              </Button>
+            </div>
+
+            <p className="auth-note">Create an account or log in here. Cloud syncing for entries and settings is available after login.</p>
+          </div>
+        )}
+      </Card>
+
+      <Card className="pad side-col">
+        {authUser ? (
+          <>
+            <h3>Account status</h3>
+            <div className="mini-card"><strong>Logged in</strong><p>Your account is connected as {authUser.email}.</p></div>
+            <div className="mini-card"><strong>Smart cloud loading</strong><p>If this device has no local data, cloud data loads automatically after login.</p></div>
+            <div className="mini-card"><strong>Auto-save available</strong><p>When enabled, changes save to cloud automatically after a short delay.</p></div>
+            <div className="mini-card"><strong>Manual controls remain</strong><p>You can still use Save to cloud or Load from cloud when needed.</p></div>
+            <div className="mini-card"><strong>Local backup still active</strong><p>Your browser still keeps a local copy for faster access.</p></div>
+            <div className="mini-card"><strong>Account deletion</strong><p>Deleting an account removes the Firebase account and cloud document, but local device data is separate.</p></div>
+          </>
+        ) : (
+          <>
+            <h3>What accounts unlock</h3>
+            <div className="mini-card"><strong>Device sync</strong><p>Use 4Sara on a phone, laptop, or new browser.</p></div>
+            <div className="mini-card"><strong>Safer backup</strong><p>Reduce the risk of losing data if browser storage is cleared.</p></div>
+            <div className="mini-card"><strong>Cloud controls</strong><p>Export, delete cloud data, and manage account privacy.</p></div>
+          </>
+        )}
+      </Card>
+    </main>
+  );
+}
 
 function WelcomeScreen({ onStart, onReturn }) {
   return (
@@ -1463,6 +1696,19 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
           <label><span>Flow level</span><select value={onboarding.firstFlow} onChange={(e) => setOnboarding({ ...onboarding, firstFlow: e.target.value })}><option>N/A</option><option>N/A</option><option>Light</option><option>Medium</option><option>Heavy</option><option>Spotting</option></select></label>
           <label><span>Mood</span><select value={onboarding.firstMood} onChange={(e) => setOnboarding({ ...onboarding, firstMood: e.target.value })}>{moods.map((mood) => <option key={mood}>{mood}</option>)}</select></label>
         </div>
+        <div className="consent-card">
+          <label className="consent-row">
+            <input
+              type="checkbox"
+              checked={Boolean(onboarding.consentAccepted)}
+              onChange={(e) => setOnboarding({ ...onboarding, consentAccepted: e.target.checked })}
+            />
+            <span>
+              I understand 4Sara is for wellness tracking only. Predictions are estimates and should not be used as medical advice or birth control. I understand my data may be stored locally and, if I log in, synced to cloud storage.
+            </span>
+          </label>
+        </div>
+
         <div className="two-actions">
           <Button onClick={completeOnboarding}><Save size={16} /> Create my tracker</Button>
           <Button onClick={skipOnboarding} variant="secondary">Skip setup</Button>
@@ -1828,170 +2074,132 @@ function NumberField({ label, value, onChange, placeholder, min, max }) {
   return <label className="form single"><span>{label}</span><input type="number" min={min} max={max} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></label>;
 }
 
-function PrivacyPage({ settings, setLocked, clearData, exportJson, exportCsv }) {
+function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, exportJson, exportCsv }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
-        <h2><Lock size={20} /> Privacy</h2>
-        <div className="info-box rose-box"><h3>What 4Sara stores right now</h3><p>This prototype stores menstruation entries, check-ins, symptoms, moods, notes, settings, custom symptoms, name, age, and PIN settings in this browser only using local storage.</p></div>
-        <div className="info-box purple-box"><h3>What 4Sara does not do yet</h3><p>This version does not have online accounts, cloud syncing, a shared database, app-store push notifications, or server-side storage.</p></div>
-        <div className="info-box"><h3>Privacy controls</h3><div className="actions"><Button onClick={exportJson} variant="secondary"><Download size={16} /> Backup data</Button><Button onClick={exportCsv} variant="secondary"><Download size={16} /> Spreadsheet export</Button><Button onClick={clearData} variant="secondary"><Trash2 size={16} /> Clear data</Button></div></div>
-        <div className="info-box amber-box"><h3>Before making this public</h3><p>A production version should add a real Privacy Policy, Terms of Use, secure account login, encrypted database storage, account deletion, and legal review because menstrual-cycle data is sensitive health-related information.</p></div>
-      </Card>
+        <h2><Lock size={20} /> Privacy & data</h2>
+        <p className="muted">
+          4Sara can use both local device storage and optional cloud storage. This page explains where your data is stored and how to control it.
+        </p>
 
-      <Card className="pad side-col">
-        <h3>Quick status</h3>
-        <InfoTile title="Profile" value={settings.profileName ? `${settings.profileName}${settings.profileAge ? `, ${settings.profileAge}` : ""}` : "Not set"} />
-        <InfoTile title="Storage" value="This browser only" />
-        <InfoTile title="Cloud account" value="Not active" />
-        <InfoTile title="PIN lock" value={settings.pinEnabled && settings.pin ? "Available" : "Off"} />
-        {settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}
-      </Card>
-    </main>
-  );
-}
-
-
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud }) {
-  return (
-    <main className="layout">
-      <Card className="pad main-col">
-        <h2><Mail size={20} /> Account</h2>
-
-        {authLoading ? (
-          <p className="muted">Checking account status...</p>
-        ) : authUser ? (
-          <div className="account-signed-in account-only-view">
-            <div className="account-status-card">
-              <div>
-                <p className="account-eyebrow">Signed in</p>
-                <h3>{authUser.email}</h3>
-                <p>Your account is active. Cloud sync is available for this account.</p>
-                <span className={authUser.emailVerified ? "verify-badge verified" : "verify-badge unverified"}>
-                  {authUser.emailVerified ? "Email verified" : "Email not verified"}
-                </span>
-              </div>
-            </div>
-
-            {!authUser.emailVerified && (
-              <div className="email-verification-card">
-                <h3>Confirm your email</h3>
-                <p>Please verify your email address so the account is confirmed.</p>
-                <Button onClick={handleResendVerification} variant="secondary">Resend verification email</Button>
-                {authNotice && <p className="auth-notice">{authNotice}</p>}
-                {authError && <p className="auth-error">{authError}</p>}
-              </div>
-            )}
-
-            <div className="cloud-migration-card">
-              <h3>Cloud data check</h3>
-              {!cloudCheckedForAccount ? (
-                <p>Checking for existing cloud data...</p>
-              ) : cloudHasData ? (
-                <>
-                  <p>Cloud data was found for this account{cloudUpdatedAt ? `, last updated ${new Date(cloudUpdatedAt).toLocaleString()}` : ""}.</p>
-                  <div className="migration-actions">
-                    <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load cloud data to this device</Button>
-                    <Button onClick={saveToCloud} disabled={syncBusy}>Save this device’s data to cloud</Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p>No cloud data was found yet. You can save this device’s current 4Sara data to your account.</p>
-                  <div className="migration-actions">
-                    <Button onClick={saveToCloud} disabled={syncBusy}>Save this device’s data to cloud</Button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="info-box amber-box">
-              <h3>Cloud sync</h3>
-              <p>{syncStatus}</p>
-              {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
-            </div>
-
-            <label className="setting-row autosync-row">
-              <span>Auto-save changes to cloud</span>
-              <input type="checkbox" checked={autoSyncEnabled} onChange={(event) => setAutoSyncEnabled(event.target.checked)} />
-            </label>
-
-            <div className="account-actions">
-              <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
-              <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
-              <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
-            </div>
-
-            <div className="danger-zone">
-              <h3>Cloud data controls</h3>
-              <p>Delete the cloud copy of your 4Sara data from this account. This does not delete the local data saved on this device.</p>
-              {confirmDeleteCloud && (
-                <p className="danger-confirm">Confirm delete: click the button again to permanently remove the cloud copy.</p>
-              )}
-              <div className="account-actions">
-                <Button onClick={deleteCloudData} variant="secondary" disabled={syncBusy}>
-                  {confirmDeleteCloud ? "Confirm delete cloud data" : "Delete cloud data"}
-                </Button>
-                {confirmDeleteCloud && <Button onClick={() => setConfirmDeleteCloud(false)} variant="secondary">Cancel</Button>}
-              </div>
-            </div>
+        <div className="privacy-grid">
+          <div className="privacy-info-card">
+            <h3>Local data</h3>
+            <p>Your logs, check-ins, settings, and symptoms are saved in this browser/device so the app can work quickly.</p>
+            <strong>Stored on this device</strong>
           </div>
-        ) : (
-          <div className="auth-panel">
-            <div className="auth-mode-tabs">
-              <button className={authMode === "signin" ? "active" : ""} onClick={() => setAuthMode("signin")}>Log in</button>
-              <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>Create account</button>
-            </div>
 
-            <div className="form">
-              <label>
-                <span>Email</span>
-                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
-              </label>
+          <div className="privacy-info-card">
+            <h3>Cloud data</h3>
+            <p>If you are logged in and cloud sync is enabled, 4Sara can save a copy of your data to your account so it can be used on another device.</p>
+            <strong>{authUser ? `Signed in as ${authUser.email}` : "Not signed in"}</strong>
+          </div>
+        </div>
 
-              <label>
-                <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 symbol" />
-              </label>
+        <div className="privacy-section">
+          <h3>Export your data</h3>
+          <p>Download a backup before clearing or deleting anything.</p>
+          <div className="actions">
+            <Button onClick={exportJson} variant="secondary"><Download size={16} /> Export backup JSON</Button>
+            <Button onClick={exportCsv} variant="secondary"><Download size={16} /> Export spreadsheet CSV</Button>
+          </div>
+        </div>
 
-              {authMode === "signup" && <PasswordRequirements password={authPassword} />}
+        <div className="privacy-section">
+          <h3>Cloud storage status</h3>
+          <p>{authUser ? syncStatus : "You are not logged in. Your data is currently local to this device."}</p>
+          <div className="privacy-status-row">
+            <span className={authUser ? "status-pill online" : "status-pill local"}>{authUser ? "Account connected" : "Local only"}</span>
+            {authUser && <span className={cloudHasData ? "status-pill online" : "status-pill local"}>{cloudHasData ? "Cloud data found" : "No cloud data found yet"}</span>}
+          </div>
+        </div>
 
-              {authError && <p className="auth-error">{authError}</p>}
-              {authNotice && <p className="auth-notice">{authNotice}</p>}
-
-              {authMode === "signin" && (
-                <button type="button" className="link-button" onClick={handlePasswordReset}>Forgot password?</button>
-              )}
-
-              <Button onClick={handleAuthSubmit} className="full">
-                {authMode === "signup" ? "Create account" : "Log in"}
+        {authUser && (
+          <div className="privacy-section danger-zone">
+            <h3>Delete cloud data</h3>
+            <p>This deletes the cloud copy of your 4Sara data from your account. It does not delete the local data saved on this device.</p>
+            {confirmDeleteCloud && <p className="danger-confirm">Confirm delete: click the button again to permanently remove the cloud copy.</p>}
+            <div className="actions">
+              <Button onClick={deleteCloudData} variant="secondary" disabled={syncBusy}>
+                {confirmDeleteCloud ? "Confirm delete cloud data" : "Delete cloud data"}
               </Button>
+              {confirmDeleteCloud && <Button onClick={() => setConfirmDeleteCloud(false)} variant="secondary">Cancel</Button>}
             </div>
-
-            <p className="auth-note">Create an account or log in here. Cloud syncing for entries and settings will be added after login is tested.</p>
           </div>
         )}
+
+
+        {authUser && (
+          <div className="privacy-section danger-zone account-delete-zone">
+            <h3>Delete account</h3>
+            <p>This deletes your account and cloud data. It does not delete the local data saved on this device.</p>
+            {confirmDeleteAccount && <p className="danger-confirm">Confirm delete: click the button again to permanently delete this account.</p>}
+            <div className="actions">
+              <Button onClick={deleteAccount} variant="secondary" disabled={syncBusy}>
+                {confirmDeleteAccount ? "Confirm delete account" : "Delete account"}
+              </Button>
+              {confirmDeleteAccount && <Button onClick={() => setConfirmDeleteAccount(false)} variant="secondary">Cancel</Button>}
+            </div>
+          </div>
+        )}
+
+        <div className="privacy-section legal-section">
+          <h3>Privacy Policy</h3>
+          <p>
+            4Sara is designed to help users privately track menstruation, symptoms, moods, cycle phases, and related wellness notes.
+          </p>
+          <ul>
+            <li><strong>Local data:</strong> Your entries, check-ins, symptoms, moods, and settings may be saved on this device/browser.</li>
+            <li><strong>Cloud data:</strong> If you create an account and use cloud sync, a copy of your 4Sara data may be saved to your account so it can be used across devices.</li>
+            <li><strong>Export:</strong> You can export your data as a backup file or spreadsheet.</li>
+            <li><strong>Delete:</strong> You can clear local data from this device and delete cloud data from your account.</li>
+            <li><strong>Account email:</strong> If you create an account, your email address is used for login, password reset, and account verification.</li>
+          </ul>
+          <p className="legal-note">
+            Do not enter information you do not want stored locally or synced to your account. If you are sharing a device, use your device lock and 4Sara PIN options carefully.
+          </p>
+        </div>
+
+        <div className="privacy-section legal-section">
+          <h3>Terms & Disclaimer</h3>
+          <p>
+            4Sara is a wellness tracking tool. It is not a medical device, medical provider, or emergency service.
+          </p>
+          <ul>
+            <li>Cycle phases, fertile windows, ovulation dates, and menstruation predictions are estimates only.</li>
+            <li>4Sara should not be used as birth control or as a substitute for medical advice.</li>
+            <li>Predictions may be wrong if cycles are irregular, data is missing, health changes occur, medication changes occur, pregnancy occurs, or other factors affect the cycle.</li>
+            <li>For medical concerns, severe pain, unusually heavy bleeding, pregnancy questions, or urgent symptoms, contact a qualified healthcare professional.</li>
+            <li>By using 4Sara, users are responsible for reviewing their own data and understanding that the app provides tracking and estimated insights only.</li>
+          </ul>
+          <p className="legal-note">
+            If something feels medically urgent, do not wait on the app. Seek appropriate medical care.
+          </p>
+        </div>
+
+        <div className="privacy-section danger-zone">
+          <h3>Clear local data</h3>
+          <p>This removes 4Sara data from this browser/device. It does not delete cloud data from your account.</p>
+          <Button onClick={clearData} variant="secondary">Clear local data on this device</Button>
+        </div>
       </Card>
 
       <Card className="pad side-col">
-        {authUser ? (
-          <>
-            <h3>Account status</h3>
-            <div className="mini-card"><strong>Logged in</strong><p>Your account is connected as {authUser.email}.</p></div>
-            <div className="mini-card"><strong>Auto-save available</strong><p>When enabled, changes save to cloud automatically after a short delay.</p></div>
-            <div className="mini-card"><strong>Manual controls remain</strong><p>You can still use Save to cloud or Load from cloud when needed.</p></div>
-            <div className="mini-card"><strong>Local backup still active</strong><p>Your browser still keeps a local copy for faster access.</p></div>
-            <div className="mini-card"><strong>Cloud deletion</strong><p>Deleting cloud data removes the Firebase copy but keeps this device’s local copy unless you clear local data separately.</p></div>
-          </>
-        ) : (
-          <>
-            <h3>What accounts will unlock</h3>
-            <div className="mini-card"><strong>Device sync</strong><p>Use 4Sara on a phone, laptop, or new browser.</p></div>
-            <div className="mini-card"><strong>Safer backup</strong><p>Reduce the risk of losing data if browser storage is cleared.</p></div>
-            <div className="mini-card"><strong>Cloud controls</strong><p>Next steps should include export, delete data, and privacy controls.</p></div>
-          </>
-        )}
+        <h3>Quick guide</h3>
+        <div className="mini-card"><strong>Local data</strong><p>Saved in this browser/device.</p></div>
+        <div className="mini-card"><strong>Cloud data</strong><p>Saved to your signed-in account when cloud sync is used.</p></div>
+        <div className="mini-card"><strong>Export first</strong><p>Download a backup before deleting data.</p></div>
+        <div className="mini-card"><strong>PIN lock</strong><p>Your PIN can lock this device’s app view, but it is not a substitute for your phone or account password.</p></div>
       </Card>
+
+      {settings.pinEnabled && (
+        <Card className="pad main-col">
+          <h3><KeyRound size={18} /> PIN lock</h3>
+          <p className="muted">Lock the app view on this device.</p>
+          <Button onClick={() => setLocked(true)} variant="secondary">Lock now</Button>
+        </Card>
+      )}
     </main>
   );
 }

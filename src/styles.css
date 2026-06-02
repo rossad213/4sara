@@ -1566,3 +1566,199 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .dark .password-rules li.met {
   color: #86efac;
 }
+
+
+/* Privacy tab cleanup */
+.privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.privacy-info-card,
+.privacy-section {
+  border-radius: 24px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.72);
+}
+
+.privacy-info-card h3,
+.privacy-section h3 {
+  margin: 0 0 8px;
+}
+
+.privacy-info-card p,
+.privacy-section p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.privacy-info-card strong {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.privacy-section {
+  margin-top: 14px;
+}
+
+.privacy-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.status-pill.online {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill.local {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.dark .privacy-info-card,
+.dark .privacy-section {
+  background: rgba(30,41,59,.9);
+  border-color: rgba(148,163,184,.28);
+}
+
+.dark .status-pill.online {
+  background: rgba(20,83,45,.45);
+  color: #bbf7d0;
+}
+
+.dark .status-pill.local {
+  background: rgba(15,23,42,.72);
+  color: #cbd5e1;
+}
+
+@media (max-width: 760px) {
+  .privacy-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Safe auto-load and paused auto-sync */
+.sync-paused-note {
+  margin: -4px 0 4px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dark .sync-paused-note {
+  background: rgba(120,53,15,.28);
+  border-color: rgba(251,191,36,.35);
+  color: #fde68a;
+}
+
+
+/* Delete account controls */
+.account-delete-zone {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.account-delete-zone h3 {
+  color: #7f1d1d;
+}
+
+.account-delete-zone p {
+  color: #7f1d1d;
+}
+
+.dark .account-delete-zone {
+  background: rgba(127,29,29,.26);
+  border-color: rgba(248,113,113,.42);
+}
+
+.dark .account-delete-zone h3,
+.dark .account-delete-zone p {
+  color: #fecaca;
+}
+
+
+/* Privacy Policy and Terms sections */
+.legal-section ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.legal-section li {
+  margin-bottom: 8px;
+}
+
+.legal-section strong {
+  color: var(--text);
+}
+
+.legal-note {
+  margin-top: 12px !important;
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255,241,242,.72);
+  border: 1px solid rgba(244,63,94,.18);
+  font-weight: 700;
+}
+
+.dark .legal-note {
+  background: rgba(30,41,59,.72);
+  border-color: rgba(148,163,184,.28);
+}
+
+
+/* Onboarding privacy/wellness acknowledgment */
+.consent-card {
+  border-radius: 22px;
+  padding: 14px;
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  margin: 16px 0;
+}
+
+.consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #7f1d1d;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.consent-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--rose);
+  flex: 0 0 auto;
+}
+
+.dark .consent-card {
+  background: rgba(127,29,29,.22);
+  border-color: rgba(248,113,113,.35);
+}
+
+.dark .consent-row {
+  color: #fecaca;
+}

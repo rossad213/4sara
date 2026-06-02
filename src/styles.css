@@ -990,3 +990,323 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .dark .blue-box {
   background: rgba(30,41,59,.9);
 }
+
+
+/* Onboarding optional first-entry details */
+.onboarding-optional {
+  margin-top: 4px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: #fff1f2;
+  border: 1px solid #ffe4e6;
+}
+
+.onboarding-optional p {
+  margin: 0 0 3px;
+  font-weight: 900;
+  color: #be123c;
+}
+
+.onboarding-optional small {
+  color: #64748b;
+}
+
+.dark .onboarding-optional {
+  background: rgba(30,41,59,.9);
+  border-color: rgba(148,163,184,.35);
+}
+
+.dark .onboarding-optional p {
+  color: #fecdd3;
+}
+
+.dark .onboarding-optional small {
+  color: #cbd5e1;
+}
+
+
+/* Multi-mood helper text */
+.field-help {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+
+/* 4Sara color refresh
+   Main brand/background influence: #FFF0F5
+   Palette:
+   #FFF0F5 lavender blush - main background
+   #FFB6C1 light pink - primary accent
+   #FFDAB9 peach - warm accent
+   #FFE4E1 misty rose - card tint
+   #FAEBD7 antique cream - soft highlight
+*/
+:root {
+  --bg1: #FFF0F5;
+  --bg2: #FFE4E1;
+  --bg3: #FAEBD7;
+  --text: #24151b;
+  --muted: #735866;
+  --card: rgba(255, 255, 255, .88);
+  --border: rgba(255, 182, 193, .55);
+  --rose: #d94f70;
+  --rose-dark: #a82045;
+  --soft-pink: #FFB6C1;
+  --peach: #FFDAB9;
+  --mist: #FFE4E1;
+  --cream: #FAEBD7;
+  --lavender-blush: #FFF0F5;
+}
+
+.app {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(255, 182, 193, .45), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(255, 218, 185, .58), transparent 36%),
+    radial-gradient(circle at 68% 90%, rgba(250, 235, 215, .72), transparent 42%),
+    linear-gradient(135deg, #FFF0F5 0%, #FFF0F5 42%, #FFE4E1 72%, #FAEBD7 100%);
+}
+
+.app.dark {
+  --bg1: #211019;
+  --bg2: #331724;
+  --bg3: #251b16;
+  --text: #fff8fa;
+  --muted: #efc3cf;
+  --card: rgba(39, 18, 29, .92);
+  --border: rgba(255, 182, 193, .26);
+  --rose: #ff8fa3;
+  --rose-dark: #ffc2cc;
+  --soft-pink: #ff8fa3;
+  --peach: #5b392b;
+  --mist: #4b202b;
+  --cream: #3a2b22;
+  --lavender-blush: #3a1c29;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255, 182, 193, .18), transparent 34%),
+    radial-gradient(circle at 82% 24%, rgba(255, 218, 185, .12), transparent 38%),
+    linear-gradient(135deg, #180b11 0%, #27121d 52%, #241915 100%);
+}
+
+.card,
+.welcome-shell,
+.selected-card,
+.entry,
+.summary-box,
+.info-box {
+  background: rgba(255, 255, 255, .88);
+  border-color: rgba(255, 182, 193, .50);
+}
+
+.dark .card,
+.dark .welcome-shell,
+.dark .selected-card,
+.dark .entry,
+.dark .summary-box,
+.dark .info-box {
+  background: rgba(39, 18, 29, .92);
+  border-color: rgba(255, 182, 193, .24);
+}
+
+.welcome-shell {
+  box-shadow: 0 24px 70px rgba(168, 32, 69, .10);
+}
+
+.pill,
+.brand-home-btn {
+  background: rgba(255, 240, 245, .94);
+  color: #a82045;
+  border: 1px solid rgba(255, 182, 193, .36);
+}
+
+.dark .pill,
+.dark .brand-home-btn {
+  background: rgba(39, 18, 29, .92);
+  color: #ffc2cc;
+  border-color: rgba(255, 182, 193, .24);
+}
+
+.btn {
+  background: linear-gradient(135deg, #d94f70, #a82045);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(168, 32, 69, .18);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, .94);
+  color: #4b2532;
+  border-color: rgba(255, 182, 193, .58);
+}
+
+.dark .btn-secondary {
+  background: rgba(58, 28, 41, .96);
+  color: #fff8fa;
+  border-color: rgba(255, 182, 193, .28);
+}
+
+.tabs {
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid rgba(255, 182, 193, .24);
+}
+
+.dark .tabs {
+  background: rgba(39, 18, 29, .82);
+}
+
+.tab.active {
+  background: linear-gradient(135deg, #d94f70, #a82045);
+  color: #fff;
+}
+
+.message {
+  background: rgba(255, 255, 255, .9);
+  border-color: rgba(255, 182, 193, .50);
+  color: #a82045;
+}
+
+.hero {
+  background: linear-gradient(135deg, #d94f70 0%, #ff8fa3 58%, #FFDAB9 100%);
+  color: white;
+}
+
+.stat-card,
+.tile,
+.custom-list,
+.confidence,
+.empty {
+  background: rgba(255, 228, 225, .72);
+  border-color: rgba(255, 182, 193, .45);
+}
+
+.dark .stat-card,
+.dark .tile,
+.dark .custom-list,
+.dark .confidence,
+.dark .empty {
+  background: rgba(58, 28, 41, .9);
+  border-color: rgba(255, 182, 193, .24);
+}
+
+.form input,
+.form select,
+.form textarea,
+textarea,
+input,
+select,
+.choice,
+.symptom,
+.day,
+.icon-btn {
+  border-color: rgba(255, 182, 193, .55);
+}
+
+.choice.active,
+.symptom.active {
+  background: #FFE4E1;
+  border-color: #FFB6C1;
+  color: #a82045;
+}
+
+.phase-card.rose,
+.rose-box,
+.day.period,
+.phase-preview.menstruation,
+.onboarding-optional {
+  background: #FFE4E1;
+  border-color: #FFB6C1;
+}
+
+.phase-card.sky,
+.blue-box,
+.day.follicular,
+.phase-preview.follicular {
+  background: #FFF0F5;
+  border-color: #FFB6C1;
+}
+
+.phase-card.green,
+.green-box,
+.day.fertile,
+.phase-preview.fertile,
+.phase-preview.ovulation {
+  background: #FAEBD7;
+  border-color: #FFDAB9;
+}
+
+.phase-card.amber,
+.amber-box,
+.day.luteal,
+.phase-preview.luteal {
+  background: #FFDAB9;
+  border-color: #f3c69c;
+}
+
+.phase-card.purple,
+.purple-box,
+.day.predicted {
+  background: #FFF0F5;
+  border-color: #FFB6C1;
+}
+
+.phase-card.blue {
+  background: #FFF0F5;
+  border-color: #FFB6C1;
+}
+
+.day {
+  background: rgba(255, 255, 255, .86);
+}
+
+.day.period {
+  color: #8a1639;
+}
+
+.day.predicted {
+  color: #8a1639;
+}
+
+.day.follicular {
+  color: #6f3d52;
+}
+
+.day.fertile {
+  color: #6b4a24;
+}
+
+.day.luteal {
+  color: #7a411a;
+}
+
+.chip.rose-chip {
+  background: #FFE4E1;
+  color: #a82045;
+}
+
+.chip.purple-chip,
+.chip.blue-chip,
+.chip.sky-chip {
+  background: #FFF0F5;
+  color: #8a1639;
+}
+
+.chip.green-chip,
+.chip.amber-chip {
+  background: #FAEBD7;
+  color: #6b4a24;
+}
+
+.count-row strong {
+  background: #FFE4E1;
+  color: #a82045;
+}
+
+.mini-card,
+.count-row {
+  background: rgba(255, 255, 255, .78);
+}
+
+.dark .mini-card,
+.dark .count-row {
+  background: rgba(24, 11, 17, .72);
+}

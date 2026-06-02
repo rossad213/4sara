@@ -1358,3 +1358,211 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   margin-top: 8px !important;
   color: var(--muted) !important;
 }
+
+
+/* Safe cloud loading / migration */
+.cloud-migration-card {
+  border-radius: 24px;
+  padding: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.cloud-migration-card h3 {
+  margin: 0 0 8px;
+}
+
+.cloud-migration-card p {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.migration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dark .cloud-migration-card {
+  background: rgba(30,41,59,.9);
+  border-color: rgba(148,163,184,.28);
+}
+
+
+/* Email verification and password reset */
+.auth-notice {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 800;
+  font-size: 13px;
+  margin: 0;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  color: var(--rose-dark);
+  font-weight: 900;
+  padding: 0;
+  text-align: left;
+  width: fit-content;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.verify-badge {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 10px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.verify-badge.verified {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.verify-badge.unverified {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.email-verification-card {
+  border-radius: 24px;
+  padding: 18px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  display: grid;
+  gap: 10px;
+}
+
+.email-verification-card h3 {
+  margin: 0;
+  color: #92400e;
+}
+
+.email-verification-card p {
+  margin: 0;
+  color: #92400e;
+}
+
+.dark .auth-notice {
+  background: rgba(20,83,45,.32);
+  color: #bbf7d0;
+  border-color: rgba(74,222,128,.35);
+}
+
+.dark .link-button {
+  color: #fecdd3;
+}
+
+.dark .verify-badge.verified {
+  background: rgba(20,83,45,.5);
+  color: #bbf7d0;
+}
+
+.dark .verify-badge.unverified,
+.dark .email-verification-card {
+  background: rgba(120,53,15,.28);
+  border-color: rgba(251,191,36,.35);
+  color: #fde68a;
+}
+
+.dark .email-verification-card h3,
+.dark .email-verification-card p {
+  color: #fde68a;
+}
+
+
+/* Cloud data delete controls */
+.danger-zone {
+  border-radius: 24px;
+  padding: 18px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  display: grid;
+  gap: 10px;
+}
+
+.danger-zone h3 {
+  margin: 0;
+  color: #991b1b;
+}
+
+.danger-zone p {
+  margin: 0;
+  color: #7f1d1d;
+  font-size: 14px;
+}
+
+.danger-confirm {
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  font-weight: 900;
+}
+
+.dark .danger-zone {
+  background: rgba(127,29,29,.22);
+  border-color: rgba(248,113,113,.35);
+}
+
+.dark .danger-zone h3,
+.dark .danger-zone p {
+  color: #fecaca;
+}
+
+.dark .danger-confirm {
+  background: rgba(127,29,29,.35);
+  border-color: rgba(248,113,113,.45);
+}
+
+
+/* Strong password requirements */
+.password-rules {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  margin-top: -4px;
+}
+
+.password-rules p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.password-rules ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.password-rules li.met {
+  color: #047857;
+  font-weight: 900;
+}
+
+.password-rules li.met::marker {
+  content: "✓ ";
+}
+
+.dark .password-rules {
+  background: rgba(30,41,59,.9);
+  border-color: rgba(148,163,184,.28);
+}
+
+.dark .password-rules li.met {
+  color: #86efac;
+}

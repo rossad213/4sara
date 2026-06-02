@@ -5,10 +5,13 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut
 } from "firebase/auth";
 import {
+  deleteDoc,
   doc,
   getDoc,
   getFirestore,
@@ -117,6 +120,23 @@ function toggleMoodSelection(currentMoods, mood) {
     : [...withoutNA, mood];
 
   return next.length ? next : ["N/A"];
+}
+
+function validateStrongPassword(password) {
+  const hasMinLength = password.length >= 8;
+  const hasNumber = /\d/.test(password);
+  const hasSymbol = /[^A-Za-z0-9]/.test(password);
+
+  return {
+    valid: hasMinLength && hasNumber && hasSymbol,
+    hasMinLength,
+    hasNumber,
+    hasSymbol
+  };
+}
+
+function passwordRequirementMessage() {
+  return "Password must be at least 8 characters and include at least 1 number and 1 special symbol.";
 }
 
 function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
@@ -516,11 +536,16 @@ function App() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const [syncStatus, setSyncStatus] = useState("Cloud sync is ready.");
   const [syncBusy, setSyncBusy] = useState(false);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
   const [lastCloudSave, setLastCloudSave] = useState("");
   const [cloudReady, setCloudReady] = useState(false);
+  const [cloudCheckedForAccount, setCloudCheckedForAccount] = useState(false);
+  const [cloudHasData, setCloudHasData] = useState(false);
+  const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
+  const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
   const [customSymptomInput, setCustomSymptomInput] = useState("");
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A" });
 
@@ -532,6 +557,9 @@ function App() {
       setAuthUser(user);
       setAuthLoading(false);
       setCloudReady(Boolean(user));
+      setCloudCheckedForAccount(false);
+      setCloudHasData(false);
+      setCloudUpdatedAt("");
       setSyncStatus(user ? "Signed in. Cloud sync is ready." : "Signed out. Data is saved locally on this device.");
     });
 
@@ -541,7 +569,12 @@ function App() {
   useEffect(() => { if (settings.pinEnabled && settings.pin) setLocked(true); }, []);
 
   useEffect(() => {
-    if (!authUser || !autoSyncEnabled || !cloudReady) return;
+    if (!authUser || cloudCheckedForAccount) return;
+    checkCloudDataForAccount(authUser);
+  }, [authUser, cloudCheckedForAccount]);
+
+  useEffect(() => {
+    if (!authUser || !autoSyncEnabled || !cloudReady || !cloudCheckedForAccount) return;
 
     const timer = setTimeout(() => {
       saveToCloudSilent().catch((error) => {
@@ -550,7 +583,7 @@ function App() {
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [entries, settings, authUser, autoSyncEnabled, cloudReady]);
+  }, [entries, settings, authUser, autoSyncEnabled, cloudReady, cloudCheckedForAccount]);
 
 
   const updateSettings = (patch) => setSettings((current) => ({ ...current, ...patch }));
@@ -567,29 +600,105 @@ function App() {
 
   const handleAuthSubmit = async () => {
     setAuthError("");
+    setAuthNotice("");
 
     if (!authEmail.trim()) {
       setAuthError("Enter an email address.");
       return;
     }
 
-    if (!authPassword || authPassword.length < 6) {
-      setAuthError("Password must be at least 6 characters.");
+    if (authMode === "signup") {
+      const passwordCheck = validateStrongPassword(authPassword || "");
+      if (!passwordCheck.valid) {
+        setAuthError(passwordRequirementMessage());
+        return;
+      }
+    } else if (!authPassword) {
+      setAuthError("Enter your password.");
       return;
     }
 
     try {
       if (authMode === "signup") {
-        await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
-        showMessage("Account created. Cloud sync will be added in the next phase.");
+        const credential = await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+        await sendEmailVerification(credential.user);
+        setAuthNotice("Account created. A verification email was sent. Please check your inbox.");
+        showMessage("Account created. Verification email sent.");
       } else {
         await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
-        showMessage("Signed in. Cloud sync will be added in the next phase.");
+        setAuthNotice("Signed in successfully.");
+        showMessage("Signed in.");
       }
 
       setAuthPassword("");
     } catch (error) {
       setAuthError(error.message?.replace("Firebase: ", "") || "Authentication failed.");
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setAuthError("");
+    setAuthNotice("");
+
+    if (!authEmail.trim()) {
+      setAuthError("Enter your email address first, then click Forgot password.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, authEmail.trim());
+      setAuthNotice("Password reset email sent. Check your inbox.");
+      showMessage("Password reset email sent.");
+    } catch (error) {
+      setAuthError(error.message?.replace("Firebase: ", "") || "Could not send password reset email.");
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setAuthError("");
+    setAuthNotice("");
+
+    if (!auth.currentUser) {
+      setAuthError("Log in first to resend verification.");
+      return;
+    }
+
+    try {
+      await sendEmailVerification(auth.currentUser);
+      setAuthNotice("Verification email sent again. Check your inbox.");
+      showMessage("Verification email sent.");
+    } catch (error) {
+      setAuthError(error.message?.replace("Firebase: ", "") || "Could not send verification email.");
+    }
+  };
+
+  const deleteCloudData = async () => {
+    if (!authUser) {
+      showMessage("Log in first to delete cloud data.");
+      return;
+    }
+
+    if (!confirmDeleteCloud) {
+      setConfirmDeleteCloud(true);
+      setSyncStatus("Click Delete cloud data again to confirm.");
+      return;
+    }
+
+    setSyncBusy(true);
+    setSyncStatus("Deleting cloud data...");
+
+    try {
+      await deleteDoc(doc(db, "users", authUser.uid));
+      setCloudHasData(false);
+      setCloudUpdatedAt("");
+      setConfirmDeleteCloud(false);
+      setSyncStatus("Cloud data deleted. Local data on this device was not deleted.");
+      showMessage("Cloud data deleted.");
+    } catch (error) {
+      setSyncStatus("Cloud delete failed.");
+      showMessage(error.message || "Cloud delete failed.");
+    } finally {
+      setSyncBusy(false);
     }
   };
 
@@ -607,6 +716,31 @@ function App() {
     },
     updatedAt: new Date().toISOString()
   });
+
+  const checkCloudDataForAccount = async (user = auth.currentUser) => {
+    if (!user) return;
+
+    try {
+      const snapshot = await getDoc(doc(db, "users", user.uid));
+
+      if (snapshot.exists()) {
+        const cloudData = snapshot.data()?.data || {};
+        setCloudHasData(Boolean(Array.isArray(cloudData.entries) && cloudData.entries.length));
+        setCloudUpdatedAt(cloudData.updatedAt || "");
+        setSyncStatus("Cloud data found. Choose whether to load it or keep this device’s data.");
+      } else {
+        setCloudHasData(false);
+        setCloudUpdatedAt("");
+        setSyncStatus("No cloud data found yet. You can save this device’s data to cloud.");
+      }
+
+      setCloudCheckedForAccount(true);
+    } catch (error) {
+      setSyncStatus(error.message || "Could not check cloud data.");
+      setCloudCheckedForAccount(true);
+    }
+  };
+
 
   const saveToCloudSilent = async () => {
     if (!auth.currentUser) return;
@@ -626,6 +760,7 @@ function App() {
 
     const savedTime = new Date().toLocaleTimeString();
     setLastCloudSave(savedTime);
+    setCloudHasData(true);
     setSyncStatus(`Auto-saved to cloud at ${savedTime}.`);
   };
 
@@ -647,6 +782,8 @@ function App() {
 
       const savedTime = new Date().toLocaleTimeString();
       setLastCloudSave(savedTime);
+      setCloudCheckedForAccount(true);
+      setCloudHasData(true);
       setSyncStatus(`Saved to cloud at ${savedTime}.`);
       showMessage("Saved to cloud.");
     } catch (error) {
@@ -687,6 +824,8 @@ function App() {
         pinEnabled: current.pinEnabled
       }));
 
+      setCloudCheckedForAccount(true);
+      setCloudHasData(true);
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}.`);
       showMessage("Loaded cloud data.");
     } catch (error) {
@@ -1085,7 +1224,9 @@ function App() {
           authPassword={authPassword}
           setAuthPassword={setAuthPassword}
           authError={authError}
+          authNotice={authNotice}
           handleAuthSubmit={handleAuthSubmit}
+          handlePasswordReset={handlePasswordReset}
           onContinue={() => updateSettings({ accountPromptSeen: true })}
         />
       </div>
@@ -1150,7 +1291,7 @@ function App() {
             {activeTab === "insights" && <Insights stats={stats} settings={settings} setLocked={setLocked} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} handleAuthSubmit={handleAuthSubmit} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} />}
             {activeTab === "mobile" && <MobileSetupPage />}
           </motion.div>
         </AnimatePresence>
@@ -1208,7 +1349,23 @@ function WelcomeScreen({ onStart, onReturn }) {
 }
 
 
-function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, handleAuthSubmit, onContinue }) {
+
+function PasswordRequirements({ password }) {
+  const result = validateStrongPassword(password || "");
+
+  return (
+    <div className="password-rules">
+      <p>Password requirements:</p>
+      <ul>
+        <li className={result.hasMinLength ? "met" : ""}>At least 8 characters</li>
+        <li className={result.hasNumber ? "met" : ""}>At least 1 number</li>
+        <li className={result.hasSymbol ? "met" : ""}>At least 1 special symbol</li>
+      </ul>
+    </div>
+  );
+}
+
+function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, onContinue }) {
   useEffect(() => {
     if (authUser) {
       const timer = setTimeout(() => onContinue(), 900);
@@ -1253,10 +1410,17 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" />
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 symbol" />
               </label>
 
+              {authMode === "signup" && <PasswordRequirements password={authPassword} />}
+
               {authError && <p className="auth-error">{authError}</p>}
+              {authNotice && <p className="auth-notice">{authNotice}</p>}
+
+              {authMode === "signin" && (
+                <button type="button" className="link-button" onClick={handlePasswordReset}>Forgot password?</button>
+              )}
 
               <div className="welcome-actions">
                 <Button onClick={handleAuthSubmit}>
@@ -1688,7 +1852,7 @@ function PrivacyPage({ settings, setLocked, clearData, exportJson, exportCsv }) 
 }
 
 
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, handleAuthSubmit, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave }) {
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -1702,8 +1866,43 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <div>
                 <p className="account-eyebrow">Signed in</p>
                 <h3>{authUser.email}</h3>
-                <p>Your account is active. Cloud sync will be added in the next phase.</p>
+                <p>Your account is active. Cloud sync is available for this account.</p>
+                <span className={authUser.emailVerified ? "verify-badge verified" : "verify-badge unverified"}>
+                  {authUser.emailVerified ? "Email verified" : "Email not verified"}
+                </span>
               </div>
+            </div>
+
+            {!authUser.emailVerified && (
+              <div className="email-verification-card">
+                <h3>Confirm your email</h3>
+                <p>Please verify your email address so the account is confirmed.</p>
+                <Button onClick={handleResendVerification} variant="secondary">Resend verification email</Button>
+                {authNotice && <p className="auth-notice">{authNotice}</p>}
+                {authError && <p className="auth-error">{authError}</p>}
+              </div>
+            )}
+
+            <div className="cloud-migration-card">
+              <h3>Cloud data check</h3>
+              {!cloudCheckedForAccount ? (
+                <p>Checking for existing cloud data...</p>
+              ) : cloudHasData ? (
+                <>
+                  <p>Cloud data was found for this account{cloudUpdatedAt ? `, last updated ${new Date(cloudUpdatedAt).toLocaleString()}` : ""}.</p>
+                  <div className="migration-actions">
+                    <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load cloud data to this device</Button>
+                    <Button onClick={saveToCloud} disabled={syncBusy}>Save this device’s data to cloud</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>No cloud data was found yet. You can save this device’s current 4Sara data to your account.</p>
+                  <div className="migration-actions">
+                    <Button onClick={saveToCloud} disabled={syncBusy}>Save this device’s data to cloud</Button>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="info-box amber-box">
@@ -1722,6 +1921,20 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
               <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
             </div>
+
+            <div className="danger-zone">
+              <h3>Cloud data controls</h3>
+              <p>Delete the cloud copy of your 4Sara data from this account. This does not delete the local data saved on this device.</p>
+              {confirmDeleteCloud && (
+                <p className="danger-confirm">Confirm delete: click the button again to permanently remove the cloud copy.</p>
+              )}
+              <div className="account-actions">
+                <Button onClick={deleteCloudData} variant="secondary" disabled={syncBusy}>
+                  {confirmDeleteCloud ? "Confirm delete cloud data" : "Delete cloud data"}
+                </Button>
+                {confirmDeleteCloud && <Button onClick={() => setConfirmDeleteCloud(false)} variant="secondary">Cancel</Button>}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="auth-panel">
@@ -1738,10 +1951,17 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="At least 6 characters" />
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 symbol" />
               </label>
 
+              {authMode === "signup" && <PasswordRequirements password={authPassword} />}
+
               {authError && <p className="auth-error">{authError}</p>}
+              {authNotice && <p className="auth-notice">{authNotice}</p>}
+
+              {authMode === "signin" && (
+                <button type="button" className="link-button" onClick={handlePasswordReset}>Forgot password?</button>
+              )}
 
               <Button onClick={handleAuthSubmit} className="full">
                 {authMode === "signup" ? "Create account" : "Log in"}
@@ -1761,6 +1981,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
             <div className="mini-card"><strong>Auto-save available</strong><p>When enabled, changes save to cloud automatically after a short delay.</p></div>
             <div className="mini-card"><strong>Manual controls remain</strong><p>You can still use Save to cloud or Load from cloud when needed.</p></div>
             <div className="mini-card"><strong>Local backup still active</strong><p>Your browser still keeps a local copy for faster access.</p></div>
+            <div className="mini-card"><strong>Cloud deletion</strong><p>Deleting cloud data removes the Firebase copy but keeps this device’s local copy unless you clear local data separately.</p></div>
           </>
         ) : (
           <>

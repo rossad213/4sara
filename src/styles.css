@@ -1032,3 +1032,134 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   color: var(--muted);
   font-size: 12px;
 }
+
+
+/* Enhanced calendar selected-date details */
+.selected-card-enhanced {
+  align-items: stretch;
+}
+
+.selected-main {
+  flex: 1 1 520px;
+}
+
+.selected-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.selected-detail-grid div {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.68);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+
+.dark .selected-detail-grid div {
+  background: rgba(30,41,59,.72);
+  border-color: rgba(148,163,184,.28);
+}
+
+.selected-detail-grid span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 4px;
+}
+
+.selected-detail-grid strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.phase-meaning {
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255,241,242,.72);
+  color: #475569;
+  margin: 10px 0 0;
+  font-size: 14px;
+}
+
+.dark .phase-meaning {
+  background: rgba(30,41,59,.72);
+  color: #cbd5e1;
+}
+
+.selected-actions {
+  flex: 0 0 240px;
+  align-content: flex-start;
+}
+
+.future-note {
+  margin: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.dark .future-note {
+  background: rgba(30,41,59,.9);
+  color: #cbd5e1;
+}
+
+@media (max-width: 700px) {
+  .selected-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .selected-actions {
+    flex: 1 1 100%;
+  }
+}
+
+
+/* Ovulation should have its own distinct calendar color */
+.day.ovulation {
+  background: #dcfce7;
+  border-color: #22c55e;
+  color: #14532d;
+  box-shadow: inset 0 0 0 2px rgba(34, 197, 94, .18);
+}
+
+.day.ovulation small {
+  color: #14532d;
+  font-weight: 900;
+}
+
+.dark .day.ovulation {
+  background: rgba(20, 83, 45, .72);
+  border-color: rgba(74, 222, 128, .72);
+  color: #dcfce7;
+  box-shadow: inset 0 0 0 2px rgba(74, 222, 128, .18);
+}
+
+.dark .day.ovulation small {
+  color: #dcfce7;
+}
+
+
+/* Ovulation uses the same color family as fertile days */
+.day.ovulation {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+  box-shadow: none;
+}
+
+.dark .day.ovulation {
+  background: rgba(30,41,59,.9);
+  border-color: rgba(148,163,184,.3);
+  color: #f8fafc;
+  box-shadow: none;
+}

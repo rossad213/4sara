@@ -177,6 +177,30 @@ function phaseDescription(phase) {
   }
 }
 
+function getCycleDayForDate(dateKey, lastPeriodStart, avgCycle) {
+  if (!dateKey || !lastPeriodStart || !avgCycle) return null;
+
+  let start = lastPeriodStart;
+  let guard = 0;
+
+  while (daysBetween(start, dateKey) >= avgCycle && guard < 60) {
+    start = addDays(start, avgCycle);
+    guard += 1;
+  }
+
+  while (daysBetween(start, dateKey) < 0 && guard < 120) {
+    start = addDays(start, -avgCycle);
+    guard += 1;
+  }
+
+  const day = daysBetween(start, dateKey) + 1;
+  return day > 0 && day <= avgCycle ? day : null;
+}
+
+function isFutureDate(dateKey) {
+  return daysBetween(todayKey(), dateKey) > 0;
+}
+
 function suggestionFor(symptom, phase = "your cycle") {
   const s = symptom.toLowerCase();
   const p = phase === "Unknown" || phase === "your cycle" ? "your cycle" : `the ${phase.toLowerCase()} phase`;
@@ -646,7 +670,10 @@ function App() {
         isFollicular,
         isLuteal,
         phaseLabel: phase,
-        phaseDescription: phaseDescription(phase)
+        phaseDescription: phaseDescription(phase),
+        cycleDay: getCycleDayForDate(key, stats.last?.startDate, stats.averageCycle),
+        isFuture: isFutureDate(key),
+        statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
   }, [calendarDate, entries, projectedPhaseMap]);
@@ -716,6 +743,7 @@ function App() {
 
   const saveEntry = () => {
     if (!form.startDate) return showMessage("Start date is required.");
+    if (isFutureDate(form.startDate)) return showMessage("Future dates are prediction-only. Choose today or a past date to log.");
     if (form.type === "period" && form.endDate && daysBetween(form.startDate, form.endDate) < 0) return showMessage("End date cannot be before start date.");
 
     const selectedMoods = Array.isArray(form.moods) && form.moods.length ? form.moods : normalizeMoods(form);
@@ -777,6 +805,7 @@ function App() {
 
   const startLogForSelectedDate = (dateKey = selectedCalendarDay, type = "period") => {
     if (!dateKey) return showMessage("Select a calendar date first.");
+    if (isFutureDate(dateKey)) return showMessage("Future dates are prediction-only. You can log this date once it arrives.");
     setForm({ ...blankForm(), type, startDate: dateKey, endDate: "" });
     setEditingId(null);
     setActiveTab("log");
@@ -1071,7 +1100,7 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
 
         <div className="calendar-grid">
           {calendarData.map((day) => (
-            <button key={day.key} disabled={day.empty} onClick={() => !day.empty && onDayClick(day.dateKey)} className={`day ${day.empty ? "empty" : ""} ${day.entry ? "period" : ""} ${!day.entry && day.isPredicted ? "predicted" : ""} ${!day.entry && !day.isPredicted && day.isFertile ? "fertile" : ""} ${day.isFollicular ? "follicular" : ""} ${day.isLuteal ? "luteal" : ""} ${day.isToday ? "today-outline" : ""} ${selectedCalendarDay === day.dateKey ? "selected" : ""}`}>
+            <button key={day.key} disabled={day.empty} onClick={() => !day.empty && onDayClick(day.dateKey)} className={`day ${day.empty ? "empty" : ""} ${day.entry ? "period" : ""} ${!day.entry && day.isPredicted ? "predicted" : ""} ${!day.entry && !day.isPredicted && (day.isFertile || day.isOvulation) ? "fertile" : ""} ${day.isFollicular ? "follicular" : ""} ${day.isLuteal ? "luteal" : ""} ${day.isToday ? "today-outline" : ""} ${selectedCalendarDay === day.dateKey ? "selected" : ""}`}>
               {!day.empty && <>
                 <b>{day.dayNumber}</b>
                 {day.entry && <small>Menstruation</small>}
@@ -1087,10 +1116,28 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
         </div>
 
         {selectedDay && !selectedDay.empty && (
-          <div className="selected-card">
-            <div>
+          <div className="selected-card selected-card-enhanced">
+            <div className="selected-main">
               <p className="muted">Selected date</p>
               <h3>{formatDate(selectedCalendarDay)}</h3>
+
+              <div className="selected-detail-grid">
+                <div>
+                  <span>Estimated phase</span>
+                  <strong>{selectedDay.phaseLabel || "Unknown"}</strong>
+                </div>
+                <div>
+                  <span>Cycle day</span>
+                  <strong>{selectedDay.cycleDay ? `Day ${selectedDay.cycleDay}` : "Not enough data"}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>{selectedDay.statusLabel}</strong>
+                </div>
+              </div>
+
+              <p className="phase-meaning">{selectedDay.phaseDescription || "Add more cycle data to estimate this day."}</p>
+
               <div className="chips">
                 {selectedDay.entry && <span className="chip rose-chip">Menstruation day</span>}
                 {!selectedDay.entry && selectedDay.isPredicted && <span className="chip purple-chip">Predicted menstruation</span>}
@@ -1100,13 +1147,22 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
                 {selectedDay.isOvulation && <span className="chip green-chip">Estimated ovulation</span>}
                 {selectedDay.checkIns?.length > 0 && <span className="chip blue-chip">Daily check-in saved</span>}
                 {selectedDay.isToday && <span className="chip gray-chip">Today</span>}
+                {selectedDay.isFuture && <span className="chip gray-chip">Future date</span>}
                 {!selectedDay.phaseLabel && !selectedDay.isToday && (!selectedDay.checkIns || !selectedDay.checkIns.length) && <span className="chip gray-chip">No details yet</span>}
               </div>
+
               <p className="phase-tip">Phase labels are estimates based on the last menstruation date, average cycle length, and predicted ovulation. Timing can shift.</p>
             </div>
-            <div className="actions">
-              <Button onClick={() => onLogSelectedDate(selectedCalendarDay, "period")}><Plus size={16} /> Log menstruation</Button>
-              <Button onClick={() => onLogSelectedDate(selectedCalendarDay, "checkin")} variant="secondary"><Smile size={16} /> Daily check-in</Button>
+
+            <div className="actions selected-actions">
+              {selectedDay.isFuture ? (
+                <p className="future-note">Future dates show predictions only. You can log menstruation or daily check-ins once the date arrives.</p>
+              ) : (
+                <>
+                  <Button onClick={() => onLogSelectedDate(selectedCalendarDay, "period")}><Plus size={16} /> Log menstruation</Button>
+                  <Button onClick={() => onLogSelectedDate(selectedCalendarDay, "checkin")} variant="secondary"><Smile size={16} /> Daily check-in</Button>
+                </>
+              )}
             </div>
           </div>
         )}

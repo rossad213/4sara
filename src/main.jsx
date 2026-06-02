@@ -125,19 +125,23 @@ function toggleMoodSelection(currentMoods, mood) {
 
 function validateStrongPassword(password) {
   const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
   const hasNumber = /\d/.test(password);
-  const hasSymbol = /[^A-Za-z0-9]/.test(password);
+  const hasSpecialCharacter = /[^A-Za-z0-9]/.test(password);
 
   return {
-    valid: hasMinLength && hasNumber && hasSymbol,
+    valid: hasMinLength && hasUppercase && hasLowercase && hasNumber && hasSpecialCharacter,
     hasMinLength,
+    hasUppercase,
+    hasLowercase,
     hasNumber,
-    hasSymbol
+    hasSpecialCharacter
   };
 }
 
 function passwordRequirementMessage() {
-  return "Password must be at least 8 characters and include at least 1 number and 1 special character.";
+  return "Password must be at least 8 characters and include at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.";
 }
 
 function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
@@ -1338,6 +1342,7 @@ function App() {
                 <span>4Sara</span>
               </button>
               <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
+              <CloudStatusBadge authUser={authUser} autoSyncEnabled={autoSyncEnabled} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} syncBusy={syncBusy} lastCloudSave={lastCloudSave} />
             </div>
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
             <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
@@ -1489,7 +1494,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 special character" />
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}
@@ -1532,6 +1537,31 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
       </Card>
     </main>
   );
+}
+
+
+function CloudStatusBadge({ authUser, autoSyncEnabled, cloudCheckedForAccount, cloudSyncAllowed, syncBusy, lastCloudSave }) {
+  let label = "Local only";
+  let className = "local";
+
+  if (authUser && syncBusy) {
+    label = "Saving...";
+    className = "saving";
+  } else if (authUser && cloudCheckedForAccount && !cloudSyncAllowed) {
+    label = "Auto-sync paused";
+    className = "paused";
+  } else if (authUser && autoSyncEnabled && lastCloudSave) {
+    label = `Synced ${lastCloudSave}`;
+    className = "synced";
+  } else if (authUser && autoSyncEnabled) {
+    label = "Cloud connected";
+    className = "connected";
+  } else if (authUser) {
+    label = "Cloud connected, auto-sync off";
+    className = "paused";
+  }
+
+  return <span className={`cloud-status-badge ${className}`}>{label}</span>;
 }
 
 function WelcomeScreen({ onStart, onReturn }) {
@@ -1591,8 +1621,10 @@ function PasswordRequirements({ password }) {
       <p>Password requirements:</p>
       <ul>
         <li className={result.hasMinLength ? "met" : ""}>At least 8 characters</li>
+        <li className={result.hasUppercase ? "met" : ""}>At least 1 uppercase letter</li>
+        <li className={result.hasLowercase ? "met" : ""}>At least 1 lowercase letter</li>
         <li className={result.hasNumber ? "met" : ""}>At least 1 number</li>
-        <li className={result.hasSymbol ? "met" : ""}>At least 1 special character</li>
+        <li className={result.hasSpecialCharacter ? "met" : ""}>At least 1 special character</li>
       </ul>
     </div>
   );
@@ -1643,7 +1675,7 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ characters, 1 number, 1 special character" />
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}

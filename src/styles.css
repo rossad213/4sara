@@ -1335,3 +1335,26 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .dark .account-status-card p {
   color: #bbf7d0;
 }
+
+
+/* Cloud sync controls */
+.account-actions .btn {
+  min-width: 150px;
+}
+
+.account-actions .btn:disabled {
+  opacity: .62;
+  cursor: not-allowed;
+}
+
+
+/* Auto-sync controls */
+.autosync-row {
+  margin-top: 0;
+}
+
+.sync-small {
+  font-size: 12px !important;
+  margin-top: 8px !important;
+  color: var(--muted) !important;
+}

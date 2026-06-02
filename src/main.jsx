@@ -8,6 +8,13 @@ import {
   signInWithEmailAndPassword,
   signOut
 } from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  getFirestore,
+  serverTimestamp,
+  setDoc
+} from "firebase/firestore";
 import { createRoot } from "react-dom/client";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -31,6 +38,7 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 
 
 const demoEntries = [
@@ -508,6 +516,11 @@ function App() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [syncStatus, setSyncStatus] = useState("Cloud sync is ready.");
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [lastCloudSave, setLastCloudSave] = useState("");
+  const [cloudReady, setCloudReady] = useState(false);
   const [customSymptomInput, setCustomSymptomInput] = useState("");
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A" });
 
@@ -518,12 +531,27 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
       setAuthLoading(false);
+      setCloudReady(Boolean(user));
+      setSyncStatus(user ? "Signed in. Cloud sync is ready." : "Signed out. Data is saved locally on this device.");
     });
 
     return unsubscribe;
   }, []);
 
   useEffect(() => { if (settings.pinEnabled && settings.pin) setLocked(true); }, []);
+
+  useEffect(() => {
+    if (!authUser || !autoSyncEnabled || !cloudReady) return;
+
+    const timer = setTimeout(() => {
+      saveToCloudSilent().catch((error) => {
+        setSyncStatus(error.message || "Auto-sync failed.");
+      });
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [entries, settings, authUser, autoSyncEnabled, cloudReady]);
+
 
   const updateSettings = (patch) => setSettings((current) => ({ ...current, ...patch }));
 
@@ -567,7 +595,106 @@ function App() {
 
   const handleSignOut = async () => {
     await signOut(auth);
+    setSyncStatus("Signed out. Data is saved locally on this device.");
     showMessage("Signed out.");
+  };
+
+  const buildCloudPayload = () => ({
+    entries,
+    settings: {
+      ...settings,
+      pin: ""
+    },
+    updatedAt: new Date().toISOString()
+  });
+
+  const saveToCloudSilent = async () => {
+    if (!auth.currentUser) return;
+
+    await setDoc(doc(db, "users", auth.currentUser.uid), {
+      email: auth.currentUser.email,
+      data: {
+        entries,
+        settings: {
+          ...settings,
+          pin: ""
+        },
+        updatedAt: new Date().toISOString()
+      },
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    const savedTime = new Date().toLocaleTimeString();
+    setLastCloudSave(savedTime);
+    setSyncStatus(`Auto-saved to cloud at ${savedTime}.`);
+  };
+
+  const saveToCloud = async () => {
+    if (!authUser) {
+      showMessage("Log in first to save data to cloud.");
+      return;
+    }
+
+    setSyncBusy(true);
+    setSyncStatus("Saving to cloud...");
+
+    try {
+      await setDoc(doc(db, "users", authUser.uid), {
+        email: authUser.email,
+        data: buildCloudPayload(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      const savedTime = new Date().toLocaleTimeString();
+      setLastCloudSave(savedTime);
+      setSyncStatus(`Saved to cloud at ${savedTime}.`);
+      showMessage("Saved to cloud.");
+    } catch (error) {
+      setSyncStatus("Cloud save failed.");
+      showMessage(error.message || "Cloud save failed.");
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  const loadFromCloud = async () => {
+    if (!authUser) {
+      showMessage("Log in first to load cloud data.");
+      return;
+    }
+
+    setSyncBusy(true);
+    setSyncStatus("Loading from cloud...");
+
+    try {
+      const snapshot = await getDoc(doc(db, "users", authUser.uid));
+
+      if (!snapshot.exists()) {
+        setSyncStatus("No cloud data found for this account yet.");
+        showMessage("No cloud data found yet.");
+        return;
+      }
+
+      const cloudData = snapshot.data()?.data || {};
+      const cloudEntries = Array.isArray(cloudData.entries) ? cloudData.entries : [];
+      const cloudSettings = cloudData.settings || {};
+
+      setEntries(cloudEntries);
+      setSettings((current) => ({
+        ...current,
+        ...cloudSettings,
+        pin: current.pin,
+        pinEnabled: current.pinEnabled
+      }));
+
+      setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}.`);
+      showMessage("Loaded cloud data.");
+    } catch (error) {
+      setSyncStatus("Cloud load failed.");
+      showMessage(error.message || "Cloud load failed.");
+    } finally {
+      setSyncBusy(false);
+    }
   };
 
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)), [entries]);
@@ -1023,7 +1150,7 @@ function App() {
             {activeTab === "insights" && <Insights stats={stats} settings={settings} setLocked={setLocked} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} handleAuthSubmit={handleAuthSubmit} handleSignOut={handleSignOut} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} handleAuthSubmit={handleAuthSubmit} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} />}
             {activeTab === "mobile" && <MobileSetupPage />}
           </motion.div>
         </AnimatePresence>
@@ -1561,7 +1688,7 @@ function PrivacyPage({ settings, setLocked, clearData, exportJson, exportCsv }) 
 }
 
 
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, handleAuthSubmit, handleSignOut }) {
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, handleAuthSubmit, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -1580,11 +1707,19 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
             </div>
 
             <div className="info-box amber-box">
-              <h3>Cloud sync is not active yet</h3>
-              <p>This phase adds login only. Your 4Sara data is still saved on this device until cloud sync is added in the next update.</p>
+              <h3>Cloud sync</h3>
+              <p>{syncStatus}</p>
+              {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
             </div>
 
+            <label className="setting-row autosync-row">
+              <span>Auto-save changes to cloud</span>
+              <input type="checkbox" checked={autoSyncEnabled} onChange={(event) => setAutoSyncEnabled(event.target.checked)} />
+            </label>
+
             <div className="account-actions">
+              <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
+              <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
               <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
             </div>
           </div>
@@ -1623,8 +1758,9 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
           <>
             <h3>Account status</h3>
             <div className="mini-card"><strong>Logged in</strong><p>Your account is connected as {authUser.email}.</p></div>
-            <div className="mini-card"><strong>Local data still active</strong><p>Your current cycle data remains on this device until cloud sync is added.</p></div>
-            <div className="mini-card"><strong>Next step</strong><p>Cloud sync will connect your entries and settings to this account.</p></div>
+            <div className="mini-card"><strong>Auto-save available</strong><p>When enabled, changes save to cloud automatically after a short delay.</p></div>
+            <div className="mini-card"><strong>Manual controls remain</strong><p>You can still use Save to cloud or Load from cloud when needed.</p></div>
+            <div className="mini-card"><strong>Local backup still active</strong><p>Your browser still keeps a local copy for faster access.</p></div>
           </>
         ) : (
           <>

@@ -10,7 +10,8 @@
     "react": "latest",
     "react-dom": "latest",
     "framer-motion": "latest",
-    "lucide-react": "latest"
+    "lucide-react": "latest",
+    "firebase": "latest"
   },
   "devDependencies": {}
 }

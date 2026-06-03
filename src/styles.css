@@ -2190,3 +2190,9 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   background: rgba(30,41,59,.85);
   border-color: rgba(148,163,184,.28);
 }
+
+
+/* Shared profile name separation */
+.shared-profile-list .mini-card strong {
+  word-break: break-word;
+}

@@ -549,6 +549,19 @@ class AppErrorBoundary extends React.Component {
 
 
 
+
+function getOwnDisplayName(settings, authUser) {
+  return settings?.profileName?.trim() || authUser?.email || "My 4Sara";
+}
+
+function getSharedDisplayName(ownerSettings, ownerDoc, fallbackProfile) {
+  return ownerSettings?.profileName?.trim()
+    || ownerDoc?.data?.settings?.profileName?.trim()
+    || fallbackProfile?.displayName
+    || fallbackProfile?.ownerEmail
+    || "Shared 4Sara";
+}
+
 function daysUntilDate(dateString) {
   if (!dateString) return null;
   return Math.ceil((new Date(dateString) - new Date()) / 86400000);
@@ -857,7 +870,11 @@ function App() {
   }, [inviteToken]);
 
   useEffect(() => {
-    if (viewMode !== "support") return;
+    if (viewMode !== "support") {
+      setSharedSupportData(null);
+      setSharedSupportStatus("");
+      return;
+    }
 
     if (!selectedSharedOwnerId) {
       setSharedSupportData(null);
@@ -993,9 +1010,11 @@ function App() {
       const ownerSettings = ownerData.settings || {};
       const profile = sharedProfiles?.[ownerUserId] || {};
 
+      const resolvedDisplayName = getSharedDisplayName(ownerSettings, ownerDoc, profile);
+
       setSharedSupportData({
         ownerUserId,
-        displayName: profile.displayName || ownerSettings.profileName || ownerDoc.ownerDisplayName || "Shared 4Sara",
+        displayName: resolvedDisplayName,
         entries: ownerEntries,
         settings: {
           ...defaultSettings,
@@ -1003,6 +1022,19 @@ function App() {
         },
         permissions: profile.permissions || {},
         updatedAt: ownerData.updatedAt || ownerDoc.updatedAt || ""
+      });
+
+      setSharedProfiles((current) => {
+        const existing = current?.[ownerUserId] || {};
+        if (existing.displayName === resolvedDisplayName) return current;
+        return {
+          ...(current || {}),
+          [ownerUserId]: {
+            ...existing,
+            ownerUserId,
+            displayName: resolvedDisplayName
+          }
+        };
       });
 
       setSharedSupportStatus("Shared Support View loaded.");
@@ -1117,7 +1149,7 @@ function App() {
 
     try {
       const token = makeInviteToken();
-      const ownerDisplayName = settings.profileName || authUser.email || "4Sara user";
+      const ownerDisplayName = getOwnDisplayName(settings, authUser);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       await setDoc(doc(db, "supportInvites", token), {
@@ -1240,7 +1272,7 @@ function App() {
       const acceptedAt = new Date().toISOString();
       const sharedProfile = {
         ownerUserId: invite.ownerUserId,
-        displayName: invite.ownerDisplayName || "Shared 4Sara",
+        displayName: invite.ownerDisplayName || invite.ownerEmail || "Shared 4Sara",
         role: "viewer",
         permissions: invite.permissions || {},
         acceptedAt
@@ -1675,8 +1707,8 @@ function App() {
   }, [form.startDate, projectedPhaseMap, entries, stats.averageCycle, stats.averagePeriod]);
 
 
-  const supportEntries = sharedSupportData?.entries || entries;
-  const supportSettings = sharedSupportData?.settings || settings;
+  const supportEntries = selectedSharedOwnerId && sharedSupportData ? sharedSupportData.entries : entries;
+  const supportSettings = selectedSharedOwnerId && sharedSupportData ? sharedSupportData.settings : settings;
   const supportStats = useMemo(() => calculateStatsForEntries(supportEntries, supportSettings), [supportEntries, supportSettings]);
   const supportCalendarDate = calendarDate;
   const supportCalendarData = useMemo(() => {
@@ -2234,7 +2266,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                 </div>
               )}
 
-              <p className="auth-note">Use My Support View to preview what supporters can see. Shared Support Views are read-only profiles that other users have shared with you, and you can remove them from your account anytime.</p>
+              <p className="auth-note">Use My Support View to preview what supporters can see. Shared Support View names come from the owner’s profile name, and you can remove shared views from your account anytime.</p>
             </div>
 
             <div className="support-sharing-card">

@@ -2006,3 +2006,84 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   border-color: rgba(148,163,184,.28);
   color: #f8fafc;
 }
+
+
+/* Invite link open banner */
+.invite-found-banner {
+  margin: 10px 0;
+  border-radius: 20px;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.invite-found-banner div {
+  display: grid;
+  gap: 3px;
+}
+
+.invite-found-banner strong {
+  font-size: 14px;
+}
+
+.invite-found-banner span {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.invite-accept-card {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.dark .invite-found-banner,
+.dark .invite-accept-card {
+  background: rgba(20,83,45,.35);
+  border-color: rgba(74,222,128,.35);
+  color: #bbf7d0;
+}
+
+@media (max-width: 760px) {
+  .invite-found-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+
+/* Shared Support View loading */
+.view-mode-switcher select {
+  border: 0;
+  border-radius: 999px;
+  background: var(--rose);
+  color: #fff;
+  padding: 7px 10px;
+  font-weight: 900;
+  font-size: 12px;
+  outline: none;
+}
+
+.view-mode-switcher select option {
+  color: #0f172a;
+  background: #fff;
+}
+
+.dark .view-mode-switcher select option {
+  color: #f8fafc;
+  background: #1e293b;
+}
+
+
+/* Support viewer owner controls */
+.support-viewer-card {
+  border-color: #fecdd3;
+}
+
+.support-viewer-card p {
+  margin: 4px 0;
+}

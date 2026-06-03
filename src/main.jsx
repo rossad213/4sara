@@ -13,11 +13,13 @@ import {
 } from "firebase/auth";
 import {
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getFirestore,
   serverTimestamp,
-  setDoc
+  setDoc,
+  updateDoc
 } from "firebase/firestore";
 import { createRoot } from "react-dom/client";
 import { AnimatePresence, motion } from "framer-motion";
@@ -589,6 +591,10 @@ function App() {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [lastInviteLink, setLastInviteLink] = useState("");
   const [sharedProfiles, setSharedProfiles] = useState({});
+  const [supportViewers, setSupportViewers] = useState({});
+  const [selectedSharedOwnerId, setSelectedSharedOwnerId] = useState("");
+  const [sharedSupportData, setSharedSupportData] = useState(null);
+  const [sharedSupportStatus, setSharedSupportStatus] = useState("");
   const [customSymptomInput, setCustomSymptomInput] = useState("");
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A", consentAccepted: false });
 
@@ -603,6 +609,9 @@ function App() {
       setCloudCheckedForAccount(false);
       setCloudSyncAllowed(false);
       setCloudHasData(false);
+      setSupportViewers({});
+      setSelectedSharedOwnerId("");
+      setSharedSupportData(null);
       setCloudUpdatedAt("");
       setConfirmDeleteAccount(false);
       setSyncStatus(user ? "Signed in. Cloud sync is ready." : "Signed out. Data is saved locally on this device.");
@@ -614,13 +623,34 @@ function App() {
   useEffect(() => { if (settings.pinEnabled && settings.pin) setLocked(true); }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("invite");
-    if (token) {
-      setInviteToken(token);
-      setActiveTab("account");
-      setInviteStatus("Support invite found. Log in or create an account to accept it.");
-    }
+    const readInviteFromUrl = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      let token = searchParams.get("invite");
+
+      if (!token && window.location.hash) {
+        const hashQuery = window.location.hash.includes("?")
+          ? window.location.hash.slice(window.location.hash.indexOf("?") + 1)
+          : window.location.hash.replace("#", "");
+        const hashParams = new URLSearchParams(hashQuery);
+        token = hashParams.get("invite");
+      }
+
+      if (token) {
+        setInviteToken(token);
+        setActiveTab("account");
+        setInviteStatus("Support invite found. Log in or create an account to accept it.");
+        showMessage("Support invite found.");
+      }
+    };
+
+    readInviteFromUrl();
+    window.addEventListener("popstate", readInviteFromUrl);
+    window.addEventListener("focus", readInviteFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", readInviteFromUrl);
+      window.removeEventListener("focus", readInviteFromUrl);
+    };
   }, []);
 
 
@@ -633,6 +663,19 @@ function App() {
     if (!inviteToken) return;
     checkSupportInvite(inviteToken);
   }, [inviteToken]);
+
+  useEffect(() => {
+    if (viewMode !== "support") return;
+
+    if (!selectedSharedOwnerId) {
+      setSharedSupportData(null);
+      setSharedSupportStatus("");
+      return;
+    }
+
+    loadSharedSupportData(selectedSharedOwnerId);
+  }, [viewMode, selectedSharedOwnerId, sharedProfiles]);
+
 
 
   useEffect(() => {
@@ -734,6 +777,86 @@ function App() {
     }
   };
 
+  const loadSharedSupportData = async (ownerUserId) => {
+    if (!ownerUserId) {
+      setSharedSupportData(null);
+      setSharedSupportStatus("");
+      return;
+    }
+
+    setSharedSupportStatus("Loading shared Support View...");
+
+    try {
+      const snapshot = await getDoc(doc(db, "users", ownerUserId));
+
+      if (!snapshot.exists()) {
+        setSharedSupportData(null);
+        setSharedSupportStatus("Shared profile data was not found.");
+        return;
+      }
+
+      const ownerDoc = snapshot.data();
+      const ownerData = ownerDoc.data || {};
+      const ownerEntries = Array.isArray(ownerData.entries) ? ownerData.entries : [];
+      const ownerSettings = ownerData.settings || {};
+      const profile = sharedProfiles?.[ownerUserId] || {};
+
+      setSharedSupportData({
+        ownerUserId,
+        displayName: profile.displayName || ownerSettings.profileName || ownerDoc.ownerDisplayName || "Shared 4Sara",
+        entries: ownerEntries,
+        settings: {
+          ...defaultSettings,
+          ...ownerSettings
+        },
+        permissions: profile.permissions || {},
+        updatedAt: ownerData.updatedAt || ownerDoc.updatedAt || ""
+      });
+
+      setSharedSupportStatus("Shared Support View loaded.");
+    } catch (error) {
+      setSharedSupportData(null);
+      const message = error.message || "Could not load shared Support View.";
+      setSharedSupportStatus(message.includes("permission") ? "Access may have been revoked or is no longer allowed." : message);
+    }
+  };
+
+  const chooseSharedSupportView = (ownerUserId) => {
+    setSelectedSharedOwnerId(ownerUserId);
+    setViewMode("support");
+    setActiveTab("calendar");
+  };
+
+  const revokeSupportViewer = async (viewerUserId) => {
+    if (!authUser || !viewerUserId) {
+      showMessage("No support viewer selected.");
+      return;
+    }
+
+    setInviteBusy(true);
+    setInviteStatus("Revoking support access...");
+
+    try {
+      await updateDoc(doc(db, "users", authUser.uid), {
+        [`supportViewers.${viewerUserId}`]: deleteField()
+      });
+
+      setSupportViewers((current) => {
+        const next = { ...(current || {}) };
+        delete next[viewerUserId];
+        return next;
+      });
+
+      setInviteStatus("Support access revoked. That viewer can no longer load your shared data.");
+      showMessage("Support access revoked.");
+    } catch (error) {
+      setInviteStatus(error.message || "Could not revoke support access.");
+      showMessage(error.message || "Could not revoke support access.");
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
   const makeInviteToken = () => {
     if (window.crypto?.randomUUID) return window.crypto.randomUUID();
     return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -771,7 +894,7 @@ function App() {
         expiresAt
       });
 
-      const link = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(token)}`;
+      const link = `${window.location.origin}/?invite=${encodeURIComponent(token)}`;
       setLastInviteLink(link);
       setInviteStatus("Invite link created. Copy and send it to the person you want to invite.");
       showMessage("Support invite created.");
@@ -859,7 +982,8 @@ function App() {
       }
 
       if (invite.ownerUserId === authUser.uid) {
-        setInviteStatus("You cannot accept your own support invite.");
+        setInviteStatus("This invite belongs to the account you are currently logged into. To test it, open the link in incognito or another browser and log in with a different account.");
+        showMessage("Use a different account to accept this invite.");
         return;
       }
 
@@ -1023,6 +1147,7 @@ function App() {
         setCloudHasData(hasCloudEntries);
         setCloudUpdatedAt(cloudData.updatedAt || "");
         setSharedProfiles(snapshot.data()?.sharedProfiles || {});
+        setSupportViewers(snapshot.data()?.supportViewers || {});
 
         if (hasCloudEntries && !hasLocalEntries) {
           setEntries(cloudEntries);
@@ -1046,6 +1171,7 @@ function App() {
         setCloudHasData(false);
         setCloudUpdatedAt("");
         setSharedProfiles({});
+        setSupportViewers({});
         setCloudSyncAllowed(true);
         setSyncStatus("No cloud data found yet. This device can save data to cloud.");
       }
@@ -1276,6 +1402,48 @@ function App() {
     if (!form.startDate) return { phase: "Unknown" };
     return projectedPhaseMap.get(form.startDate) || { phase: inferPhase(form.startDate, entries.filter((entry) => (entry.type || "period") === "period"), stats.averageCycle, stats.averagePeriod) };
   }, [form.startDate, projectedPhaseMap, entries, stats.averageCycle, stats.averagePeriod]);
+
+
+  const supportEntries = sharedSupportData?.entries || entries;
+  const supportSettings = sharedSupportData?.settings || settings;
+  const supportStats = useMemo(() => getStats(supportEntries, supportSettings), [supportEntries, supportSettings]);
+  const supportCalendarDate = calendarDate;
+  const supportCalendarData = useMemo(() => {
+    const year = supportCalendarDate.getFullYear();
+    const month = supportCalendarDate.getMonth();
+    const first = new Date(year, month, 1);
+    const start = new Date(first);
+    start.setDate(first.getDate() - first.getDay());
+
+    return Array.from({ length: 42 }, (_, i) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      const key = toKey(date);
+      const entry = supportEntries.find((item) => {
+        const type = item.type || "period";
+        if (type === "checkin") return item.startDate === key;
+        if (!item.endDate) return item.startDate === key;
+        return key >= item.startDate && key <= item.endDate;
+      });
+      const checkIns = supportEntries.filter((item) => (item.type || "period") === "checkin" && item.startDate === key);
+      const projectedPhaseMap = buildProjectedPhaseMap(supportEntries, supportSettings);
+      const phase = projectedPhaseMap.get(key) || inferPhase(key, supportEntries, supportStats.averageCycle, supportStats.averagePeriod);
+
+      return {
+        key,
+        date,
+        isCurrentMonth: date.getMonth() === month,
+        isToday: key === todayKey(),
+        entry,
+        checkIns,
+        phaseLabel: phase,
+        phaseDescription: phaseDescription(phase),
+        cycleDay: getCycleDayForDate(key, supportStats.last?.startDate, supportStats.averageCycle),
+        isFuture: isFutureDate(key),
+        statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
+      };
+    });
+  }, [supportCalendarDate, supportEntries, supportSettings, supportStats]);
 
   const calendarData = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -1602,7 +1770,7 @@ function App() {
               </button>
               <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
               <CloudStatusBadge authUser={authUser} autoSyncEnabled={autoSyncEnabled} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} syncBusy={syncBusy} lastCloudSave={lastCloudSave} />
-              <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTab} />
+              <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTab} sharedProfiles={sharedProfiles} selectedSharedOwnerId={selectedSharedOwnerId} setSelectedSharedOwnerId={setSelectedSharedOwnerId} chooseSharedSupportView={chooseSharedSupportView} />
             </div>
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
             <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
@@ -1613,8 +1781,18 @@ function App() {
         {message && <div className="message">{message}</div>}
         {viewMode === "support" && (
           <div className="support-mode-banner">
-            <strong>Support View preview</strong>
-            <span>You are viewing a read-only support version. Logging, editing, settings, privacy, and account controls are hidden in this mode.</span>
+            <strong>{sharedSupportData ? `${sharedSupportData.displayName}'s Support View` : "Support View preview"}</strong>
+            <span>{sharedSupportStatus || "You are viewing a read-only support version. Logging, editing, settings, privacy, and account controls are hidden in this mode."}</span>
+          </div>
+        )}
+
+        {inviteToken && (
+          <div className="invite-found-banner">
+            <div>
+              <strong>Support invite opened</strong>
+              <span>{authUser ? "Go to Account to accept this support invite." : "Log in or create an account to accept this support invite."}</span>
+            </div>
+            <Button onClick={() => setActiveTab("account")} variant="secondary">Open Account</Button>
           </div>
         )}
 
@@ -1630,12 +1808,12 @@ function App() {
             {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} previewReminder={previewReminder} setLocked={setLocked} />}
             {activeTab === "calendar" && <CalendarPanel calendarDate={calendarDate} calendarData={calendarData} moveMonth={(direction) => setCalendarDate((current) => new Date(current.getFullYear(), current.getMonth() + direction, 1))} onDayClick={(day) => { setSelectedCalendarDay(day); showMessage(`Selected ${formatDate(day)}.`); }} selectedCalendarDay={selectedCalendarDay} onLogSelectedDate={startLogForSelectedDate} />}
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
-            {activeTab === "insights" && <Insights stats={stats} settings={settings} setLocked={setLocked} />}
+            {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
-            {activeTab === "howtohelp" && viewMode === "support" && <HowToHelpPage stats={stats} settings={settings} />}
+            {activeTab === "howtohelp" && viewMode === "support" && <HowToHelpPage stats={supportStats} settings={supportSettings} sharedSupportData={sharedSupportData} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -1645,7 +1823,7 @@ function App() {
 
 
 
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles }) {
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, revokeSupportViewer, chooseSharedSupportView }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -1704,11 +1882,20 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
               {inviteStatus && <p className="invite-status">{inviteStatus}</p>}
 
-              {inviteToken && pendingInvite && (
-                <div className="mini-card">
-                  <strong>Pending invite</strong>
-                  <p>From: {pendingInvite.ownerDisplayName || "4Sara user"}</p>
-                  <Button onClick={acceptSupportInvite} disabled={inviteBusy}>Accept support invite</Button>
+              {inviteToken && (
+                <div className="mini-card invite-accept-card">
+                  <strong>Pending support invite</strong>
+                  {pendingInvite ? (
+                    <>
+                      <p>From: {pendingInvite.ownerDisplayName || "4Sara user"}</p>
+                      <Button onClick={acceptSupportInvite} disabled={inviteBusy}>Accept support invite</Button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Invite token detected. Check the invite, then accept it.</p>
+                      <Button onClick={() => checkSupportInvite(inviteToken)} disabled={inviteBusy} variant="secondary">Check invite</Button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1728,12 +1915,33 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                     <div className="mini-card" key={profile.ownerUserId}>
                       <strong>{profile.displayName || "Shared 4Sara"}</strong>
                       <p>Role: read-only supporter</p>
+                      <Button onClick={() => chooseSharedSupportView(profile.ownerUserId)} variant="secondary">Open Support View</Button>
                     </div>
                   ))}
                 </div>
               )}
 
               <p className="auth-note">This phase links the invite to an account. The next phase will load the owner’s shared calendar and insights data through secure Firestore rules.</p>
+            </div>
+
+            <div className="support-sharing-card">
+              <h3>Support viewers</h3>
+              <p>These people have read-only Support View access to your shared calendar, insights, and How to Help view.</p>
+
+              {Object.keys(supportViewers || {}).length > 0 ? (
+                <div className="shared-profile-list">
+                  {Object.entries(supportViewers).map(([viewerUserId, viewer]) => (
+                    <div className="mini-card support-viewer-card" key={viewerUserId}>
+                      <strong>{viewer.viewerEmail || "Support viewer"}</strong>
+                      <p>Role: read-only supporter</p>
+                      {viewer.acceptedAt && <p>Accepted: {new Date(viewer.acceptedAt).toLocaleString()}</p>}
+                      <Button onClick={() => revokeSupportViewer(viewerUserId)} variant="secondary" disabled={inviteBusy}>Revoke access</Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No active support viewers yet.</p>
+              )}
             </div>
 
             <div className="info-box amber-box">
@@ -1877,21 +2085,46 @@ function CloudStatusBadge({ authUser, autoSyncEnabled, cloudCheckedForAccount, c
 }
 
 
-function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab }) {
-  const switchTo = (mode) => {
-    setViewMode(mode);
-    setActiveTab(mode === "support" ? "calendar" : "dashboard");
+function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles, selectedSharedOwnerId, setSelectedSharedOwnerId, chooseSharedSupportView }) {
+  const profiles = Object.values(sharedProfiles || {});
+
+  const switchToOwner = () => {
+    setViewMode("owner");
+    setSelectedSharedOwnerId("");
+    setActiveTab("dashboard");
+  };
+
+  const switchToSupportPreview = () => {
+    setViewMode("support");
+    setSelectedSharedOwnerId("");
+    setActiveTab("calendar");
   };
 
   return (
     <div className="view-mode-switcher" aria-label="Choose viewing mode">
-      <button className={viewMode === "owner" ? "active" : ""} onClick={() => switchTo("owner")}>My 4Sara</button>
-      <button className={viewMode === "support" ? "active" : ""} onClick={() => switchTo("support")}>Support View</button>
+      <button className={viewMode === "owner" ? "active" : ""} onClick={switchToOwner}>My 4Sara</button>
+
+      {profiles.length ? (
+        <select
+          value={viewMode === "support" ? selectedSharedOwnerId : ""}
+          onChange={(event) => event.target.value ? chooseSharedSupportView(event.target.value) : switchToSupportPreview()}
+          aria-label="Choose Support View"
+        >
+          <option value="">Support View</option>
+          {profiles.map((profile) => (
+            <option key={profile.ownerUserId} value={profile.ownerUserId}>
+              {profile.displayName || "Shared 4Sara"}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <button className={viewMode === "support" ? "active" : ""} onClick={switchToSupportPreview}>Support View</button>
+      )}
     </div>
   );
 }
 
-function HowToHelpPage({ stats }) {
+function HowToHelpPage({ stats, sharedSupportData }) {
   const phase = stats.last?.startDate
     ? inferPhase(todayKey(), [{ type: "period", startDate: stats.last.startDate, endDate: stats.last.endDate || stats.last.startDate }], stats.averageCycle, stats.averagePeriod)
     : "Unknown";
@@ -1937,7 +2170,7 @@ function HowToHelpPage({ stats }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
-        <h2><HeartPulse size={20} /> How to Help</h2>
+        <h2><HeartPulse size={20} /> How to Help{sharedSupportData?.displayName ? ` ${sharedSupportData.displayName}` : ""}</h2>
         <p className="muted">This read-only support guide uses phase estimates and logged patterns to suggest simple ways to be helpful.</p>
 
         <div className="help-current-card">

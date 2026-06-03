@@ -546,6 +546,121 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
+
+function calculateStatsForEntries(sourceEntries, sourceSettings) {
+  const safeEntries = Array.isArray(sourceEntries) ? sourceEntries : [];
+  const safeSettings = { ...defaultSettings, ...(sourceSettings || {}) };
+
+  const periodEntries = safeEntries.filter((entry) => (entry.type || "period") === "period");
+  const chronological = [...periodEntries].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  const last = chronological[chronological.length - 1];
+
+  const cycleLengths = [];
+  for (let i = 1; i < chronological.length; i++) {
+    cycleLengths.push(daysBetween(chronological[i - 1].startDate, chronological[i].startDate));
+  }
+
+  const calculatedCycle = cycleLengths.length ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 28;
+  const periodLengths = chronological.filter((entry) => entry.endDate).map((entry) => daysBetween(entry.startDate, entry.endDate) + 1);
+  const calculatedPeriod = periodLengths.length ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5;
+
+  const averageCycle = Number(safeSettings.cycleLengthOverride) || calculatedCycle;
+  const averagePeriod = Number(safeSettings.periodLengthOverride) || calculatedPeriod;
+  const nextPeriod = last ? addDays(last.startDate, averageCycle) : "";
+  const predictedEnd = nextPeriod ? addDays(nextPeriod, averagePeriod - 1) : "";
+  const ovulationDay = nextPeriod ? addDays(nextPeriod, -14) : "";
+  const fertileStart = ovulationDay ? addDays(ovulationDay, -5) : "";
+  const fertileEnd = ovulationDay ? addDays(ovulationDay, 1) : "";
+  const reminderDate = nextPeriod ? addDays(nextPeriod, -Number(safeSettings.reminderDaysBefore || 0)) : "";
+  const daysUntil = nextPeriod ? daysBetween(todayKey(), nextPeriod) : null;
+
+  const symptomStats = Object.entries(safeEntries.flatMap((entry) => entry.symptoms || []).reduce((acc, symptom) => {
+    acc[symptom] = (acc[symptom] || 0) + 1;
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]);
+
+  const phaseSymptoms = {};
+  const phaseMoods = {};
+
+  safeEntries.forEach((entry) => {
+    const phase = inferPhase(entry.startDate, chronological, averageCycle, averagePeriod);
+    phaseSymptoms[phase] ||= {};
+    phaseMoods[phase] ||= {};
+
+    (entry.symptoms || []).forEach((symptom) => {
+      phaseSymptoms[phase][symptom] = (phaseSymptoms[phase][symptom] || 0) + 1;
+    });
+
+    normalizeMoods(entry).forEach((mood) => {
+      if (mood !== "N/A") phaseMoods[phase][mood] = (phaseMoods[phase][mood] || 0) + 1;
+    });
+  });
+
+  const phaseInsights = Object.entries(phaseSymptoms)
+    .filter(([phase]) => phase !== "Unknown")
+    .map(([phase, symptoms]) => ({
+      phase,
+      topSymptoms: Object.entries(symptoms).sort((a, b) => b[1] - a[1]).slice(0, 3),
+      topMood: Object.entries(phaseMoods[phase] || {}).sort((a, b) => b[1] - a[1])[0]
+    }))
+    .filter((item) => item.topSymptoms.length || item.topMood);
+
+  const checkInPhaseData = {};
+
+  safeEntries
+    .filter((entry) => (entry.type || "period") === "checkin")
+    .forEach((entry) => {
+      const phase = inferPhase(entry.startDate, chronological, averageCycle, averagePeriod);
+      const key = phase === "Unknown" ? "Unassigned" : phase;
+
+      checkInPhaseData[key] ||= {
+        phase: key,
+        count: 0,
+        symptoms: {},
+        moods: {}
+      };
+
+      checkInPhaseData[key].count += 1;
+
+      (entry.symptoms || []).forEach((symptom) => {
+        checkInPhaseData[key].symptoms[symptom] = (checkInPhaseData[key].symptoms[symptom] || 0) + 1;
+      });
+
+      normalizeMoods(entry).forEach((mood) => {
+        if (mood !== "N/A") {
+          checkInPhaseData[key].moods[mood] = (checkInPhaseData[key].moods[mood] || 0) + 1;
+        }
+      });
+    });
+
+  const checkInPhaseInsights = Object.values(checkInPhaseData)
+    .map((item) => ({
+      ...item,
+      topSymptoms: Object.entries(item.symptoms).sort((a, b) => b[1] - a[1]).slice(0, 3),
+      topMood: Object.entries(item.moods).sort((a, b) => b[1] - a[1])[0]
+    }))
+    .sort((a, b) => {
+      const order = ["Menstruation", "Follicular", "Fertile", "Ovulation", "Luteal", "Unassigned"];
+      return order.indexOf(a.phase) - order.indexOf(b.phase);
+    });
+
+  const currentCycleDay = last ? Math.max(1, daysBetween(last.startDate, todayKey()) + 1) : null;
+  const minCycle = cycleLengths.length ? Math.min(...cycleLengths) : null;
+  const maxCycle = cycleLengths.length ? Math.max(...cycleLengths) : null;
+  const dataConfidence = periodEntries.length >= 6 ? "Strong" : periodEntries.length >= 3 ? "Good" : periodEntries.length >= 1 ? "Limited" : "No data";
+  const confidenceNote = periodEntries.length >= 6
+    ? "Predictions are stronger because several cycles are logged."
+    : periodEntries.length >= 3
+    ? "Predictions are improving as more cycles are logged."
+    : periodEntries.length >= 1
+    ? "Add at least 3 cycles for better predictions."
+    : "Add a menstruation entry to start seeing insights.";
+
+  const baseStats = { last, averageCycle, averagePeriod, nextPeriod, predictedEnd, ovulationDay, fertileStart, fertileEnd, reminderDate, daysUntil, currentCycleDay, minCycle, maxCycle, dataConfidence, confidenceNote, symptomStats, phaseInsights, checkInPhaseInsights, totalEntries: periodEntries.length };
+
+  return { ...baseStats, dynamicSuggestions: buildSuggestions(baseStats) };
+}
+
 function App() {
   const [entries, setEntries] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || demoEntries; }
@@ -1406,7 +1521,7 @@ function App() {
 
   const supportEntries = sharedSupportData?.entries || entries;
   const supportSettings = sharedSupportData?.settings || settings;
-  const supportStats = useMemo(() => getStats(supportEntries, supportSettings), [supportEntries, supportSettings]);
+  const supportStats = useMemo(() => calculateStatsForEntries(supportEntries, supportSettings), [supportEntries, supportSettings]);
   const supportCalendarDate = calendarDate;
   const supportCalendarData = useMemo(() => {
     const year = supportCalendarDate.getFullYear();
@@ -1426,8 +1541,9 @@ function App() {
         return key >= item.startDate && key <= item.endDate;
       });
       const checkIns = supportEntries.filter((item) => (item.type || "period") === "checkin" && item.startDate === key);
-      const projectedPhaseMap = buildProjectedPhaseMap(supportEntries, supportSettings);
-      const phase = projectedPhaseMap.get(key) || inferPhase(key, supportEntries, supportStats.averageCycle, supportStats.averagePeriod);
+      const supportProjectedPhaseMap = buildProjectedCycleMap(supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, 6);
+      const phaseObj = supportProjectedPhaseMap.get(key);
+      const phase = phaseObj?.phase || inferPhase(key, supportEntries.filter((item) => (item.type || "period") === "period"), supportStats.averageCycle, supportStats.averagePeriod);
 
       return {
         key,

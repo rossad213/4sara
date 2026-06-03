@@ -2179,7 +2179,15 @@ function App() {
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
-            {activeTab === "howtohelp" && viewMode === "support" && <HowToHelpPage stats={supportStats} settings={supportSettings} entries={supportEntries} sharedSupportData={sharedSupportData} />}
+            {activeTab === "howtohelp" && viewMode === "support" && (
+              <HowToHelpPage
+                stats={supportStats}
+                settings={supportSettings}
+                entries={supportEntries}
+                calendarData={supportCalendarData}
+                sharedSupportData={sharedSupportData}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -2514,10 +2522,11 @@ function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles,
   );
 }
 
-function HowToHelpPage({ stats, entries, sharedSupportData }) {
-  const phase = stats.last?.startDate
-    ? inferPhase(todayKey(), [{ type: "period", startDate: stats.last.startDate, endDate: stats.last.endDate || stats.last.startDate }], stats.averageCycle, stats.averagePeriod)
-    : "Unknown";
+function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
+  const todayCalendarDay = (calendarData || []).find((day) => !day.empty && (day.dateKey || day.key) === todayKey());
+  const phase = todayCalendarDay?.phaseLabel
+    || getCurrentProjectedPhase(stats, entries)
+    || "Unknown";
   const phaseText = phaseDescription(phase);
   const topSymptoms = (stats.symptomStats || []).slice(0, 5);
   const phasePatterns = stats.checkInPhaseInsights || [];
@@ -2561,10 +2570,10 @@ function HowToHelpPage({ stats, entries, sharedSupportData }) {
     <main className="layout">
       <Card className="pad main-col">
         <h2><HeartPulse size={20} /> How to Help{sharedSupportData?.displayName ? ` ${sharedSupportData.displayName}` : ""}</h2>
-        <p className="muted">This read-only support guide uses today’s calendar phase estimate and logged patterns to suggest simple ways to be helpful.</p>
+        <p className="muted">This read-only support guide uses the same phase shown for today on the Calendar tab, plus logged patterns, to suggest simple ways to be helpful.</p>
 
         <div className="help-current-card">
-          <p className="account-eyebrow">Estimated current phase</p>
+          <p className="account-eyebrow">Estimated current phase for {formatDate(todayKey())}</p>
           <h3>{phase}</h3>
           <p>{phaseText}</p>
         </div>
@@ -2580,7 +2589,7 @@ function HowToHelpPage({ stats, entries, sharedSupportData }) {
 
         <div className="privacy-section legal-section">
           <h3>Support reminder</h3>
-          <p>This view is not medical advice. It is meant to help supporters be more thoughtful, patient, and aware. Always respect privacy, consent, and boundaries.</p>
+          <p>This view is not medical advice. It is meant to help supporters be more thoughtful, patient, and aware. The current phase shown here matches today’s phase on the Calendar tab. Always respect privacy, consent, and boundaries.</p>
         </div>
       </Card>
 

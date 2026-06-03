@@ -2196,3 +2196,22 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .shared-profile-list .mini-card strong {
   word-break: break-word;
 }
+
+
+/* Calendar account-linked support view fix */
+.calendar-grid .day b {
+  display: block;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.calendar-grid .day small {
+  display: block;
+  margin-top: 3px;
+  line-height: 1.1;
+}
+
+.calendar-grid .day.empty {
+  pointer-events: none;
+  opacity: .25;
+}

@@ -1037,7 +1037,7 @@ function App() {
         };
       });
 
-      setSharedSupportStatus("Shared Support View loaded.");
+      setSharedSupportStatus(`Shared Support View loaded for ${resolvedDisplayName}.`);
     } catch (error) {
       setSharedSupportData(null);
       setSharedSupportStatus(friendlyPermissionMessage(error.message));
@@ -1711,35 +1711,57 @@ function App() {
   const supportSettings = selectedSharedOwnerId && sharedSupportData ? sharedSupportData.settings : settings;
   const supportStats = useMemo(() => calculateStatsForEntries(supportEntries, supportSettings), [supportEntries, supportSettings]);
   const supportCalendarDate = calendarDate;
-  const supportCalendarData = useMemo(() => {
-    const year = supportCalendarDate.getFullYear();
-    const month = supportCalendarDate.getMonth();
-    const first = new Date(year, month, 1);
-    const start = new Date(first);
-    start.setDate(first.getDate() - first.getDay());
+  const supportProjectedPhaseMap = useMemo(() => {
+    return buildProjectedCycleMap(supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, 6);
+  }, [supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod]);
 
-    return Array.from({ length: 42 }, (_, i) => {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
-      const key = toDateKey(date);
-      const entry = supportEntries.find((item) => {
-        const type = item.type || "period";
-        if (type === "checkin") return item.startDate === key;
-        if (!item.endDate) return item.startDate === key;
-        return key >= item.startDate && key <= item.endDate;
-      });
-      const checkIns = supportEntries.filter((item) => (item.type || "period") === "checkin" && item.startDate === key);
-      const supportProjectedPhaseMap = buildProjectedCycleMap(supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, 6);
-      const phaseObj = supportProjectedPhaseMap.get(key);
-      const phase = phaseObj?.phase || inferPhase(key, supportEntries.filter((item) => (item.type || "period") === "period"), supportStats.averageCycle, supportStats.averagePeriod);
+  const supportCalendarData = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    const offset = first.getDay();
+    const cells = Math.ceil((offset + last.getDate()) / 7) * 7;
+
+    const periodDays = new Map();
+    const checkInDays = new Map();
+
+    supportEntries.filter((entry) => (entry.type || "period") === "period").forEach((entry) => {
+      getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
+    });
+
+    supportEntries.filter((entry) => (entry.type || "period") === "checkin").forEach((entry) => {
+      if (!checkInDays.has(entry.startDate)) checkInDays.set(entry.startDate, []);
+      checkInDays.get(entry.startDate).push(entry);
+    });
+
+    return Array.from({ length: cells }, (_, index) => {
+      const dayNumber = index - offset + 1;
+      if (dayNumber < 1 || dayNumber > last.getDate()) return { empty: true, key: `support-empty-${index}` };
+
+      const key = toDateKey(new Date(year, month, dayNumber));
+      const entry = periodDays.get(key);
+      const projection = supportProjectedPhaseMap.get(key);
+      const phase = entry ? "Menstruation" : projection?.phase || inferPhase(key, supportEntries.filter((item) => (item.type || "period") === "period"), supportStats.averageCycle, supportStats.averagePeriod);
+      const isPredicted = !entry && phase === "Menstruation";
+      const isFertile = phase === "Fertile";
+      const isOvulation = phase === "Ovulation";
+      const isFollicular = phase === "Follicular";
+      const isLuteal = phase === "Luteal";
 
       return {
+        empty: false,
         key,
-        date,
-        isCurrentMonth: date.getMonth() === month,
+        dayNumber,
+        dateKey: key,
         isToday: key === todayKey(),
         entry,
-        checkIns,
+        checkIns: checkInDays.get(key) || [],
+        isPredicted,
+        isFertile,
+        isOvulation,
+        isFollicular,
+        isLuteal,
         phaseLabel: phase,
         phaseDescription: phaseDescription(phase),
         cycleDay: getCycleDayForDate(key, supportStats.last?.startDate, supportStats.averageCycle),
@@ -1747,7 +1769,7 @@ function App() {
         statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
-  }, [supportCalendarDate, supportEntries, supportSettings, supportStats]);
+  }, [calendarDate, supportEntries, supportProjectedPhaseMap, supportStats.averageCycle, supportStats.averagePeriod, supportStats.last?.startDate]);
 
   const calendarData = useMemo(() => {
     const year = calendarDate.getFullYear();

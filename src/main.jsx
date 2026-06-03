@@ -1533,7 +1533,7 @@ function App() {
     return Array.from({ length: 42 }, (_, i) => {
       const date = new Date(start);
       date.setDate(start.getDate() + i);
-      const key = toKey(date);
+      const key = toDateKey(date);
       const entry = supportEntries.find((item) => {
         const type = item.type || "period";
         if (type === "checkin") return item.startDate === key;

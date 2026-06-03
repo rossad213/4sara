@@ -547,6 +547,20 @@ class AppErrorBoundary extends React.Component {
 }
 
 
+
+function daysUntilDate(dateString) {
+  if (!dateString) return null;
+  return Math.ceil((new Date(dateString) - new Date()) / 86400000);
+}
+
+function friendlyPermissionMessage(message) {
+  const text = String(message || "");
+  if (text.toLowerCase().includes("permission") || text.toLowerCase().includes("insufficient")) {
+    return "You may not have access to this shared view anymore. Ask the owner to send a new invite.";
+  }
+  return text || "Something went wrong. Please try again.";
+}
+
 function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const safeEntries = Array.isArray(sourceEntries) ? sourceEntries : [];
   const safeSettings = { ...defaultSettings, ...(sourceSettings || {}) };
@@ -707,6 +721,7 @@ function App() {
   const [lastInviteLink, setLastInviteLink] = useState("");
   const [sharedProfiles, setSharedProfiles] = useState({});
   const [supportViewers, setSupportViewers] = useState({});
+  const [confirmRevokeViewerId, setConfirmRevokeViewerId] = useState("");
   const [selectedSharedOwnerId, setSelectedSharedOwnerId] = useState("");
   const [sharedSupportData, setSharedSupportData] = useState(null);
   const [sharedSupportStatus, setSharedSupportStatus] = useState("");
@@ -725,6 +740,7 @@ function App() {
       setCloudSyncAllowed(false);
       setCloudHasData(false);
       setSupportViewers({});
+      setConfirmRevokeViewerId("");
       setSelectedSharedOwnerId("");
       setSharedSupportData(null);
       setCloudUpdatedAt("");
@@ -931,8 +947,7 @@ function App() {
       setSharedSupportStatus("Shared Support View loaded.");
     } catch (error) {
       setSharedSupportData(null);
-      const message = error.message || "Could not load shared Support View.";
-      setSharedSupportStatus(message.includes("permission") ? "Access may have been revoked or is no longer allowed." : message);
+      setSharedSupportStatus(friendlyPermissionMessage(error.message));
     }
   };
 
@@ -945,6 +960,12 @@ function App() {
   const revokeSupportViewer = async (viewerUserId) => {
     if (!authUser || !viewerUserId) {
       showMessage("No support viewer selected.");
+      return;
+    }
+
+    if (confirmRevokeViewerId !== viewerUserId) {
+      setConfirmRevokeViewerId(viewerUserId);
+      setInviteStatus("Click Revoke access again to confirm removing this supporter.");
       return;
     }
 
@@ -962,11 +983,13 @@ function App() {
         return next;
       });
 
+      setConfirmRevokeViewerId("");
       setInviteStatus("Support access revoked. That viewer can no longer load your shared data.");
       showMessage("Support access revoked.");
     } catch (error) {
-      setInviteStatus(error.message || "Could not revoke support access.");
-      showMessage(error.message || "Could not revoke support access.");
+      const friendly = friendlyPermissionMessage(error.message);
+      setInviteStatus(friendly);
+      showMessage(friendly);
     } finally {
       setInviteBusy(false);
     }
@@ -1014,8 +1037,9 @@ function App() {
       setInviteStatus("Invite link created. Copy and send it to the person you want to invite.");
       showMessage("Support invite created.");
     } catch (error) {
-      setInviteStatus(error.message || "Could not create support invite.");
-      showMessage(error.message || "Could not create support invite.");
+      const friendly = friendlyPermissionMessage(error.message || "Could not create support invite.");
+      setInviteStatus(friendly);
+      showMessage(friendly);
     } finally {
       setInviteBusy(false);
     }
@@ -1063,7 +1087,7 @@ function App() {
 
       return invite;
     } catch (error) {
-      setInviteStatus(error.message || "Could not check invite.");
+      setInviteStatus(friendlyPermissionMessage(error.message || "Could not check invite."));
       return null;
     } finally {
       setInviteBusy(false);
@@ -1150,8 +1174,9 @@ function App() {
       const cleanUrl = `${window.location.origin}${window.location.pathname}`;
       window.history.replaceState({}, document.title, cleanUrl);
     } catch (error) {
-      setInviteStatus(error.message || "Could not accept invite.");
-      showMessage(error.message || "Could not accept invite.");
+      const friendly = friendlyPermissionMessage(error.message || "Could not accept invite.");
+      setInviteStatus(friendly);
+      showMessage(friendly);
     } finally {
       setInviteBusy(false);
     }
@@ -1743,14 +1768,23 @@ function App() {
     showMessage(type === "checkin" ? "Ready to add today's check-in." : "Ready to log menstruation today.");
   };
 
-  const startLogForSelectedDate = (dateKey = selectedCalendarDay, type = "period") => {
-    if (!dateKey) return showMessage("Select a calendar date first.");
-    if (isFutureDate(dateKey)) return showMessage("Future dates are prediction-only. You can log this date once it arrives.");
-    setForm({ ...blankForm(), type, startDate: dateKey, endDate: "" });
+  const startLogForSelectedDate = (dateKey, type = "period") => {
+    if (viewMode === "support") {
+      showMessage("Support View is read-only. Logging is not available.");
+      return;
+    }
+
+    if (isFutureDate(dateKey)) {
+      showMessage("Future dates show predictions only. You can log once the date arrives.");
+      return;
+    }
+
+    setForm({ ...blankForm(), type, startDate: dateKey });
     setEditingId(null);
     setActiveTab("log");
     showMessage(type === "checkin" ? `Ready to add a check-in for ${formatDate(dateKey)}.` : `Ready to log menstruation for ${formatDate(dateKey)}.`);
   };
+
 
   const jumpToNextPeriod = () => {
     if (!stats.nextPeriod) return showMessage("Add a cycle first so 4Sara can predict the next menstruation.");
@@ -1898,7 +1932,7 @@ function App() {
         {viewMode === "support" && (
           <div className="support-mode-banner">
             <strong>{sharedSupportData ? `${sharedSupportData.displayName}'s Support View` : "Support View preview"}</strong>
-            <span>{sharedSupportStatus || "You are viewing a read-only support version. Logging, editing, settings, privacy, and account controls are hidden in this mode."}</span>
+            <span>{sharedSupportStatus || (selectedSharedOwnerId ? "Read-only access is active. Logging, editing, settings, privacy, and account controls are hidden." : "Preview mode. Choose an accepted Support View profile to see shared calendar, insights, and How to Help data.")}</span>
           </div>
         )}
 
@@ -1927,7 +1961,7 @@ function App() {
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && viewMode === "support" && <HowToHelpPage stats={supportStats} settings={supportSettings} sharedSupportData={sharedSupportData} />}
           </motion.div>
@@ -1939,7 +1973,7 @@ function App() {
 
 
 
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, revokeSupportViewer, chooseSharedSupportView }) {
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, confirmRevokeViewerId, setConfirmRevokeViewerId, revokeSupportViewer, chooseSharedSupportView }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -2004,6 +2038,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                   {pendingInvite ? (
                     <>
                       <p>From: {pendingInvite.ownerDisplayName || "4Sara user"}</p>
+                      {pendingInvite.expiresAt && <p>Expires in about {Math.max(0, daysUntilDate(pendingInvite.expiresAt))} day{Math.max(0, daysUntilDate(pendingInvite.expiresAt)) === 1 ? "" : "s"}.</p>}
                       <Button onClick={acceptSupportInvite} disabled={inviteBusy}>Accept support invite</Button>
                     </>
                   ) : (
@@ -2021,7 +2056,10 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               </div>
 
               {lastInviteLink && (
-                <input className="invite-link-input" value={lastInviteLink} readOnly onFocus={(event) => event.target.select()} />
+                <>
+                  <input className="invite-link-input" value={lastInviteLink} readOnly onFocus={(event) => event.target.select()} />
+                  <p className="invite-expiry-note">This invite expires in 7 days and should only be sent to someone you trust.</p>
+                </>
               )}
 
               {Object.keys(sharedProfiles || {}).length > 0 && (
@@ -2051,7 +2089,13 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                       <strong>{viewer.viewerEmail || "Support viewer"}</strong>
                       <p>Role: read-only supporter</p>
                       {viewer.acceptedAt && <p>Accepted: {new Date(viewer.acceptedAt).toLocaleString()}</p>}
-                      <Button onClick={() => revokeSupportViewer(viewerUserId)} variant="secondary" disabled={inviteBusy}>Revoke access</Button>
+                      {confirmRevokeViewerId === viewerUserId && <p className="danger-confirm">Click Revoke access again to confirm, or cancel below.</p>}
+                      <div className="account-actions">
+                        <Button onClick={() => revokeSupportViewer(viewerUserId)} variant="secondary" disabled={inviteBusy}>
+                          {confirmRevokeViewerId === viewerUserId ? "Confirm revoke access" : "Revoke access"}
+                        </Button>
+                        {confirmRevokeViewerId === viewerUserId && <Button onClick={() => setConfirmRevokeViewerId("")} variant="secondary">Cancel</Button>}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2161,6 +2205,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
             <div className="mini-card"><strong>Manual controls remain</strong><p>You can still use Save to cloud or Load from cloud when needed.</p></div>
             <div className="mini-card"><strong>Local backup still active</strong><p>Your browser still keeps a local copy for faster access.</p></div>
             <div className="mini-card"><strong>Account deletion</strong><p>Deleting an account removes the Firebase account and cloud document, but local device data is separate.</p></div>
+            <div className="mini-card"><strong>Support sharing tip</strong><p>Only invite trusted people. You can revoke access from the Support viewers section.</p></div>
           </>
         ) : (
           <>
@@ -2651,7 +2696,7 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
             </div>
 
             <div className="actions selected-actions">
-              {readOnly ? (
+              {isReadOnly ? (
                 <p className="future-note">Support View is read-only. Calendar details and phase estimates are visible, but logging is not available.</p>
               ) : selectedDay.isFuture ? (
                 <p className="future-note">Future dates show predictions only. You can log menstruation or daily check-ins once the date arrives.</p>

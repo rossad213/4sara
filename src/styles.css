@@ -2221,3 +2221,9 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .container > .card.pad h2 {
   margin-bottom: 6px;
 }
+
+
+/* Existing account loading state for all devices */
+.container > .card.pad h2 {
+  margin-bottom: 6px;
+}

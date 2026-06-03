@@ -826,6 +826,7 @@ function App() {
       setCloudReady(Boolean(user));
       setCloudCheckedForAccount(false);
       setAccountDataChecked(false);
+      setExistingAccountLoaded(false);
       setCloudSyncAllowed(false);
       setCloudHasData(false);
       setSupportViewers({});
@@ -1485,6 +1486,7 @@ function App() {
             pinEnabled: current.pinEnabled
           }));
           setActiveTab("dashboard");
+          setExistingAccountLoaded(true);
           setCloudSyncAllowed(true);
           setSyncStatus("Cloud data loaded. You are signed in and ready to use 4Sara.");
         } else if (hasCloudEntries && hasLocalEntries) {
@@ -1495,6 +1497,7 @@ function App() {
             onboardingComplete: true
           }));
           setActiveTab("dashboard");
+          setExistingAccountLoaded(true);
           setCloudSyncAllowed(false);
           setSyncStatus("Cloud data found. Auto-sync is paused until you choose whether to load cloud data or save this device’s data.");
         } else {
@@ -1508,6 +1511,7 @@ function App() {
         setSharedProfiles({});
         setSupportViewers({});
         await rememberCloudChoiceForAccount(user, "save-device");
+        setExistingAccountLoaded(false);
         setCloudSyncAllowed(true);
         setSyncStatus("No cloud data found yet. This account can save data to cloud.");
       }
@@ -2115,20 +2119,22 @@ function App() {
     );
   }
 
-  if (authUser && !accountDataChecked) {
+  if (authUser && (!accountDataChecked || !cloudCheckedForAccount)) {
     return (
       <div className="app">
         <div className="container">
           <Card className="pad">
             <h2>Loading your 4Sara account...</h2>
-            <p className="muted">Checking for your saved cloud data before setup continues.</p>
+            <p className="muted">Checking for your saved account data before setup continues.</p>
           </Card>
         </div>
       </div>
     );
   }
 
-  if (!settings.onboardingComplete) {
+  if (authUser && existingAccountLoaded) {
+    // Existing signed-in accounts with cloud data should never be sent back through onboarding on any device or browser.
+  } else if (!settings.onboardingComplete) {
     return <div className={settings.darkMode ? "app dark" : "app"}><OnboardingScreen onboarding={onboarding} setOnboarding={setOnboarding} completeOnboarding={completeOnboarding} skipOnboarding={skipOnboarding} message={message} /></div>;
   }
 
@@ -2388,7 +2394,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <h3>Cloud sync</h3>
               <p>{syncStatus}</p>
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
-              <p className="sync-small">Existing accounts with cloud data open directly into the tracker on new devices.</p>
+              <p className="sync-small">Existing accounts with cloud data open directly into the tracker on any device or browser.</p>
             </div>
 
             <label className="setting-row autosync-row">

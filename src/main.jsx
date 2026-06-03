@@ -781,6 +781,7 @@ function App() {
   const [sharedProfiles, setSharedProfiles] = useState({});
   const [supportViewers, setSupportViewers] = useState({});
   const [confirmRevokeViewerId, setConfirmRevokeViewerId] = useState("");
+  const [confirmRemoveSharedOwnerId, setConfirmRemoveSharedOwnerId] = useState("");
   const [selectedSharedOwnerId, setSelectedSharedOwnerId] = useState("");
   const [sharedSupportData, setSharedSupportData] = useState(null);
   const [sharedSupportStatus, setSharedSupportStatus] = useState("");
@@ -800,6 +801,7 @@ function App() {
       setCloudHasData(false);
       setSupportViewers({});
       setConfirmRevokeViewerId("");
+      setConfirmRemoveSharedOwnerId("");
       setSelectedSharedOwnerId("");
       setSharedSupportData(null);
       setCloudUpdatedAt("");
@@ -1007,6 +1009,51 @@ function App() {
     } catch (error) {
       setSharedSupportData(null);
       setSharedSupportStatus(friendlyPermissionMessage(error.message));
+    }
+  };
+
+  const removeSharedSupportView = async (ownerUserId) => {
+    if (!authUser || !ownerUserId) {
+      showMessage("No shared Support View selected.");
+      return;
+    }
+
+    if (confirmRemoveSharedOwnerId !== ownerUserId) {
+      setConfirmRemoveSharedOwnerId(ownerUserId);
+      setInviteStatus("Click Remove from my account again to confirm.");
+      return;
+    }
+
+    setInviteBusy(true);
+    setInviteStatus("Removing shared Support View...");
+
+    try {
+      await updateDoc(doc(db, "users", authUser.uid), {
+        [`sharedProfiles.${ownerUserId}`]: deleteField()
+      });
+
+      setSharedProfiles((current) => {
+        const next = { ...(current || {}) };
+        delete next[ownerUserId];
+        return next;
+      });
+
+      if (selectedSharedOwnerId === ownerUserId) {
+        setSelectedSharedOwnerId("");
+        setSharedSupportData(null);
+        setViewMode("owner");
+        setActiveTab("dashboard");
+      }
+
+      setConfirmRemoveSharedOwnerId("");
+      setInviteStatus("Shared Support View removed from your account.");
+      showMessage("Shared Support View removed.");
+    } catch (error) {
+      const friendly = friendlyPermissionMessage(error.message);
+      setInviteStatus(friendly);
+      showMessage(friendly);
+    } finally {
+      setInviteBusy(false);
     }
   };
 
@@ -2039,12 +2086,30 @@ function App() {
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 16, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: "easeOut" }}>
             {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} previewReminder={previewReminder} setLocked={setLocked} />}
-            {activeTab === "calendar" && <CalendarPanel calendarDate={calendarDate} calendarData={calendarData} moveMonth={(direction) => setCalendarDate((current) => new Date(current.getFullYear(), current.getMonth() + direction, 1))} onDayClick={(day) => { setSelectedCalendarDay(day); showMessage(`Selected ${formatDate(day)}.`); }} selectedCalendarDay={selectedCalendarDay} onLogSelectedDate={startLogForSelectedDate} readOnly={viewMode === "support"} />}
+            {activeTab === "calendar" && (
+              <CalendarPanel
+                calendarDate={calendarDate}
+                calendarData={viewMode === "support" ? supportCalendarData : calendarData}
+                moveMonth={(direction) => setCalendarDate((current) => new Date(current.getFullYear(), current.getMonth() + direction, 1))}
+                onDayClick={(day) => {
+                  if (!day) {
+                    setSelectedCalendarDay("");
+                    return;
+                  }
+                  setSelectedCalendarDay(day);
+                  showMessage(`Selected ${formatDate(day)}.`);
+                }}
+                selectedCalendarDay={selectedCalendarDay}
+                onLogSelectedDate={startLogForSelectedDate}
+                stats={viewMode === "support" ? supportStats : stats}
+                readOnly={viewMode === "support"}
+              />
+            )}
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && viewMode === "support" && <HowToHelpPage stats={supportStats} settings={supportSettings} sharedSupportData={sharedSupportData} />}
           </motion.div>
@@ -2056,7 +2121,7 @@ function App() {
 
 
 
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, confirmRevokeViewerId, setConfirmRevokeViewerId, revokeSupportViewer, chooseSharedSupportView }) {
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, confirmRevokeViewerId, setConfirmRevokeViewerId, confirmRemoveSharedOwnerId, setConfirmRemoveSharedOwnerId, revokeSupportViewer, chooseSharedSupportView, removeSharedSupportView }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -2152,13 +2217,24 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                     <div className="mini-card" key={profile.ownerUserId}>
                       <strong>{profile.displayName || "Shared 4Sara"}</strong>
                       <p>Role: read-only supporter</p>
-                      <Button onClick={() => chooseSharedSupportView(profile.ownerUserId)} variant="secondary">Open Support View</Button>
+                      {confirmRemoveSharedOwnerId === profile.ownerUserId && (
+                        <p className="danger-confirm">Click Remove from my account again to confirm, or cancel below.</p>
+                      )}
+                      <div className="account-actions">
+                        <Button onClick={() => chooseSharedSupportView(profile.ownerUserId)} variant="secondary">Open Support View</Button>
+                        <Button onClick={() => removeSharedSupportView(profile.ownerUserId)} variant="secondary" disabled={inviteBusy}>
+                          {confirmRemoveSharedOwnerId === profile.ownerUserId ? "Confirm remove" : "Remove from my account"}
+                        </Button>
+                        {confirmRemoveSharedOwnerId === profile.ownerUserId && (
+                          <Button onClick={() => setConfirmRemoveSharedOwnerId("")} variant="secondary">Cancel</Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              <p className="auth-note">Use My Support View to preview what supporters can see. Shared Support Views are read-only profiles that other users have shared with you.</p>
+              <p className="auth-note">Use My Support View to preview what supporters can see. Shared Support Views are read-only profiles that other users have shared with you, and you can remove them from your account anytime.</p>
             </div>
 
             <div className="support-sharing-card">
@@ -2696,15 +2772,46 @@ function InfoTile({ title, value }) {
   return <div className="tile"><p>{title}</p><strong>{value}</strong></div>;
 }
 
-function CalendarPanel({ calendarDate, calendarData, selectedCalendarDay, setSelectedCalendarDay, setCalendarDate, stats, onLogSelectedDate, readOnly = false }) {
+function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, selectedCalendarDay, onLogSelectedDate, readOnly = false }) {
   const isReadOnly = Boolean(readOnly);
-  const selectedDay = calendarData.find((day) => day.dateKey === selectedCalendarDay);
+  const selectedDay = calendarData.find((day) => day.dateKey === selectedCalendarDay || day.key === selectedCalendarDay) || null;
+
+  const handleDayClick = (day) => {
+    if (!day || day.empty) return;
+
+    if (day.isFuture) {
+      onDayClick("");
+      return;
+    }
+
+    onDayClick(day.dateKey || day.key);
+  };
+
+  const renderEntryDetails = (entry, title = "Logged menstruation") => {
+    if (!entry) return null;
+
+    return (
+      <div className="calendar-log-card">
+        <strong>{title}</strong>
+        <p><span>Date:</span> {formatDate(entry.startDate)}{entry.endDate ? ` - ${formatDate(entry.endDate)}` : ""}</p>
+        {entry.flow && entry.flow !== "N/A" && <p><span>Flow:</span> {entry.flow}</p>}
+        {moodLabel(entry) !== "N/A" && <p><span>Mood(s):</span> {moodLabel(entry)}</p>}
+        {(entry.symptoms || []).length > 0 && <p><span>Symptoms:</span> {(entry.symptoms || []).join(", ")}</p>}
+        {entry.notes && <p><span>Notes:</span> {entry.notes}</p>}
+      </div>
+    );
+  };
 
   return (
     <main>
       <Card className="pad">
         <div className="card-head">
-          <div><h2>Calendar</h2><p className="muted">Tap a date to view details, then choose whether to log it.</p></div>
+          <div>
+            <h2>Calendar</h2>
+            <p className="muted">
+              {isReadOnly ? "Tap a past date to view shared details. Future dates stay hidden." : "Tap a past or current date to view logs or add a new entry."}
+            </p>
+          </div>
           <div className="month-controls">
             <button onClick={() => moveMonth(-1)} className="icon-btn"><ChevronLeft size={18} /></button>
             <strong>{monthName(calendarDate)}</strong>
@@ -2727,7 +2834,13 @@ function CalendarPanel({ calendarDate, calendarData, selectedCalendarDay, setSel
 
         <div className="calendar-grid">
           {calendarData.map((day) => (
-            <button key={day.key} disabled={day.empty} onClick={() => !day.empty && onDayClick(day.dateKey)} className={`day ${day.empty ? "empty" : ""} ${day.entry ? "period" : ""} ${!day.entry && day.isPredicted ? "predicted" : ""} ${!day.entry && !day.isPredicted && (day.isFertile || day.isOvulation) ? "fertile" : ""} ${day.isFollicular ? "follicular" : ""} ${day.isLuteal ? "luteal" : ""} ${day.isToday ? "today-outline" : ""} ${selectedCalendarDay === day.dateKey ? "selected" : ""}`}>
+            <button
+              key={day.key}
+              disabled={day.empty}
+              onClick={() => handleDayClick(day)}
+              className={`day ${day.empty ? "empty" : ""} ${day.isFuture ? "future-disabled" : ""} ${day.entry ? "period" : ""} ${!day.entry && day.isPredicted ? "predicted" : ""} ${!day.entry && !day.isPredicted && (day.isFertile || day.isOvulation) ? "fertile" : ""} ${day.isFollicular ? "follicular" : ""} ${day.isLuteal ? "luteal" : ""} ${day.isToday ? "today-outline" : ""} ${selectedCalendarDay === (day.dateKey || day.key) ? "selected" : ""}`}
+              title={day.isFuture ? "Future dates are prediction-only and do not open details." : "View date details"}
+            >
               {!day.empty && <>
                 <b>{day.dayNumber}</b>
                 {day.entry && <small>Menstruation</small>}
@@ -2736,17 +2849,17 @@ function CalendarPanel({ calendarDate, calendarData, selectedCalendarDay, setSel
                 {!day.entry && !day.isPredicted && !day.isOvulation && day.isFertile && <small>Fertile</small>}
                 {!day.entry && !day.isPredicted && !day.isOvulation && !day.isFertile && day.isFollicular && <small>Follicular</small>}
                 {!day.entry && !day.isPredicted && !day.isOvulation && !day.isFertile && day.isLuteal && <small>Luteal</small>}
-                {day.checkIns?.length > 0 && <small>Check-in</small>}
+                {(day.checkIns || []).length > 0 && <small>Check-in</small>}
               </>}
             </button>
           ))}
         </div>
 
-        {selectedDay && !selectedDay.empty && (
+        {selectedDay && !selectedDay.empty && !selectedDay.isFuture && (
           <div className="selected-card selected-card-enhanced">
             <div className="selected-main">
               <p className="muted">Selected date</p>
-              <h3>{formatDate(selectedCalendarDay)}</h3>
+              <h3>{formatDate(selectedDay.dateKey || selectedDay.key || selectedCalendarDay)}</h3>
 
               <div className="selected-detail-grid">
                 <div>
@@ -2774,8 +2887,19 @@ function CalendarPanel({ calendarDate, calendarData, selectedCalendarDay, setSel
                 {selectedDay.isOvulation && <span className="chip green-chip">Estimated ovulation</span>}
                 {(selectedDay.checkIns || []).length > 0 && <span className="chip blue-chip">Daily check-in saved</span>}
                 {selectedDay.isToday && <span className="chip gray-chip">Today</span>}
-                {selectedDay.isFuture && <span className="chip gray-chip">Future date</span>}
-                {!selectedDay.phaseLabel && !selectedDay.isToday && !(selectedDay.checkIns || []).length && <span className="chip gray-chip">No details yet</span>}
+                {!selectedDay.entry && !(selectedDay.checkIns || []).length && <span className="chip gray-chip">No logs for this date</span>}
+              </div>
+
+              <div className="calendar-log-section">
+                {selectedDay.entry && renderEntryDetails(selectedDay.entry)}
+                {(selectedDay.checkIns || []).map((entry, index) => (
+                  <div className="calendar-log-card" key={entry.id || `${entry.startDate}-${index}`}>
+                    <strong>Daily check-in</strong>
+                    {moodLabel(entry) !== "N/A" && <p><span>Mood(s):</span> {moodLabel(entry)}</p>}
+                    {(entry.symptoms || []).length > 0 && <p><span>Symptoms:</span> {(entry.symptoms || []).join(", ")}</p>}
+                    {entry.notes && <p><span>Notes:</span> {entry.notes}</p>}
+                  </div>
+                ))}
               </div>
 
               <p className="phase-tip">Phase labels are estimates based on the last menstruation date, average cycle length, and predicted ovulation. Timing can shift.</p>
@@ -2783,13 +2907,11 @@ function CalendarPanel({ calendarDate, calendarData, selectedCalendarDay, setSel
 
             <div className="actions selected-actions">
               {isReadOnly ? (
-                <p className="future-note">Support View is read-only. Calendar details and phase estimates are visible, but logging is not available.</p>
-              ) : selectedDay.isFuture ? (
-                <p className="future-note">Future dates show predictions only. You can log menstruation or daily check-ins once the date arrives.</p>
+                <p className="future-note">Support View is read-only. Previous logs can be viewed, but logging is not available.</p>
               ) : (
                 <>
-                  <Button onClick={() => onLogSelectedDate(selectedCalendarDay, "period")}><Plus size={16} /> Log menstruation</Button>
-                  <Button onClick={() => onLogSelectedDate(selectedCalendarDay, "checkin")} variant="secondary"><Smile size={16} /> Daily check-in</Button>
+                  <Button onClick={() => onLogSelectedDate(selectedDay.dateKey || selectedDay.key || selectedCalendarDay, "period")}><Plus size={16} /> Log menstruation</Button>
+                  <Button onClick={() => onLogSelectedDate(selectedDay.dateKey || selectedDay.key || selectedCalendarDay, "checkin")} variant="secondary"><Smile size={16} /> Daily check-in</Button>
                 </>
               )}
             </div>

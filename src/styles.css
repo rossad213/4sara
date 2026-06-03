@@ -2138,3 +2138,55 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     text-align: center;
   }
 }
+
+
+/* Remove shared Support View */
+.shared-profile-list .account-actions {
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+
+/* Calendar clickable log details */
+.day.future-disabled {
+  cursor: default;
+}
+
+.day.future-disabled:hover {
+  transform: none;
+}
+
+.calendar-log-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.calendar-log-card {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(255,255,255,.78);
+}
+
+.calendar-log-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.calendar-log-card p {
+  margin: 4px 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.calendar-log-card span {
+  color: var(--text);
+  font-weight: 900;
+}
+
+.dark .calendar-log-card {
+  background: rgba(30,41,59,.85);
+  border-color: rgba(148,163,184,.28);
+}

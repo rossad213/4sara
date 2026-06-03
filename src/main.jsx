@@ -522,6 +522,7 @@ function App() {
   });
 
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [viewMode, setViewMode] = useState("owner");
   const [form, setForm] = useState(blankForm());
   const [editingId, setEditingId] = useState(null);
   const [calendarDate, setCalendarDate] = useState(() => new Date());
@@ -1019,7 +1020,7 @@ function App() {
       ? "Add at least 3 cycles for better predictions."
       : "Add a menstruation entry to start seeing insights.";
 
-    const baseStats = { last, averageCycle, averagePeriod, nextPeriod, predictedEnd, ovulationDay, fertileStart, fertileEnd, reminderDate, daysUntil, currentCycleDay, minCycle, maxCycle, dataConfidence, confidenceNote, symptomStats, phaseInsights, checkInPhaseInsights, totalEntries: periodEntries.length };
+    const baseStats = { last, averageCycle, averagePeriod, nextPeriod, predictedEnd, ovulationDay, fertileStart, fertileEnd, reminderDate, daysUntil, currentCycleDay, currentPhase: inferPhase(todayKey(), chronological, averageCycle, averagePeriod), allEntries: chronological, minCycle, maxCycle, dataConfidence, confidenceNote, symptomStats, phaseInsights, checkInPhaseInsights, totalEntries: periodEntries.length };
 
     return { ...baseStats, dynamicSuggestions: buildSuggestions(baseStats) };
   }, [entries, settings]);
@@ -1271,7 +1272,7 @@ function App() {
     }
   };
 
-  const navItems = [
+  const ownerNavItems = [
     { id: "dashboard", label: "Home", icon: Home },
     { id: "calendar", label: "Calendar", icon: CalendarDays },
     { id: "log", label: "Log", icon: Plus },
@@ -1281,6 +1282,21 @@ function App() {
     { id: "account", label: "Account", icon: Mail },
     { id: "mobile", label: "Mobile", icon: Home }
   ];
+
+  const supportNavItems = [
+    { id: "calendar", label: "Calendar", icon: CalendarDays },
+    { id: "insights", label: "Insights", icon: Sparkles },
+    { id: "howtohelp", label: "How to Help", icon: HeartPulse }
+  ];
+
+  const navItems = viewMode === "support" ? supportNavItems : ownerNavItems;
+
+  useEffect(() => {
+    const allowedTabs = navItems.map((item) => item.id);
+    if (!allowedTabs.includes(activeTab)) {
+      setActiveTab(viewMode === "support" ? "calendar" : "dashboard");
+    }
+  }, [viewMode, activeTab]);
 
   if (!settings.welcomeSeen) {
     return <div className={settings.darkMode ? "app dark" : "app"}><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onReturn={() => updateSettings({ welcomeSeen: true, accountPromptSeen: true, onboardingComplete: true })} /></div>;
@@ -1343,14 +1359,21 @@ function App() {
               </button>
               <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
               <CloudStatusBadge authUser={authUser} autoSyncEnabled={autoSyncEnabled} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} syncBusy={syncBusy} lastCloudSave={lastCloudSave} />
+              <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTab} />
             </div>
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
             <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
           </div>
-          <div className="actions"><Button onClick={() => logToday("period")}><Plus size={16} /> Log Today</Button></div>
+          <div className="actions">{viewMode === "owner" && <Button onClick={() => logToday("period")}><Plus size={16} /> Log Today</Button>}</div>
         </header>
 
         {message && <div className="message">{message}</div>}
+        {viewMode === "support" && (
+          <div className="support-mode-banner">
+            <strong>Support View preview</strong>
+            <span>You are viewing a read-only support version. Logging, editing, settings, privacy, and account controls are hidden in this mode.</span>
+          </div>
+        )}
 
         <nav className="tabs">
           {navItems.map((item) => {
@@ -1368,7 +1391,8 @@ function App() {
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} />}
-            {activeTab === "mobile" && <MobileSetupPage />}
+            {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
+            {activeTab === "howtohelp" && viewMode === "support" && <HowToHelpPage stats={stats} settings={settings} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -1562,6 +1586,108 @@ function CloudStatusBadge({ authUser, autoSyncEnabled, cloudCheckedForAccount, c
   }
 
   return <span className={`cloud-status-badge ${className}`}>{label}</span>;
+}
+
+
+function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab }) {
+  const switchTo = (mode) => {
+    setViewMode(mode);
+    setActiveTab(mode === "support" ? "calendar" : "dashboard");
+  };
+
+  return (
+    <div className="view-mode-switcher" aria-label="Choose viewing mode">
+      <button className={viewMode === "owner" ? "active" : ""} onClick={() => switchTo("owner")}>My 4Sara</button>
+      <button className={viewMode === "support" ? "active" : ""} onClick={() => switchTo("support")}>Support View</button>
+    </div>
+  );
+}
+
+function HowToHelpPage({ stats }) {
+  const phase = stats.currentPhase || "Unknown";
+  const phaseText = phaseDescription(phase);
+  const topSymptoms = (stats.symptomStats || []).slice(0, 5);
+  const phasePatterns = stats.checkInPhaseInsights || [];
+
+  const supportTips = {
+    Menstruation: [
+      "Offer comfort, rest, water, a heating pad, or help with small tasks.",
+      "Be patient if energy is lower or cramps are present.",
+      "Avoid minimizing pain or symptoms."
+    ],
+    Follicular: [
+      "Encourage gentle planning, movement, or routines if energy is improving.",
+      "This may be a good time for positive motivation and shared plans.",
+      "Keep support flexible because energy can still vary."
+    ],
+    Fertile: [
+      "Be supportive and attentive to mood, energy, and body changes.",
+      "Respect privacy and boundaries around fertility information.",
+      "Remember the fertile window is only an estimate."
+    ],
+    Ovulation: [
+      "Support comfort if there is bloating, one-sided pain, or sensitivity.",
+      "Respect privacy and boundaries around ovulation information.",
+      "Remember ovulation timing is estimated and can shift."
+    ],
+    Luteal: [
+      "Be extra patient with mood changes, cravings, fatigue, or irritability.",
+      "Offer help before stress builds up, such as errands, meals, or quiet time.",
+      "Avoid unnecessary conflict and do not dismiss symptoms."
+    ],
+    Unknown: [
+      "Ask what kind of support would be helpful today.",
+      "Be patient, listen first, and avoid assumptions.",
+      "Encourage rest or medical care if symptoms feel concerning."
+    ]
+  };
+
+  const tips = supportTips[phase] || supportTips.Unknown;
+
+  return (
+    <main className="layout">
+      <Card className="pad main-col">
+        <h2><HeartPulse size={20} /> How to Help</h2>
+        <p className="muted">This read-only support guide uses phase estimates and logged patterns to suggest simple ways to be helpful.</p>
+
+        <div className="help-current-card">
+          <p className="account-eyebrow">Estimated current phase</p>
+          <h3>{phase}</h3>
+          <p>{phaseText}</p>
+        </div>
+
+        <div className="help-tip-list">
+          {tips.map((tip) => (
+            <div className="mini-card" key={tip}>
+              <strong>Support idea</strong>
+              <p>{tip}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="privacy-section legal-section">
+          <h3>Support reminder</h3>
+          <p>This view is not medical advice. It is meant to help supporters be more thoughtful, patient, and aware. Always respect privacy, consent, and boundaries.</p>
+        </div>
+      </Card>
+
+      <Card className="pad side-col">
+        <h3>Recent patterns</h3>
+        {topSymptoms.length ? topSymptoms.map(([symptom, count]) => (
+          <div className="mini-card" key={symptom}><strong>{symptom}</strong><p>Logged {count} time{count === 1 ? "" : "s"}.</p></div>
+        )) : <p className="muted">No symptom patterns yet.</p>}
+
+        <h3>Check-ins by phase</h3>
+        {phasePatterns.length ? phasePatterns.slice(0, 5).map((item) => (
+          <div className="mini-card" key={item.phase}>
+            <strong>{item.phase}</strong>
+            <p>{item.count} check-in{item.count === 1 ? "" : "s"} logged.</p>
+            {item.topMood && <p>Common mood: {item.topMood[0]}</p>}
+          </div>
+        )) : <p className="muted">No phase check-in patterns yet.</p>}
+      </Card>
+    </main>
+  );
 }
 
 function WelcomeScreen({ onStart, onReturn }) {
@@ -1886,7 +2012,9 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
             </div>
 
             <div className="actions selected-actions">
-              {selectedDay.isFuture ? (
+              {readOnly ? (
+                <p className="future-note">Support View is read-only. Calendar details and phase estimates are visible, but logging is not available.</p>
+              ) : selectedDay.isFuture ? (
                 <p className="future-note">Future dates show predictions only. You can log menstruation or daily check-ins once the date arrives.</p>
               ) : (
                 <>

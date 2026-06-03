@@ -510,6 +510,40 @@ function Card({ children, className = "" }) {
   return <div className={`card ${className}`}>{children}</div>;
 }
 
+
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, message: error?.message || "Something went wrong." };
+  }
+
+  componentDidCatch(error) {
+    console.error("4Sara screen error:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="app">
+          <div className="container">
+            <Card className="pad">
+              <h2>4Sara had trouble loading this screen</h2>
+              <p className="muted">Refresh the page. If this keeps happening, clear site data and reopen 4Sara.</p>
+              <p className="auth-error">{this.state.message}</p>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function App() {
   const [entries, setEntries] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || demoEntries; }
@@ -549,6 +583,12 @@ function App() {
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
+  const [pendingInvite, setPendingInvite] = useState(null);
+  const [inviteStatus, setInviteStatus] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [lastInviteLink, setLastInviteLink] = useState("");
+  const [sharedProfiles, setSharedProfiles] = useState({});
   const [customSymptomInput, setCustomSymptomInput] = useState("");
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A", consentAccepted: false });
 
@@ -574,9 +614,26 @@ function App() {
   useEffect(() => { if (settings.pinEnabled && settings.pin) setLocked(true); }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("invite");
+    if (token) {
+      setInviteToken(token);
+      setActiveTab("account");
+      setInviteStatus("Support invite found. Log in or create an account to accept it.");
+    }
+  }, []);
+
+
+  useEffect(() => {
     if (!authUser || cloudCheckedForAccount) return;
     checkCloudDataForAccount(authUser);
   }, [authUser, cloudCheckedForAccount]);
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    checkSupportInvite(inviteToken);
+  }, [inviteToken]);
+
 
   useEffect(() => {
     if (!authUser || !autoSyncEnabled || !cloudReady || !cloudCheckedForAccount || !cloudSyncAllowed) return;
@@ -674,6 +731,190 @@ function App() {
       showMessage("Verification email sent.");
     } catch (error) {
       setAuthError(error.message?.replace("Firebase: ", "") || "Could not send verification email.");
+    }
+  };
+
+  const makeInviteToken = () => {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  };
+
+  const createSupportInvite = async () => {
+    if (!authUser) {
+      showMessage("Log in first to create a support invite.");
+      return;
+    }
+
+    setInviteBusy(true);
+    setInviteStatus("Creating invite...");
+
+    try {
+      const token = makeInviteToken();
+      const ownerDisplayName = settings.profileName || authUser.email || "4Sara user";
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      await setDoc(doc(db, "supportInvites", token), {
+        token,
+        ownerUserId: authUser.uid,
+        ownerEmail: authUser.email,
+        ownerDisplayName,
+        status: "pending",
+        permissions: {
+          calendar: true,
+          insights: true,
+          howToHelp: true,
+          moods: true,
+          symptoms: true,
+          notes: false
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt
+      });
+
+      const link = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(token)}`;
+      setLastInviteLink(link);
+      setInviteStatus("Invite link created. Copy and send it to the person you want to invite.");
+      showMessage("Support invite created.");
+    } catch (error) {
+      setInviteStatus(error.message || "Could not create support invite.");
+      showMessage(error.message || "Could not create support invite.");
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const copyInviteLink = async () => {
+    if (!lastInviteLink) {
+      showMessage("Create an invite link first.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(lastInviteLink);
+      showMessage("Invite link copied.");
+    } catch {
+      setInviteStatus("Copy failed. Select and copy the invite link manually.");
+    }
+  };
+
+  const checkSupportInvite = async (token = inviteToken) => {
+    if (!token) return null;
+
+    setInviteBusy(true);
+    setInviteStatus("Checking invite...");
+
+    try {
+      const snapshot = await getDoc(doc(db, "supportInvites", token));
+
+      if (!snapshot.exists()) {
+        setPendingInvite(null);
+        setInviteStatus("Invite not found or already removed.");
+        return null;
+      }
+
+      const invite = snapshot.data();
+      setPendingInvite(invite);
+
+      if (invite.status !== "pending") {
+        setInviteStatus("This invite has already been used or is no longer active.");
+      } else if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+        setInviteStatus("This invite has expired. Ask the owner to create a new one.");
+      } else {
+        setInviteStatus(`Invite from ${invite.ownerDisplayName || "4Sara user"} found. Accept it to add Support View to your account.`);
+      }
+
+      return invite;
+    } catch (error) {
+      setInviteStatus(error.message || "Could not check invite.");
+      return null;
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const acceptSupportInvite = async () => {
+    if (!authUser) {
+      setInviteStatus("Log in or create an account before accepting the invite.");
+      setActiveTab("account");
+      return;
+    }
+
+    const token = inviteToken || pendingInvite?.token;
+    if (!token) {
+      setInviteStatus("No invite link found.");
+      return;
+    }
+
+    setInviteBusy(true);
+    setInviteStatus("Accepting invite...");
+
+    try {
+      const invite = pendingInvite || await checkSupportInvite(token);
+
+      if (!invite) return;
+
+      if (invite.status !== "pending") {
+        setInviteStatus("This invite is no longer active.");
+        return;
+      }
+
+      if (invite.ownerUserId === authUser.uid) {
+        setInviteStatus("You cannot accept your own support invite.");
+        return;
+      }
+
+      if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+        setInviteStatus("This invite has expired. Ask the owner to create a new one.");
+        return;
+      }
+
+      const acceptedAt = new Date().toISOString();
+      const sharedProfile = {
+        ownerUserId: invite.ownerUserId,
+        displayName: invite.ownerDisplayName || "Shared 4Sara",
+        role: "viewer",
+        permissions: invite.permissions || {},
+        acceptedAt
+      };
+
+      await setDoc(doc(db, "users", authUser.uid), {
+        sharedProfiles: {
+          [invite.ownerUserId]: sharedProfile
+        }
+      }, { merge: true });
+
+      await setDoc(doc(db, "users", invite.ownerUserId), {
+        supportViewers: {
+          [authUser.uid]: {
+            viewerUserId: authUser.uid,
+            viewerEmail: authUser.email,
+            role: "viewer",
+            permissions: invite.permissions || {},
+            acceptedAt
+          }
+        }
+      }, { merge: true });
+
+      await setDoc(doc(db, "supportInvites", token), {
+        status: "accepted",
+        acceptedBy: authUser.uid,
+        acceptedByEmail: authUser.email,
+        acceptedAt
+      }, { merge: true });
+
+      setSharedProfiles((current) => ({ ...current, [invite.ownerUserId]: sharedProfile }));
+      setPendingInvite(null);
+      setInviteToken("");
+      setInviteStatus("Invite accepted. Support View has been added to this account.");
+      showMessage("Support invite accepted.");
+
+      const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+      window.history.replaceState({}, document.title, cleanUrl);
+    } catch (error) {
+      setInviteStatus(error.message || "Could not accept invite.");
+      showMessage(error.message || "Could not accept invite.");
+    } finally {
+      setInviteBusy(false);
     }
   };
 
@@ -781,6 +1022,7 @@ function App() {
 
         setCloudHasData(hasCloudEntries);
         setCloudUpdatedAt(cloudData.updatedAt || "");
+        setSharedProfiles(snapshot.data()?.sharedProfiles || {});
 
         if (hasCloudEntries && !hasLocalEntries) {
           setEntries(cloudEntries);
@@ -803,6 +1045,7 @@ function App() {
       } else {
         setCloudHasData(false);
         setCloudUpdatedAt("");
+        setSharedProfiles({});
         setCloudSyncAllowed(true);
         setSyncStatus("No cloud data found yet. This device can save data to cloud.");
       }
@@ -1020,7 +1263,7 @@ function App() {
       ? "Add at least 3 cycles for better predictions."
       : "Add a menstruation entry to start seeing insights.";
 
-    const baseStats = { last, averageCycle, averagePeriod, nextPeriod, predictedEnd, ovulationDay, fertileStart, fertileEnd, reminderDate, daysUntil, currentCycleDay, currentPhase: inferPhase(todayKey(), chronological, averageCycle, averagePeriod), allEntries: chronological, minCycle, maxCycle, dataConfidence, confidenceNote, symptomStats, phaseInsights, checkInPhaseInsights, totalEntries: periodEntries.length };
+    const baseStats = { last, averageCycle, averagePeriod, nextPeriod, predictedEnd, ovulationDay, fertileStart, fertileEnd, reminderDate, daysUntil, currentCycleDay, minCycle, maxCycle, dataConfidence, confidenceNote, symptomStats, phaseInsights, checkInPhaseInsights, totalEntries: periodEntries.length };
 
     return { ...baseStats, dynamicSuggestions: buildSuggestions(baseStats) };
   }, [entries, settings]);
@@ -1390,7 +1633,7 @@ function App() {
             {activeTab === "insights" && <Insights stats={stats} settings={settings} setLocked={setLocked} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && viewMode === "support" && <HowToHelpPage stats={stats} settings={settings} />}
           </motion.div>
@@ -1402,7 +1645,7 @@ function App() {
 
 
 
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount }) {
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -1455,6 +1698,44 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               )}
             </div>
 
+            <div className="support-sharing-card">
+              <h3>Support sharing</h3>
+              <p>Create a read-only support invite. The invited person must log in or create an account before accepting.</p>
+
+              {inviteStatus && <p className="invite-status">{inviteStatus}</p>}
+
+              {inviteToken && pendingInvite && (
+                <div className="mini-card">
+                  <strong>Pending invite</strong>
+                  <p>From: {pendingInvite.ownerDisplayName || "4Sara user"}</p>
+                  <Button onClick={acceptSupportInvite} disabled={inviteBusy}>Accept support invite</Button>
+                </div>
+              )}
+
+              <div className="account-actions">
+                <Button onClick={createSupportInvite} disabled={inviteBusy}>Create support invite</Button>
+                {lastInviteLink && <Button onClick={copyInviteLink} variant="secondary">Copy invite link</Button>}
+              </div>
+
+              {lastInviteLink && (
+                <input className="invite-link-input" value={lastInviteLink} readOnly onFocus={(event) => event.target.select()} />
+              )}
+
+              {Object.keys(sharedProfiles || {}).length > 0 && (
+                <div className="shared-profile-list">
+                  <h4>Shared Support Views on this account</h4>
+                  {Object.values(sharedProfiles).map((profile) => (
+                    <div className="mini-card" key={profile.ownerUserId}>
+                      <strong>{profile.displayName || "Shared 4Sara"}</strong>
+                      <p>Role: read-only supporter</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="auth-note">This phase links the invite to an account. The next phase will load the owner’s shared calendar and insights data through secure Firestore rules.</p>
+            </div>
+
             <div className="info-box amber-box">
               <h3>Cloud sync</h3>
               <p>{syncStatus}</p>
@@ -1505,6 +1786,13 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
           </div>
         ) : (
           <div className="auth-panel">
+            {inviteToken && (
+              <div className="support-sharing-card">
+                <h3>Support invite found</h3>
+                <p>{inviteStatus || "Log in or create an account to accept this Support View invite."}</p>
+                {pendingInvite && <p>Invite from: <strong>{pendingInvite.ownerDisplayName || "4Sara user"}</strong></p>}
+              </div>
+            )}
             <div className="auth-mode-tabs">
               <button className={authMode === "signin" ? "active" : ""} onClick={() => setAuthMode("signin")}>Log in</button>
               <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>Create account</button>
@@ -1604,7 +1892,9 @@ function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab }) {
 }
 
 function HowToHelpPage({ stats }) {
-  const phase = stats.currentPhase || "Unknown";
+  const phase = stats.last?.startDate
+    ? inferPhase(todayKey(), [{ type: "period", startDate: stats.last.startDate, endDate: stats.last.endDate || stats.last.startDate }], stats.averageCycle, stats.averagePeriod)
+    : "Unknown";
   const phaseText = phaseDescription(phase);
   const topSymptoms = (stats.symptomStats || []).slice(0, 5);
   const phasePatterns = stats.checkInPhaseInsights || [];
@@ -2002,10 +2292,10 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
                 {selectedDay.isFollicular && <span className="chip sky-chip">Follicular phase</span>}
                 {selectedDay.isLuteal && <span className="chip amber-chip">Luteal phase</span>}
                 {selectedDay.isOvulation && <span className="chip green-chip">Estimated ovulation</span>}
-                {selectedDay.checkIns?.length > 0 && <span className="chip blue-chip">Daily check-in saved</span>}
+                {(selectedDay.checkIns || []).length > 0 && <span className="chip blue-chip">Daily check-in saved</span>}
                 {selectedDay.isToday && <span className="chip gray-chip">Today</span>}
                 {selectedDay.isFuture && <span className="chip gray-chip">Future date</span>}
-                {!selectedDay.phaseLabel && !selectedDay.isToday && (!selectedDay.checkIns || !selectedDay.checkIns.length) && <span className="chip gray-chip">No details yet</span>}
+                {!selectedDay.phaseLabel && !selectedDay.isToday && !(selectedDay.checkIns || []).length && <span className="chip gray-chip">No details yet</span>}
               </div>
 
               <p className="phase-tip">Phase labels are estimates based on the last menstruation date, average cycle length, and predicted ovulation. Timing can shift.</p>
@@ -2385,4 +2675,4 @@ function PrivacyCard({ settings, setLocked }) {
   return <Card className="pad"><h2><Lock size={20} /> Privacy</h2><p className="muted">This prototype stores data only in this browser. For a public app, use encrypted storage, secure accounts, clear delete/export tools, and strict privacy terms.</p>{settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}</Card>;
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(<AppErrorBoundary><App /></AppErrorBoundary>);

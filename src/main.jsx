@@ -1785,7 +1785,6 @@ function App() {
     showMessage(type === "checkin" ? `Ready to add a check-in for ${formatDate(dateKey)}.` : `Ready to log menstruation for ${formatDate(dateKey)}.`);
   };
 
-
   const jumpToNextPeriod = () => {
     if (!stats.nextPeriod) return showMessage("Add a cycle first so 4Sara can predict the next menstruation.");
     setCalendarDate(new Date(stats.nextPeriod + "T00:00:00"));
@@ -1956,7 +1955,7 @@ function App() {
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 16, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: "easeOut" }}>
             {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} previewReminder={previewReminder} setLocked={setLocked} />}
-            {activeTab === "calendar" && <CalendarPanel calendarDate={calendarDate} calendarData={calendarData} moveMonth={(direction) => setCalendarDate((current) => new Date(current.getFullYear(), current.getMonth() + direction, 1))} onDayClick={(day) => { setSelectedCalendarDay(day); showMessage(`Selected ${formatDate(day)}.`); }} selectedCalendarDay={selectedCalendarDay} onLogSelectedDate={startLogForSelectedDate} />}
+            {activeTab === "calendar" && <CalendarPanel calendarDate={calendarDate} calendarData={calendarData} moveMonth={(direction) => setCalendarDate((current) => new Date(current.getFullYear(), current.getMonth() + direction, 1))} onDayClick={(day) => { setSelectedCalendarDay(day); showMessage(`Selected ${formatDate(day)}.`); }} selectedCalendarDay={selectedCalendarDay} onLogSelectedDate={startLogForSelectedDate} readOnly={viewMode === "support"} />}
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
@@ -2611,7 +2610,8 @@ function InfoTile({ title, value }) {
   return <div className="tile"><p>{title}</p><strong>{value}</strong></div>;
 }
 
-function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, selectedCalendarDay, onLogSelectedDate }) {
+function CalendarPanel({ calendarDate, calendarData, selectedCalendarDay, setSelectedCalendarDay, setCalendarDate, stats, onLogSelectedDate, readOnly = false }) {
+  const isReadOnly = Boolean(readOnly);
   const selectedDay = calendarData.find((day) => day.dateKey === selectedCalendarDay);
 
   return (

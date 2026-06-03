@@ -797,6 +797,7 @@ function App() {
   const [cloudCheckedForAccount, setCloudCheckedForAccount] = useState(false);
   const [cloudSyncAllowed, setCloudSyncAllowed] = useState(false);
   const [accountDataChecked, setAccountDataChecked] = useState(false);
+  const [existingAccountLoaded, setExistingAccountLoaded] = useState(false);
   const [cloudHasData, setCloudHasData] = useState(false);
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
@@ -1469,6 +1470,7 @@ function App() {
           }));
           await rememberCloudChoiceForAccount(user, "load-cloud");
           setCloudSyncAllowed(true);
+          setExistingAccountLoaded(true);
           setSyncStatus("Cloud data loaded automatically because this device had no local data.");
           showMessage("Cloud data loaded.");
         } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "save-device") {
@@ -1488,6 +1490,7 @@ function App() {
           setActiveTab("dashboard");
           setExistingAccountLoaded(true);
           setCloudSyncAllowed(true);
+          setExistingAccountLoaded(true);
           setSyncStatus("Cloud data loaded. You are signed in and ready to use 4Sara.");
         } else if (hasCloudEntries && hasLocalEntries) {
           setSettings((current) => ({
@@ -1499,6 +1502,7 @@ function App() {
           setActiveTab("dashboard");
           setExistingAccountLoaded(true);
           setCloudSyncAllowed(false);
+          setExistingAccountLoaded(true);
           setSyncStatus("Cloud data found. Auto-sync is paused until you choose whether to load cloud data or save this device’s data.");
         } else {
           await rememberCloudChoiceForAccount(user, "save-device");
@@ -1623,6 +1627,7 @@ function App() {
       setCloudCheckedForAccount(true);
       setCloudSyncAllowed(true);
       setCloudHasData(true);
+      setExistingAccountLoaded(true);
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}. This device will keep using cloud data after refresh.`);
       showMessage("Loaded cloud data.");
     } catch (error) {
@@ -2093,6 +2098,8 @@ function App() {
     }
   }, [viewMode, activeTab]);
 
+  const hasLoadedExistingAccount = Boolean(existingAccountLoaded || (authUser && cloudHasData && cloudCheckedForAccount));
+
   if (!settings.welcomeSeen) {
     return <div className={settings.darkMode ? "app dark" : "app"}><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onReturn={() => updateSettings({ welcomeSeen: true, accountPromptSeen: true, onboardingComplete: true })} /></div>;
   }
@@ -2132,7 +2139,7 @@ function App() {
     );
   }
 
-  if (authUser && existingAccountLoaded) {
+  if (authUser && hasLoadedExistingAccount) {
     // Existing signed-in accounts with cloud data should never be sent back through onboarding on any device or browser.
   } else if (!settings.onboardingComplete) {
     return <div className={settings.darkMode ? "app dark" : "app"}><OnboardingScreen onboarding={onboarding} setOnboarding={setOnboarding} completeOnboarding={completeOnboarding} skipOnboarding={skipOnboarding} message={message} /></div>;

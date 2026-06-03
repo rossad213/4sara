@@ -2115,3 +2115,26 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .sync-small {
   line-height: 1.35;
 }
+
+
+/* Account-level cloud preference note */
+.sync-small {
+  line-height: 1.35;
+}
+
+
+/* My Support View switcher polish */
+.view-mode-switcher button {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .view-mode-switcher {
+    flex-wrap: wrap;
+  }
+
+  .view-mode-switcher select {
+    width: 100%;
+    text-align: center;
+  }
+}

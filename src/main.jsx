@@ -593,6 +593,33 @@ function clearCloudChoice(userId) {
   localStorage.setItem(CLOUD_CHOICE_KEY, JSON.stringify(current));
 }
 
+async function rememberCloudChoiceForAccount(user, choice) {
+  if (!user || !choice) return;
+
+  rememberCloudChoice(user.uid, choice);
+
+  await setDoc(doc(db, "users", user.uid), {
+    email: user.email || "",
+    cloudPreference: {
+      choice,
+      updatedAt: new Date().toISOString()
+    }
+  }, { merge: true });
+}
+
+async function clearCloudChoiceForAccount(user) {
+  if (!user) return;
+
+  clearCloudChoice(user.uid);
+
+  await setDoc(doc(db, "users", user.uid), {
+    cloudPreference: {
+      choice: "",
+      clearedAt: new Date().toISOString()
+    }
+  }, { merge: true });
+}
+
 function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const safeEntries = Array.isArray(sourceEntries) ? sourceEntries : [];
   const safeSettings = { ...defaultSettings, ...(sourceSettings || {}) };
@@ -832,7 +859,7 @@ function App() {
 
     if (!selectedSharedOwnerId) {
       setSharedSupportData(null);
-      setSharedSupportStatus("");
+      setSharedSupportStatus("My Support View preview is using your own data in read-only mode.");
       return;
     }
 
@@ -1231,7 +1258,7 @@ function App() {
 
     try {
       await deleteDoc(doc(db, "users", authUser.uid));
-      clearCloudChoice(authUser.uid);
+      await clearCloudChoiceForAccount(authUser);
       setCloudHasData(false);
       setCloudUpdatedAt("");
       setCloudSyncAllowed(false);
@@ -1323,7 +1350,8 @@ function App() {
         setSharedProfiles(snapshot.data()?.sharedProfiles || {});
         setSupportViewers(snapshot.data()?.supportViewers || {});
 
-        const rememberedChoice = getCloudChoice(user.uid)?.choice;
+        const accountChoice = snapshot.data()?.cloudPreference?.choice;
+        const rememberedChoice = accountChoice || getCloudChoice(user.uid)?.choice;
 
         if (hasCloudEntries && !hasLocalEntries) {
           setEntries(cloudEntries);
@@ -1333,21 +1361,21 @@ function App() {
             pin: current.pin,
             pinEnabled: current.pinEnabled
           }));
-          rememberCloudChoice(user.uid, "load-cloud");
+          await rememberCloudChoiceForAccount(user, "load-cloud");
           setCloudSyncAllowed(true);
           setSyncStatus("Cloud data loaded automatically because this device had no local data.");
           showMessage("Cloud data loaded.");
         } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "save-device") {
           setCloudSyncAllowed(true);
-          setSyncStatus("Cloud sync is allowed because you previously chose to save this device’s data to cloud.");
+          setSyncStatus("Cloud sync is allowed because this account previously chose to save device data to cloud.");
         } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "load-cloud") {
           setCloudSyncAllowed(true);
-          setSyncStatus("Cloud sync is allowed because you previously chose to load cloud data on this device.");
+          setSyncStatus("Cloud sync is allowed because this account previously chose to load cloud data.");
         } else if (hasCloudEntries && hasLocalEntries) {
           setCloudSyncAllowed(false);
           setSyncStatus("Cloud data found. Auto-sync is paused until you choose whether to load cloud data or save this device’s data.");
         } else {
-          rememberCloudChoice(user.uid, "save-device");
+          await rememberCloudChoiceForAccount(user, "save-device");
           setCloudSyncAllowed(true);
           setSyncStatus("No cloud data found yet. This device can save data to cloud.");
         }
@@ -1356,8 +1384,9 @@ function App() {
         setCloudUpdatedAt("");
         setSharedProfiles({});
         setSupportViewers({});
+        await rememberCloudChoiceForAccount(user, "save-device");
         setCloudSyncAllowed(true);
-        setSyncStatus("No cloud data found yet. This device can save data to cloud.");
+        setSyncStatus("No cloud data found yet. This account can save data to cloud.");
       }
 
       setCloudCheckedForAccount(true);
@@ -1379,6 +1408,10 @@ function App() {
           ...settings,
           pin: ""
         },
+        updatedAt: new Date().toISOString()
+      },
+      cloudPreference: {
+        choice: "save-device",
         updatedAt: new Date().toISOString()
       },
       updatedAt: serverTimestamp()
@@ -1404,12 +1437,16 @@ function App() {
       await setDoc(doc(db, "users", authUser.uid), {
         email: authUser.email,
         data: buildCloudPayload(),
+        cloudPreference: {
+          choice: "save-device",
+          updatedAt: new Date().toISOString()
+        },
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+      rememberCloudChoice(authUser.uid, "save-device");
       const savedTime = new Date().toLocaleTimeString();
       setLastCloudSave(savedTime);
-      rememberCloudChoice(authUser.uid, "save-device");
       setCloudCheckedForAccount(true);
       setCloudSyncAllowed(true);
       setCloudHasData(true);
@@ -1453,7 +1490,7 @@ function App() {
         pinEnabled: current.pinEnabled
       }));
 
-      rememberCloudChoice(authUser.uid, "load-cloud");
+      await rememberCloudChoiceForAccount(authUser, "load-cloud");
       setCloudCheckedForAccount(true);
       setCloudSyncAllowed(true);
       setCloudHasData(true);
@@ -1978,7 +2015,7 @@ function App() {
         {viewMode === "support" && (
           <div className="support-mode-banner">
             <strong>{sharedSupportData ? `${sharedSupportData.displayName}'s Support View` : "Support View preview"}</strong>
-            <span>{sharedSupportStatus || (selectedSharedOwnerId ? "Read-only access is active. Logging, editing, settings, privacy, and account controls are hidden." : "Preview mode. Choose an accepted Support View profile to see shared calendar, insights, and How to Help data.")}</span>
+            <span>{sharedSupportStatus || (selectedSharedOwnerId ? "Read-only access is active. Logging, editing, settings, privacy, and account controls are hidden." : "This is your own read-only Support View preview. It shows what supporters can see without allowing edits.")}</span>
           </div>
         )}
 
@@ -2121,7 +2158,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                 </div>
               )}
 
-              <p className="auth-note">This phase links the invite to an account. The next phase will load the owner’s shared calendar and insights data through secure Firestore rules.</p>
+              <p className="auth-note">Use My Support View to preview what supporters can see. Shared Support Views are read-only profiles that other users have shared with you.</p>
             </div>
 
             <div className="support-sharing-card">
@@ -2154,7 +2191,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <h3>Cloud sync</h3>
               <p>{syncStatus}</p>
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
-              <p className="sync-small">4Sara remembers your last cloud choice on this device.</p>
+              <p className="sync-small">4Sara remembers your last cloud choice for this signed-in account, with this device as a backup.</p>
             </div>
 
             <label className="setting-row autosync-row">
@@ -2302,7 +2339,7 @@ function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles,
     setActiveTab("dashboard");
   };
 
-  const switchToSupportPreview = () => {
+  const switchToMySupportPreview = () => {
     setViewMode("support");
     setSelectedSharedOwnerId("");
     setActiveTab("calendar");
@@ -2311,22 +2348,23 @@ function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles,
   return (
     <div className="view-mode-switcher" aria-label="Choose viewing mode">
       <button className={viewMode === "owner" ? "active" : ""} onClick={switchToOwner}>My 4Sara</button>
+      <button className={viewMode === "support" && !selectedSharedOwnerId ? "active" : ""} onClick={switchToMySupportPreview}>My Support View</button>
 
-      {profiles.length ? (
+      {profiles.length > 0 && (
         <select
-          value={viewMode === "support" ? selectedSharedOwnerId : ""}
-          onChange={(event) => event.target.value ? chooseSharedSupportView(event.target.value) : switchToSupportPreview()}
-          aria-label="Choose Support View"
+          value={viewMode === "support" && selectedSharedOwnerId ? selectedSharedOwnerId : ""}
+          onChange={(event) => {
+            if (event.target.value) chooseSharedSupportView(event.target.value);
+          }}
+          aria-label="Choose a shared Support View"
         >
-          <option value="">Support View</option>
+          <option value="">Shared Support Views</option>
           {profiles.map((profile) => (
             <option key={profile.ownerUserId} value={profile.ownerUserId}>
               {profile.displayName || "Shared 4Sara"}
             </option>
           ))}
         </select>
-      ) : (
-        <button className={viewMode === "support" ? "active" : ""} onClick={switchToSupportPreview}>Support View</button>
       )}
     </div>
   );

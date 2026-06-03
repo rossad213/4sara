@@ -32,6 +32,7 @@ import "./styles.css";
 
 const STORAGE_KEY = "4sara_entries_final";
 const SETTINGS_KEY = "4sara_settings_final";
+const CLOUD_CHOICE_KEY = "4sara_cloud_choice_by_user";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDkzvywYKkGnj65WP-Yu24a_6NMypghFcU",
@@ -559,6 +560,37 @@ function friendlyPermissionMessage(message) {
     return "You may not have access to this shared view anymore. Ask the owner to send a new invite.";
   }
   return text || "Something went wrong. Please try again.";
+}
+
+
+function getCloudChoiceMap() {
+  try {
+    return JSON.parse(localStorage.getItem(CLOUD_CHOICE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function getCloudChoice(userId) {
+  if (!userId) return null;
+  return getCloudChoiceMap()[userId] || null;
+}
+
+function rememberCloudChoice(userId, choice) {
+  if (!userId || !choice) return;
+  const current = getCloudChoiceMap();
+  current[userId] = {
+    choice,
+    rememberedAt: new Date().toISOString()
+  };
+  localStorage.setItem(CLOUD_CHOICE_KEY, JSON.stringify(current));
+}
+
+function clearCloudChoice(userId) {
+  if (!userId) return;
+  const current = getCloudChoiceMap();
+  delete current[userId];
+  localStorage.setItem(CLOUD_CHOICE_KEY, JSON.stringify(current));
 }
 
 function calculateStatsForEntries(sourceEntries, sourceSettings) {
@@ -1199,6 +1231,7 @@ function App() {
 
     try {
       await deleteDoc(doc(db, "users", authUser.uid));
+      clearCloudChoice(authUser.uid);
       setCloudHasData(false);
       setCloudUpdatedAt("");
       setCloudSyncAllowed(false);
@@ -1230,6 +1263,7 @@ function App() {
     setSyncStatus("Deleting account...");
 
     try {
+      clearCloudChoice(authUser.uid);
       await deleteDoc(doc(db, "users", authUser.uid));
       await deleteUser(auth.currentUser);
 
@@ -1289,6 +1323,8 @@ function App() {
         setSharedProfiles(snapshot.data()?.sharedProfiles || {});
         setSupportViewers(snapshot.data()?.supportViewers || {});
 
+        const rememberedChoice = getCloudChoice(user.uid)?.choice;
+
         if (hasCloudEntries && !hasLocalEntries) {
           setEntries(cloudEntries);
           setSettings((current) => ({
@@ -1297,13 +1333,21 @@ function App() {
             pin: current.pin,
             pinEnabled: current.pinEnabled
           }));
+          rememberCloudChoice(user.uid, "load-cloud");
           setCloudSyncAllowed(true);
           setSyncStatus("Cloud data loaded automatically because this device had no local data.");
           showMessage("Cloud data loaded.");
+        } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "save-device") {
+          setCloudSyncAllowed(true);
+          setSyncStatus("Cloud sync is allowed because you previously chose to save this device’s data to cloud.");
+        } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "load-cloud") {
+          setCloudSyncAllowed(true);
+          setSyncStatus("Cloud sync is allowed because you previously chose to load cloud data on this device.");
         } else if (hasCloudEntries && hasLocalEntries) {
           setCloudSyncAllowed(false);
           setSyncStatus("Cloud data found. Auto-sync is paused until you choose whether to load cloud data or save this device’s data.");
         } else {
+          rememberCloudChoice(user.uid, "save-device");
           setCloudSyncAllowed(true);
           setSyncStatus("No cloud data found yet. This device can save data to cloud.");
         }
@@ -1340,6 +1384,7 @@ function App() {
       updatedAt: serverTimestamp()
     }, { merge: true });
 
+    rememberCloudChoice(authUser.uid, "save-device");
     const savedTime = new Date().toLocaleTimeString();
     setLastCloudSave(savedTime);
     setCloudHasData(true);
@@ -1364,10 +1409,11 @@ function App() {
 
       const savedTime = new Date().toLocaleTimeString();
       setLastCloudSave(savedTime);
+      rememberCloudChoice(authUser.uid, "save-device");
       setCloudCheckedForAccount(true);
       setCloudSyncAllowed(true);
       setCloudHasData(true);
-      setSyncStatus(`Saved to cloud at ${savedTime}.`);
+      setSyncStatus(`Saved to cloud at ${savedTime}. This device will keep using Save to cloud after refresh.`);
       showMessage("Saved to cloud.");
     } catch (error) {
       setSyncStatus("Cloud save failed.");
@@ -1407,10 +1453,11 @@ function App() {
         pinEnabled: current.pinEnabled
       }));
 
+      rememberCloudChoice(authUser.uid, "load-cloud");
       setCloudCheckedForAccount(true);
       setCloudSyncAllowed(true);
       setCloudHasData(true);
-      setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}.`);
+      setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}. This device will keep using cloud data after refresh.`);
       showMessage("Loaded cloud data.");
     } catch (error) {
       setSyncStatus("Cloud load failed.");
@@ -2107,6 +2154,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <h3>Cloud sync</h3>
               <p>{syncStatus}</p>
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
+              <p className="sync-small">4Sara remembers your last cloud choice on this device.</p>
             </div>
 
             <label className="setting-row autosync-row">

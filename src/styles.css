@@ -2215,3 +2215,9 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   pointer-events: none;
   opacity: .25;
 }
+
+
+/* Account loading gate */
+.container > .card.pad h2 {
+  margin-bottom: 6px;
+}

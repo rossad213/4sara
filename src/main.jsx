@@ -796,6 +796,7 @@ function App() {
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudCheckedForAccount, setCloudCheckedForAccount] = useState(false);
   const [cloudSyncAllowed, setCloudSyncAllowed] = useState(false);
+  const [accountDataChecked, setAccountDataChecked] = useState(false);
   const [cloudHasData, setCloudHasData] = useState(false);
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
@@ -824,6 +825,7 @@ function App() {
       setAuthLoading(false);
       setCloudReady(Boolean(user));
       setCloudCheckedForAccount(false);
+      setAccountDataChecked(false);
       setCloudSyncAllowed(false);
       setCloudHasData(false);
       setSupportViewers({});
@@ -877,6 +879,13 @@ function App() {
     if (!authUser || cloudCheckedForAccount) return;
     checkCloudDataForAccount(authUser);
   }, [authUser, cloudCheckedForAccount]);
+
+  useEffect(() => {
+    if (!authUser && !authLoading) {
+      setAccountDataChecked(true);
+    }
+  }, [authUser, authLoading]);
+
 
   useEffect(() => {
     if (!inviteToken) return;
@@ -1451,6 +1460,9 @@ function App() {
           setSettings((current) => ({
             ...current,
             ...cloudSettings,
+            welcomeSeen: true,
+            accountPromptSeen: true,
+            onboardingComplete: true,
             pin: current.pin,
             pinEnabled: current.pinEnabled
           }));
@@ -1462,9 +1474,27 @@ function App() {
           setCloudSyncAllowed(true);
           setSyncStatus("Cloud sync is allowed because this account previously chose to save device data to cloud.");
         } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "load-cloud") {
+          setEntries(cloudEntries);
+          setSettings((current) => ({
+            ...current,
+            ...cloudSettings,
+            welcomeSeen: true,
+            accountPromptSeen: true,
+            onboardingComplete: true,
+            pin: current.pin,
+            pinEnabled: current.pinEnabled
+          }));
+          setActiveTab("dashboard");
           setCloudSyncAllowed(true);
-          setSyncStatus("Cloud sync is allowed because this account previously chose to load cloud data.");
+          setSyncStatus("Cloud data loaded. You are signed in and ready to use 4Sara.");
         } else if (hasCloudEntries && hasLocalEntries) {
+          setSettings((current) => ({
+            ...current,
+            welcomeSeen: true,
+            accountPromptSeen: true,
+            onboardingComplete: true
+          }));
+          setActiveTab("dashboard");
           setCloudSyncAllowed(false);
           setSyncStatus("Cloud data found. Auto-sync is paused until you choose whether to load cloud data or save this device’s data.");
         } else {
@@ -1483,9 +1513,11 @@ function App() {
       }
 
       setCloudCheckedForAccount(true);
+      setAccountDataChecked(true);
     } catch (error) {
       setSyncStatus(error.message || "Could not check cloud data.");
       setCloudCheckedForAccount(true);
+      setAccountDataChecked(true);
       setCloudSyncAllowed(false);
     }
   };
@@ -2083,6 +2115,19 @@ function App() {
     );
   }
 
+  if (authUser && !accountDataChecked) {
+    return (
+      <div className="app">
+        <div className="container">
+          <Card className="pad">
+            <h2>Loading your 4Sara account...</h2>
+            <p className="muted">Checking for your saved cloud data before setup continues.</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (!settings.onboardingComplete) {
     return <div className={settings.darkMode ? "app dark" : "app"}><OnboardingScreen onboarding={onboarding} setOnboarding={setOnboarding} completeOnboarding={completeOnboarding} skipOnboarding={skipOnboarding} message={message} /></div>;
   }
@@ -2343,7 +2388,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <h3>Cloud sync</h3>
               <p>{syncStatus}</p>
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
-              <p className="sync-small">4Sara remembers your last cloud choice for this signed-in account, with this device as a backup.</p>
+              <p className="sync-small">Existing accounts with cloud data open directly into the tracker on new devices.</p>
             </div>
 
             <label className="setting-row autosync-row">

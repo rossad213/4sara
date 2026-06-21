@@ -2227,3 +2227,121 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .container > .card.pad h2 {
   margin-bottom: 6px;
 }
+
+
+/* Mobile-only calendar layout fix */
+@media (max-width: 760px) {
+  .weekdays,
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    width: 100%;
+    max-width: 100%;
+    gap: 5px;
+    overflow: hidden;
+  }
+
+  .weekdays div {
+    min-width: 0;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  .calendar-grid .day,
+  .day {
+    min-width: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    aspect-ratio: 1 / 1;
+    padding: 6px 3px;
+    border-radius: 13px;
+    overflow: hidden;
+  }
+
+  .calendar-grid .day b,
+  .day b {
+    display: block;
+    font-size: 12px;
+    line-height: 1;
+    margin: 0 0 3px;
+  }
+
+  .calendar-grid .day small,
+  .day small {
+    display: block;
+    font-size: 8px;
+    line-height: 1.05;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .calendar-grid .day.selected,
+  .day.selected {
+    box-shadow: 0 0 0 2px rgba(71, 85, 105, .65);
+  }
+
+  .calendar-grid .day.empty,
+  .day.empty {
+    pointer-events: none;
+  }
+
+  .phase-cards {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .phase-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .phase-card h3 {
+    font-size: 16px;
+  }
+
+  .phase-card p {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .month-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .selected-card-enhanced {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .weekdays,
+  .calendar-grid {
+    gap: 4px;
+  }
+
+  .calendar-grid .day,
+  .day {
+    padding: 5px 2px;
+    border-radius: 11px;
+  }
+
+  .calendar-grid .day b,
+  .day b {
+    font-size: 11px;
+  }
+
+  .calendar-grid .day small,
+  .day small {
+    font-size: 7.5px;
+  }
+
+  .weekdays div {
+    font-size: 10px;
+  }
+}

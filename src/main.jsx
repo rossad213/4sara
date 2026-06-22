@@ -2670,53 +2670,139 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
   );
 }
 
-function WelcomeScreen({ onStart, onReturn }) {
+function WelcomeScreen({ onStart, onLogin }) {
+  const [welcomeTab, setWelcomeTab] = useState("home");
+
+  const supportLinks = {
+    stripe3: "https://buy.stripe.com/4gMaEX65g5up6TCgQtgnK00",
+    stripe5: "https://buy.stripe.com/7sYbJ1alw9KF91K57LgnK01",
+    stripe10: "https://buy.stripe.com/14AcN58doaOJ5Py1VzgnK02",
+    stripeCustom: "https://buy.stripe.com/aFa5kDdxI6yt3Hqbw9gnK03"
+  };
+
+  const openSupportLink = (url) => {
+    if (!url) {
+      alert("Support link coming soon.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <div className="welcome-screen">
-      <div className="welcome-shell">
-        <div className="welcome-logo" aria-hidden="true">
-          <img src="/icons/icon-192.png" alt="" />
+    <div className="welcome-wrap">
+      <div className="welcome-card">
+        <div className="welcome-ribbon" aria-label="Welcome navigation">
+          <button className={welcomeTab === "home" ? "active" : ""} onClick={() => setWelcomeTab("home")}>Home</button>
+          <button className={welcomeTab === "about" ? "active" : ""} onClick={() => setWelcomeTab("about")}>About</button>
+          <button className={welcomeTab === "support" ? "active" : ""} onClick={() => setWelcomeTab("support")}>Support</button>
         </div>
 
-        <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
+        <img className="welcome-logo" src="/icon-512.png" alt="4Sara logo" />
 
-        <h1>Welcome to 4Sara</h1>
+        {welcomeTab === "home" && (
+          <>
+            <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
+            <h1>Welcome to 4Sara</h1>
+            <p className="welcome-subtitle">Your private cycle companion for tracking menstruation, symptoms, moods, phases, and patterns — all in one simple place.</p>
 
-        <p className="welcome-lead">
-          Your private cycle companion for tracking menstruation, symptoms, moods, phases, and patterns — all in one simple place.
-        </p>
+            <div className="welcome-features">
+              <div className="welcome-feature"><Lock size={20} /><h3>Private by design</h3><p>Your data stays on this device unless you choose to save it to cloud.</p></div>
+              <div className="welcome-feature"><CalendarDays size={20} /><h3>Track every phase</h3><p>See menstruation, follicular, fertile, ovulation, and luteal estimates.</p></div>
+              <div className="welcome-feature"><Sparkles size={20} /><h3>Understand patterns</h3><p>Use check-ins to uncover symptoms, moods, and helpful suggestions.</p></div>
+            </div>
 
-        <div className="welcome-highlights">
-          <div>
-            <Lock size={20} />
-            <strong>Private by design</strong>
-            <p>Your data stays on this device unless you choose to export it.</p>
+            <div className="welcome-actions">
+              <Button onClick={onStart}><Plus size={16} /> Get Started</Button>
+              <Button onClick={onLogin} variant="secondary">I already use 4Sara</Button>
+            </div>
+
+            <p className="welcome-disclaimer">4Sara provides estimates and wellness tracking only. It should not be used as birth control or medical advice.</p>
+          </>
+        )}
+
+        {welcomeTab === "about" && (
+          <div className="welcome-info-page">
+            <div className="pill"><HeartPulse size={16} /> About 4Sara</div>
+            <h1>Built with care, privacy, and support in mind</h1>
+            <p>
+              4Sara began as a personal project created by Ross for his girlfriend, Sara. He wanted to build a private, thoughtful cycle tracker that could be customized around her needs — not just a generic app, but something simple, supportive, and easier to understand.
+            </p>
+            <p>
+              As the project grew, Ross realized that the same kind of tool could help others too. 4Sara was built to make cycle tracking feel more personal, more private, and more supportive, with features like phase estimates, symptom and mood tracking, insights, and read-only Support View sharing for trusted people.
+            </p>
+            <p>
+              4Sara is free to use because helpful wellness tools should be accessible. Support from friendly contributors helps keep 4Sara free and growing while improving the experience for everyone.
+            </p>
+
+            <div className="about-highlight-grid">
+              <div className="mini-card"><strong>Personal</strong><p>Designed around real needs, not a one-size-fits-all experience.</p></div>
+              <div className="mini-card"><strong>Private</strong><p>Built with privacy-focused tracking, cloud choice, and account controls.</p></div>
+              <div className="mini-card"><strong>Supportive</strong><p>Support View helps trusted people understand how to help without editing data.</p></div>
+            </div>
+
+            <div className="welcome-actions">
+              <Button onClick={() => setWelcomeTab("support")}>Support 4Sara</Button>
+              <Button onClick={onStart} variant="secondary">Start using 4Sara</Button>
+            </div>
           </div>
-          <div>
-            <CalendarDays size={20} />
-            <strong>Track every phase</strong>
-            <p>See menstruation, follicular, fertile, ovulation, and luteal estimates.</p>
-          </div>
-          <div>
-            <Sparkles size={20} />
-            <strong>Understand patterns</strong>
-            <p>Use check-ins to uncover symptoms, moods, and helpful suggestions.</p>
-          </div>
-        </div>
+        )}
 
-        <div className="welcome-actions">
-          <Button onClick={onStart}><Plus size={16} /> Get Started</Button>
-          <Button onClick={onReturn} variant="secondary">I already use 4Sara</Button>
-        </div>
+        {welcomeTab === "support" && (
+          <div className="welcome-info-page">
+            <div className="pill"><Sparkles size={16} /> Support 4Sara</div>
+            <h1>Help keep 4Sara free and growing</h1>
+            <p>
+              4Sara is free to use. Monthly support helps keep the app available, privacy-focused, and continuously improving for users and their trusted supporters.
+            </p>
+            <p>
+              Support is optional and appreciated. 4Sara is not currently presented as a tax-deductible nonprofit donation.
+            </p>
 
-        <p className="welcome-note">
-          4Sara provides estimates and wellness tracking only. It should not be used as birth control or medical advice.
-        </p>
+            <div className="support-tier-grid">
+              <div className="support-tier-card">
+                <span className="support-tier-label">Supporter</span>
+                <h3>$3/month</h3>
+                <p>Simple monthly support to help keep 4Sara free and improving.</p>
+                <Button onClick={() => openSupportLink(supportLinks.stripe3)}>Support with $3/month</Button>
+              </div>
+
+              <div className="support-tier-card featured">
+                <span className="support-tier-label">Friend of 4Sara</span>
+                <h3>$5/month</h3>
+                <p>A little extra support for continued updates, polish, and privacy-focused improvements.</p>
+                <Button onClick={() => openSupportLink(supportLinks.stripe5)}>Support with $5/month</Button>
+              </div>
+
+              <div className="support-tier-card">
+                <span className="support-tier-label">Builder Supporter</span>
+                <h3>$10/month</h3>
+                <p>Strong monthly support for future features and keeping 4Sara available for others.</p>
+                <Button onClick={() => openSupportLink(supportLinks.stripe10)}>Support with $10/month</Button>
+              </div>
+
+              <div className="support-tier-card custom-support-card">
+                <span className="support-tier-label">Custom support</span>
+                <h3>Custom amount</h3>
+                <p>Choose your own support amount through Stripe.</p>
+                <Button onClick={() => openSupportLink(supportLinks.stripeCustom)} variant="secondary">Choose custom amount</Button>
+              </div>
+            </div>
+
+            <div className="support-note-box">
+              <strong>Secure checkout</strong>
+              <p>Stripe securely handles the support checkout. Monthly options are recurring, and the custom amount option lets supporters choose their own amount.</p>
+            </div>
+
+
+            <div className="welcome-actions">
+              <Button onClick={onStart} variant="secondary">Continue to 4Sara</Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
 
 
 function PasswordRequirements({ password }) {

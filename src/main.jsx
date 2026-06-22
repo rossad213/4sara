@@ -2697,13 +2697,7 @@ function WelcomeScreen({ onStart, onLogin }) {
           <button className={welcomeTab === "support" ? "active" : ""} onClick={() => setWelcomeTab("support")}>Support</button>
         </div>
 
-        <div className="welcome-logo-css" role="img" aria-label="4Sara logo">
-          <span className="petal petal-left"></span>
-          <span className="petal petal-center"></span>
-          <span className="petal petal-right"></span>
-          <span className="petal petal-dark"></span>
-          <span className="petal-drop"></span>
-        </div>
+        <img className="welcome-logo" src="/icon-512.png" alt="4Sara logo" />
 
         {welcomeTab === "home" && (
           <>

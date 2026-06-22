@@ -2931,3 +2931,31 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     border-width: 4px;
   }
 }
+
+
+/* Real 4Sara logo image */
+.welcome-logo {
+  display: block;
+  width: 104px;
+  height: 104px;
+  object-fit: cover;
+  border-radius: 28px;
+  margin: 0 auto 20px;
+  box-shadow: 0 24px 55px rgba(244,63,94,.16);
+  background: #fff1f2;
+}
+
+/* Hide old CSS-only logo pieces if cached styles remain */
+.welcome-logo-css,
+.welcome-logo-css .petal,
+.welcome-logo-css .petal-drop {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .welcome-logo {
+    width: 88px;
+    height: 88px;
+    border-radius: 24px;
+  }
+}

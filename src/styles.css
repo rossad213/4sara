@@ -2556,3 +2556,251 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .support-note-box strong::after {
   content: "";
 }
+
+
+/* Welcome screen layout restore */
+.welcome-wrap {
+  min-height: 100vh;
+  width: 100%;
+  padding: 36px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top, rgba(255, 228, 230, .95), rgba(255, 247, 250, .7) 48%, rgba(248, 250, 252, .65));
+}
+
+.welcome-card {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  border-radius: 34px;
+  border: 1px solid rgba(251, 207, 232, .95);
+  background: rgba(255, 255, 255, .86);
+  box-shadow: 0 28px 80px rgba(244, 63, 94, .12);
+  padding: 42px 34px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.welcome-card .welcome-ribbon {
+  display: inline-flex;
+  position: static;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px;
+  margin: 0 auto 26px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(251, 207, 232, .95);
+  box-shadow: 0 16px 36px rgba(244,63,94,.08);
+}
+
+.welcome-card .welcome-ribbon button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  padding: 10px 20px;
+  font-weight: 950;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.welcome-card .welcome-ribbon button.active {
+  background: var(--rose);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(244,63,94,.24);
+}
+
+.welcome-logo {
+  display: block;
+  width: 104px;
+  height: 104px;
+  object-fit: cover;
+  border-radius: 28px;
+  margin: 0 auto 20px;
+  box-shadow: 0 24px 55px rgba(244,63,94,.16);
+  background: #fff1f2;
+}
+
+.welcome-card .pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  margin: 0 auto 24px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+  color: #be123c;
+  font-weight: 950;
+  box-shadow: 0 8px 22px rgba(244,63,94,.08);
+}
+
+.welcome-card h1 {
+  max-width: 900px;
+  margin: 0 auto 18px;
+  font-size: clamp(42px, 6vw, 72px);
+  line-height: .96;
+  letter-spacing: -0.055em;
+  color: #0f172a;
+}
+
+.welcome-subtitle {
+  max-width: 720px;
+  margin: 0 auto 30px;
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.welcome-features {
+  max-width: 900px;
+  margin: 0 auto 28px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  text-align: left;
+}
+
+.welcome-feature {
+  border: 1px solid rgba(251, 207, 232, .95);
+  border-radius: 24px;
+  background: rgba(255,255,255,.74);
+  padding: 20px;
+  box-shadow: 0 12px 34px rgba(244,63,94,.07);
+}
+
+.welcome-feature svg {
+  color: var(--rose);
+  margin-bottom: 10px;
+}
+
+.welcome-feature h3 {
+  margin: 0 0 8px;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.welcome-feature p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.welcome-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.welcome-disclaimer {
+  margin: 24px auto 0;
+  max-width: 760px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.welcome-info-page {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.welcome-info-page h1 {
+  text-align: center;
+  font-size: clamp(36px, 5vw, 58px);
+  margin-bottom: 18px;
+}
+
+.welcome-info-page > p {
+  color: #64748b;
+  font-size: 17px;
+  line-height: 1.65;
+  margin: 0 0 16px;
+}
+
+.about-highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 26px 0;
+}
+
+.support-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 28px 0;
+  text-align: left;
+}
+
+.custom-support-card {
+  grid-column: 1 / -1;
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .welcome-features,
+  .about-highlight-grid,
+  .support-tier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-support-card {
+    max-width: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .welcome-wrap {
+    padding: 18px 10px;
+    align-items: flex-start;
+  }
+
+  .welcome-card {
+    border-radius: 26px;
+    padding: 24px 14px;
+  }
+
+  .welcome-card .welcome-ribbon {
+    display: flex;
+    width: 100%;
+    gap: 4px;
+    margin-bottom: 22px;
+  }
+
+  .welcome-card .welcome-ribbon button {
+    flex: 1;
+    padding: 9px 8px;
+    font-size: 13px;
+  }
+
+  .welcome-logo {
+    width: 88px;
+    height: 88px;
+    border-radius: 24px;
+  }
+
+  .welcome-card h1 {
+    font-size: 42px;
+  }
+
+  .welcome-subtitle,
+  .welcome-info-page > p {
+    font-size: 15px;
+  }
+
+  .welcome-feature {
+    padding: 16px;
+  }
+}

@@ -2697,7 +2697,7 @@ function WelcomeScreen({ onStart, onLogin }) {
           <button className={welcomeTab === "support" ? "active" : ""} onClick={() => setWelcomeTab("support")}>Support</button>
         </div>
 
-        <img className="welcome-logo" src="/icon-512.png" alt="4Sara logo" />
+        <img className="welcome-logo" src="/apple-touch-icon.png" alt="4Sara logo" onError={(event) => { event.currentTarget.src = "/icon-192.png"; }} />
 
         {welcomeTab === "home" && (
           <>

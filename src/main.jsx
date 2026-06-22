@@ -2697,24 +2697,13 @@ function WelcomeScreen({ onStart, onLogin }) {
           <button className={welcomeTab === "support" ? "active" : ""} onClick={() => setWelcomeTab("support")}>Support</button>
         </div>
 
-        <img
-          className="welcome-logo"
-          src="/icon-512.png"
-          alt="4Sara logo"
-          onError={(event) => {
-            const img = event.currentTarget;
-            if (img.dataset.fallback === "1") {
-              img.src = "/icon-192.png";
-              img.dataset.fallback = "2";
-            } else if (img.dataset.fallback === "2") {
-              img.src = "/favicon.png";
-              img.dataset.fallback = "3";
-            } else if (img.dataset.fallback !== "3") {
-              img.src = "/apple-touch-icon.png";
-              img.dataset.fallback = "1";
-            }
-          }}
-        />
+        <div className="welcome-logo-css" role="img" aria-label="4Sara logo">
+          <span className="petal petal-left"></span>
+          <span className="petal petal-center"></span>
+          <span className="petal petal-right"></span>
+          <span className="petal petal-dark"></span>
+          <span className="petal-drop"></span>
+        </div>
 
         {welcomeTab === "home" && (
           <>

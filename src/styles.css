@@ -2933,7 +2933,7 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 }
 
 
-/* Real 4Sara logo image */
+/* Safe real-logo patch */
 .welcome-logo {
   display: block;
   width: 104px;
@@ -2945,7 +2945,6 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   background: #fff1f2;
 }
 
-/* Hide old CSS-only logo pieces if cached styles remain */
 .welcome-logo-css,
 .welcome-logo-css .petal,
 .welcome-logo-css .petal-drop {

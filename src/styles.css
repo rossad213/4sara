@@ -2804,3 +2804,10 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     padding: 16px;
   }
 }
+
+
+/* Welcome logo display fix */
+.welcome-logo {
+  background-color: #fff1f2;
+  background-image: radial-gradient(circle at 50% 35%, rgba(244, 63, 94, .14), transparent 58%);
+}

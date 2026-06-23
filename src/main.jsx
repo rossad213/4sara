@@ -3059,36 +3059,42 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
   const displayName = settings.profileName || "Sara";
   const nextRange = stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Add a cycle to predict";
   const daysLabel = stats.nextPeriod ? (stats.daysUntil > 0 ? `In ${stats.daysUntil} days` : stats.daysUntil === 0 ? "Expected today" : `${Math.abs(stats.daysUntil)} days past prediction`) : "Not enough data";
-  const recentCheck = sortedEntries[0];
+  const recentEntries = sortedEntries.slice(0, 3);
+  const symptomCount = stats.symptomStats?.length ? stats.symptomStats.length : "—";
 
   return (
-    <main className="dashboard-redesign">
-      <section className="dashboard-welcome-row">
+    <main className="dashboard-redesign dashboard-pro-home">
+      <section className="dashboard-welcome-row pro-welcome-row">
         <div>
           <h1>Welcome back, {displayName} <span aria-hidden="true">♡</span></h1>
           <p>Here’s your personalized health overview.</p>
         </div>
-        <p className="dashboard-quote">“You’re not just tracking a cycle, you’re building awareness.”</p>
+        <div className="pro-welcome-art" aria-hidden="true">
+          <span>“You’re not just tracking a cycle,<br />you’re building awareness.”</span>
+          <img src={REAL_4SARA_LOGO} alt="" />
+        </div>
       </section>
 
-      <section className="dashboard-top-grid">
-        <Card className="dash-period-card">
-          <div className="period-card-copy">
+      <section className="pro-dashboard-grid">
+        <Card className="pro-next-card">
+          <div className="pro-next-copy">
             <p className="dash-eyebrow">Next period</p>
-            <h2>{nextRange}</h2>
-            <span className="dash-badge">{daysLabel}</span>
+            <div className="pro-next-title-row">
+              <h2>{nextRange}</h2>
+              <span className="dash-badge">{daysLabel}</span>
+            </div>
             <p>Your period is predicted from your cycle history and average cycle length of {stats.averageCycle} days.</p>
             <Button onClick={jumpToNextPeriod}><CalendarDays size={16} /> View Calendar</Button>
           </div>
-          <div className="period-illustration" aria-hidden="true">
-            <div className="mini-calendar-art">
-              <span /> <span /> <span /> <span />
-              <b /> <b /> <b /> <b /> <b /> <b />
+          <div className="pro-calendar-illustration" aria-hidden="true">
+            <div className="pro-calendar-top"><i /><i /><i /><i /></div>
+            <div className="pro-calendar-dots">
+              {Array.from({ length: 16 }).map((_, index) => <span key={index} className={index === 8 || index === 9 || index === 10 ? "active" : ""} />)}
             </div>
           </div>
         </Card>
 
-        <Card className="dash-protected-card">
+        <Card className="pro-privacy-card">
           <div className="dash-card-title"><ShieldCheck size={20} /><h2>Your privacy is protected</h2></div>
           <ul>
             <li><Lock size={16} /> All data is private and encrypted</li>
@@ -3097,54 +3103,60 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
           </ul>
           <button type="button" className="link-button" onClick={() => setActiveTab("privacy")}>Manage privacy settings <ChevronRight size={16} /></button>
         </Card>
-      </section>
 
-      <section className="dash-stat-grid">
-        <StatCard icon={Droplet} label="Cycle length" value={`${stats.averageCycle} days`} />
-        <StatCard icon={CalendarDays} label="Period length" value={`${stats.averagePeriod} days`} />
-        <StatCard icon={Sparkles} label="Ovulation day" value={stats.ovulationDay ? "Day 14" : "—"} />
-        <StatCard icon={HeartPulse} label="Symptoms tracked" value={stats.symptomStats?.length ? stats.symptomStats.length : "—"} />
-      </section>
+        <div className="pro-stat-grid">
+          <StatCard icon={Droplet} label="Cycle length" value={`${stats.averageCycle} days`} />
+          <StatCard icon={CalendarDays} label="Period length" value={`${stats.averagePeriod} days`} />
+          <StatCard icon={Sparkles} label="Ovulation day" value={stats.ovulationDay ? "Day 14" : "—"} />
+          <StatCard icon={HeartPulse} label="Symptoms tracked" value={symptomCount} />
+        </div>
 
-      <section className="dashboard-lower-grid">
-        <Card className="pad dash-list-card">
+        <Card className="pad pro-recent-card pro-panel-card">
           <div className="card-head compact-head">
             <h2>Recent entries</h2>
-            <span className="small-link">View all</span>
+            <button className="small-link button-link" type="button" onClick={() => setActiveTab("log")}>View all</button>
           </div>
-          {recentCheck ? (
-            <div className="recent-summary-card">
-              <strong>{formatDate(recentCheck.startDate)}{recentCheck.endDate ? ` - ${formatDate(recentCheck.endDate)}` : ""}</strong>
-              <p>Flow: {recentCheck.flow || "N/A"} · Mood: {moodLabel(recentCheck)}</p>
-              <div className="entry-actions-inline">
-                <button type="button" onClick={() => startEdit(recentCheck)}><Pencil size={15} /></button>
-                <button type="button" onClick={() => deleteEntry(recentCheck.id)}><Trash2 size={15} /></button>
-              </div>
+          {recentEntries.length ? (
+            <div className="pro-entry-list">
+              {recentEntries.map((entry) => (
+                <div className="pro-entry-row" key={entry.id}>
+                  <span className={`pro-entry-icon ${entry.type === "checkin" ? "checkin" : "period"}`}>{entry.type === "checkin" ? "☺" : "◌"}</span>
+                  <div>
+                    <strong>{formatDate(entry.startDate)}{entry.endDate ? ` - ${formatDate(entry.endDate)}` : ""}</strong>
+                    <p>{entry.type === "checkin" ? "Daily check-in" : "Menstruation"} · Flow: {entry.flow || "N/A"} · Mood: {moodLabel(entry)}</p>
+                  </div>
+                  <div className="entry-actions-inline pro-entry-actions">
+                    <button type="button" onClick={() => startEdit(entry)} aria-label="Edit entry"><Pencil size={15} /></button>
+                    <button type="button" onClick={() => deleteEntry(entry.id)} aria-label="Delete entry"><Trash2 size={15} /></button>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : <p className="muted">No entries yet. Add your first log to start seeing patterns.</p>}
-          <EntryList entries={sortedEntries.slice(0, 2)} onEdit={startEdit} onDelete={deleteEntry} compact />
+          <Button onClick={() => setActiveTab("log")} className="full pro-new-checkin"><Plus size={16} /> New check-in</Button>
         </Card>
 
-        <Card className="pad dash-list-card">
+        <Card className="pad pro-upcoming-card pro-panel-card">
           <div className="card-head compact-head">
             <h2>Upcoming</h2>
             <button className="small-link button-link" type="button" onClick={jumpToNextPeriod}>View calendar</button>
           </div>
-          <div className="upcoming-list">
+          <div className="pro-upcoming-list">
             <InfoTile title="Upcoming period" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} />
             <InfoTile title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} />
             <InfoTile title="Reminder" value={settings.remindersEnabled && stats.reminderDate ? formatDate(stats.reminderDate) : "Off"} />
           </div>
         </Card>
 
-        <Card className="pad dash-insight-card">
+        <Card className="pad pro-insight-card pro-panel-card">
           <h2>Unlock deeper insights</h2>
           <p>Track trends, spot patterns, and understand your cycle better over time.</p>
+          <div className="pro-trend-line" aria-hidden="true"><span /><span /><span /><span /></div>
           <Button onClick={() => setActiveTab("insights")}>View Insights</Button>
         </Card>
       </section>
 
-      <Card className="dash-progress-card">
+      <Card className="pro-progress-card">
         <HeartPulse size={26} />
         <div>
           <strong>You’re doing great!</strong>

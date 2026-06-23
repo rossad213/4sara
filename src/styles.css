@@ -3107,83 +3107,20 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   color: #db2777;
 }
 
-.landing-logo-mark {
+ .landing-logo-mark {
   width: 76px;
   height: 76px;
-  position: relative;
   display: inline-block;
   flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 18px;
 }
 
 .landing-logo-mark.compact {
   width: 42px;
   height: 42px;
+  border-radius: 10px;
 }
-
-.landing-petal {
-  position: absolute;
-  display: block;
-  border-radius: 70% 70% 48% 48%;
-  transform-origin: 50% 100%;
-  background: linear-gradient(160deg, #fb7185, #db2777);
-  opacity: .88;
-}
-
-.landing-petal-left {
-  width: 32px;
-  height: 45px;
-  left: 12px;
-  top: 20px;
-  transform: rotate(-27deg);
-  background: linear-gradient(160deg, #fda4af, #fb7185);
-  opacity: .68;
-}
-
-.landing-petal-right {
-  width: 32px;
-  height: 45px;
-  right: 12px;
-  top: 20px;
-  transform: rotate(27deg);
-  background: linear-gradient(160deg, #fda4af, #fb7185);
-  opacity: .68;
-}
-
-.landing-petal-center {
-  width: 36px;
-  height: 58px;
-  left: 20px;
-  top: 5px;
-  background: linear-gradient(180deg, #fb7185, #db2777);
-}
-
-.landing-petal-dark {
-  width: 30px;
-  height: 45px;
-  left: 23px;
-  top: 27px;
-  background: linear-gradient(180deg, #be123c, #831843);
-}
-
-.landing-drop {
-  position: absolute;
-  width: 18px;
-  height: 28px;
-  left: 29px;
-  top: 41px;
-  background: #fffaf7;
-  border: 4px solid #831843;
-  border-top: 0;
-  border-radius: 60% 60% 70% 70%;
-  transform: rotate(45deg);
-  display: block;
-}
-
-.compact .landing-petal-left { width: 18px; height: 25px; left: 6px; top: 11px; }
-.compact .landing-petal-right { width: 18px; height: 25px; right: 6px; top: 11px; }
-.compact .landing-petal-center { width: 20px; height: 32px; left: 11px; top: 3px; }
-.compact .landing-petal-dark { width: 17px; height: 26px; left: 13px; top: 15px; }
-.compact .landing-drop { width: 10px; height: 15px; left: 16px; top: 24px; border-width: 2px; border-top: 0; }
 
 .landing-preview-shell {
   background: rgba(255,255,255,.68);
@@ -3399,7 +3336,7 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   padding: 15px;
 }
 
-.mini-lotus .landing-logo-mark { width: 34px; height: 34px; }
+.mini-lotus .landing-logo-mark { width: 34px; height: 34px; border-radius: 9px; }
 .landing-phase-card small,
 .landing-mini-panel small,
 .landing-checkin-panel small {
@@ -3556,26 +3493,70 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   background: linear-gradient(135deg, rgba(255,241,242,.9), rgba(255,255,255,.72));
 }
 
-.landing-lock-illustration {
-  min-height: 190px;
+ .landing-lock-illustration {
+  min-height: 210px;
   display: grid;
   place-items: center;
   position: relative;
-  color: #db2777;
 }
 
-.landing-lock-illustration svg {
+.landing-lock-illustration::before,
+.landing-lock-illustration::after {
+  content: "";
   position: absolute;
-  width: 160px;
-  height: 160px;
-  stroke-width: 1.3;
-  opacity: .2;
+  width: 138px;
+  height: 88px;
+  border-radius: 999px 999px 12px 12px;
+  background: rgba(251,113,133,.16);
+  filter: blur(.2px);
 }
 
-.landing-lock-illustration .landing-logo-mark {
+.landing-lock-illustration::before {
+  transform: translate(-72px, 22px) rotate(-34deg);
+}
+
+.landing-lock-illustration::after {
+  transform: translate(72px, 22px) rotate(34deg);
+}
+
+.landing-lock-card {
+  width: 145px;
+  height: 142px;
   position: relative;
   z-index: 2;
-  transform: scale(1.15);
+  display: grid;
+  place-items: end center;
+}
+
+.landing-lock-shackle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 78px;
+  height: 76px;
+  transform: translateX(-50%);
+  border: 12px solid rgba(244,114,182,.58);
+  border-bottom: 0;
+  border-radius: 52px 52px 0 0;
+}
+
+.landing-lock-body {
+  width: 136px;
+  height: 94px;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #fce7f3, #f9a8d4);
+  border: 1px solid rgba(244,114,182,.42);
+  box-shadow: 0 22px 48px rgba(190,18,60,.12);
+  display: grid;
+  place-items: center;
+}
+
+.landing-lock-body img {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  border-radius: 16px;
+  filter: drop-shadow(0 8px 12px rgba(131,24,67,.14));
 }
 
 .landing-privacy-panel h2,
@@ -3727,4 +3708,302 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   .landing-feature-card { grid-template-columns: 1fr; }
   .landing-privacy-panel { padding: 28px; }
   .landing-url { min-width: 150px; }
+}
+
+/* Exact uploaded 4Sara logo usage - do not recreate the mark with CSS */
+.landing-logo-mark,
+.landing-logo-mark.compact,
+.brand-mini-logo img,
+.welcome-logo img {
+  content: none;
+  background: transparent !important;
+  object-fit: cover;
+  object-position: center;
+  image-rendering: auto;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.landing-logo-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.landing-logo-mark.compact {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+.landing-brand .landing-logo-mark.compact,
+.landing-footer-brand .landing-logo-mark.compact,
+.landing-sidebar-brand .landing-logo-mark.compact {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+}
+
+.mini-lotus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+}
+
+.mini-lotus .landing-logo-mark.compact {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
+.landing-lock-illustration::before,
+.landing-lock-illustration::after {
+  display: none !important;
+  content: none !important;
+}
+
+.landing-lock-card {
+  width: 178px;
+  height: 178px;
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: end center;
+}
+
+.landing-lock-shackle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 96px;
+  height: 88px;
+  transform: translateX(-50%);
+  border: 13px solid rgba(244,114,182,.62);
+  border-bottom: 0;
+  border-radius: 64px 64px 0 0;
+}
+
+.landing-lock-body {
+  width: 154px;
+  height: 112px;
+  border-radius: 30px;
+  background: linear-gradient(145deg, #ffe4e6, #f9a8d4);
+  border: 1px solid rgba(244,114,182,.36);
+  box-shadow: 0 22px 48px rgba(190,18,60,.12);
+  display: grid;
+  place-items: center;
+}
+
+.landing-lock-body img.landing-lock-logo-badge {
+  width: 82px;
+  height: 82px;
+  object-fit: cover;
+  border-radius: 24px;
+  display: block;
+  filter: drop-shadow(0 8px 14px rgba(131,24,67,.14));
+}
+
+/* prevent older decorative CSS logo fragments from appearing anywhere */
+.lotus-mark,
+.welcome-logo-css,
+.welcome-logo-css .petal,
+.welcome-logo-css .petal-drop,
+.brand-mini-logo::before,
+.brand-mini-logo::after,
+.brand-mini-logo .mini-petal,
+.brand-mini-logo .mini-drop {
+  display: none !important;
+  content: none !important;
+}
+
+
+/* === 4Sara exact uploaded logo fix ===
+   These overrides force every lotus/logo mark to use the real uploaded PNG, not CSS-drawn petals. */
+.landing-logo-mark,
+.landing-logo-mark.compact,
+.brand-mini-logo img,
+.welcome-logo img,
+.landing-lock-logo-badge {
+  display: block !important;
+  object-fit: contain !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.landing-logo-mark {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 14px !important;
+}
+
+.landing-logo-mark.compact {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  border-radius: 10px !important;
+}
+
+.landing-sidebar-brand .landing-logo-mark.compact,
+.landing-brand .landing-logo-mark.compact,
+.landing-footer-brand .landing-logo-mark.compact {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.mini-lotus {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 241, 242, .92) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.mini-lotus .landing-logo-mark.compact {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.landing-lock-body {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.landing-lock-body img.landing-lock-logo-badge,
+.landing-lock-logo-badge {
+  width: 72px !important;
+  height: 72px !important;
+  border-radius: 20px !important;
+  object-fit: contain !important;
+  transform: none !important;
+}
+
+.welcome-logo, .brand-mini-logo {
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+.welcome-logo::before, .welcome-logo::after,
+.brand-mini-logo::before, .brand-mini-logo::after,
+.lotus-mark, .welcome-petal, .welcome-petal::before, .welcome-petal::after,
+.welcome-logo-css, .welcome-logo-css .petal, .welcome-logo-css .petal-drop {
+  display: none !important;
+  content: none !important;
+}
+
+/* === Final exact-logo cleanup: use the real uploaded PNG only === */
+.landing-brand .landing-logo-mark.compact {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  border-radius: 14px !important;
+  object-fit: contain !important;
+}
+
+.landing-sidebar-brand .landing-logo-mark.compact,
+.landing-footer-brand .landing-logo-mark.compact {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  border-radius: 12px !important;
+  object-fit: contain !important;
+}
+
+.landing-brand span {
+  line-height: 1;
+}
+
+.mini-lotus {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  background: transparent !important;
+  border-radius: 14px !important;
+  overflow: visible !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.mini-lotus img {
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 14px !important;
+  object-fit: contain !important;
+  display: block !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Remove the fake lock illustration completely. This section now shows the real uploaded 4Sara app icon cleanly. */
+.landing-lock-illustration {
+  min-height: 210px !important;
+  display: grid !important;
+  place-items: center !important;
+  position: relative !important;
+}
+
+.landing-lock-illustration::before,
+.landing-lock-illustration::after,
+.landing-lock-card,
+.landing-lock-shackle,
+.landing-lock-body,
+.landing-lock-logo-badge {
+  display: none !important;
+  content: none !important;
+}
+
+.landing-logo-showcase {
+  width: 182px !important;
+  height: 182px !important;
+  border-radius: 42px !important;
+  display: grid !important;
+  place-items: center !important;
+  background: transparent !important;
+  box-shadow: 0 24px 60px rgba(190,18,60,.13) !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.landing-logo-showcase::before,
+.landing-logo-showcase::after {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  border-radius: 52px;
+  background: rgba(251, 113, 133, .10);
+  z-index: -1;
+}
+
+.landing-logo-showcase::after {
+  inset: -34px;
+  background: rgba(236, 72, 153, .06);
+}
+
+.landing-logo-showcase-img {
+  width: 182px !important;
+  height: 182px !important;
+  border-radius: 42px !important;
+  object-fit: contain !important;
+  display: block !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Keep all exact PNG logos from getting cropped or replaced by pseudo-elements. */
+.landing-logo-mark,
+.landing-logo-mark.compact,
+.landing-logo-showcase-img,
+.mini-lotus img {
+  content: normal !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  image-rendering: auto !important;
 }

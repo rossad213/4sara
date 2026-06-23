@@ -2166,24 +2166,23 @@ function App() {
 
   return (
     <div className={settings.darkMode ? "app dark" : "app"}>
-      <div className="container">
-        <header className="header">
-          <div>
-            <div className="brand-row">
-              <button className="brand-home-btn" onClick={() => updateSettings({ welcomeSeen: false, accountPromptSeen: false })} aria-label="Return to welcome screen">
-                <span className="brand-mini-logo" aria-hidden="true">
-                  <img src={REAL_4SARA_LOGO} alt="" />
-                </span>
-                <span>4Sara</span>
-              </button>
-              <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
-              <CloudStatusBadge authUser={authUser} autoSyncEnabled={autoSyncEnabled} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} syncBusy={syncBusy} lastCloudSave={lastCloudSave} />
-              <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTab} sharedProfiles={sharedProfiles} selectedSharedOwnerId={selectedSharedOwnerId} setSelectedSharedOwnerId={setSelectedSharedOwnerId} chooseSharedSupportView={chooseSharedSupportView} />
-            </div>
-            <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
-            <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
+      <div className="container app-container">
+        <header className="header app-topbar">
+          <div className="topbar-left">
+            <button className="brand-home-btn" onClick={() => updateSettings({ welcomeSeen: false, accountPromptSeen: false })} aria-label="Return to welcome screen">
+              <span className="brand-mini-logo" aria-hidden="true">
+                <img src={REAL_4SARA_LOGO} alt="" />
+              </span>
+              <span>4Sara</span>
+            </button>
+            <div className="pill"><ShieldCheck size={16} /> Private</div>
+            <CloudStatusBadge authUser={authUser} autoSyncEnabled={autoSyncEnabled} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} syncBusy={syncBusy} lastCloudSave={lastCloudSave} />
+            <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTab} sharedProfiles={sharedProfiles} selectedSharedOwnerId={selectedSharedOwnerId} setSelectedSharedOwnerId={setSelectedSharedOwnerId} chooseSharedSupportView={chooseSharedSupportView} />
           </div>
-          <div className="actions">{viewMode === "owner" && <Button onClick={() => logToday("period")}><Plus size={16} /> Log Today</Button>}</div>
+          <div className="topbar-actions">
+            <button className="topbar-icon-btn" type="button" aria-label="Notifications"><Bell size={18} /></button>
+            {viewMode === "owner" && <Button onClick={() => logToday("period")}><Plus size={16} /> Log Today</Button>}
+          </div>
         </header>
 
         {message && <div className="message">{message}</div>}
@@ -2204,16 +2203,18 @@ function App() {
           </div>
         )}
 
-        <nav className="tabs">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return <button key={item.id} onClick={() => setActiveTab(item.id)} className={`tab ${activeTab === item.id ? "active" : ""}`}><Icon size={16} />{item.label}</button>;
-          })}
-        </nav>
+        <div className="app-body-shell">
+          <nav className="tabs app-sidebar-nav" aria-label="4Sara navigation">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return <button key={item.id} onClick={() => setActiveTab(item.id)} className={`tab ${activeTab === item.id ? "active" : ""}`}><Icon size={16} />{item.label}</button>;
+            })}
+          </nav>
 
-        <AnimatePresence mode="wait">
+          <div className="app-content-panel">
+            <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 16, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} previewReminder={previewReminder} setLocked={setLocked} />}
+            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} previewReminder={previewReminder} setLocked={setLocked} setActiveTab={setActiveTab} />}
             {activeTab === "calendar" && (
               <CalendarPanel
                 calendarDate={calendarDate}
@@ -2248,8 +2249,9 @@ function App() {
                 sharedSupportData={sharedSupportData}
               />
             )}
-          </motion.div>
-        </AnimatePresence>
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
@@ -3053,45 +3055,103 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
   );
 }
 
-function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, previewReminder, setLocked }) {
+function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, previewReminder, setLocked, setActiveTab }) {
+  const displayName = settings.profileName || "Sara";
+  const nextRange = stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Add a cycle to predict";
+  const daysLabel = stats.nextPeriod ? (stats.daysUntil > 0 ? `In ${stats.daysUntil} days` : stats.daysUntil === 0 ? "Expected today" : `${Math.abs(stats.daysUntil)} days past prediction`) : "Not enough data";
+  const recentCheck = sortedEntries[0];
+
   return (
-    <main className="layout">
-      <section className="main-col">
-        <Card className="hero-card">
-          <div className="hero">
-            <div className="hero-row">
-              <CalendarDays size={34} />
-              <div><p>Next predicted menstruation</p><h2>{stats.nextPeriod ? formatDate(stats.nextPeriod) : "Add a cycle"}</h2></div>
-            </div>
-            {stats.nextPeriod && <p className="hero-sub">{stats.daysUntil > 0 ? `${stats.daysUntil} days away` : stats.daysUntil === 0 ? "Expected today" : `${Math.abs(stats.daysUntil)} days past prediction`}</p>}
+    <main className="dashboard-redesign">
+      <section className="dashboard-welcome-row">
+        <div>
+          <h1>Welcome back, {displayName} <span aria-hidden="true">♡</span></h1>
+          <p>Here’s your personalized health overview.</p>
+        </div>
+        <p className="dashboard-quote">“You’re not just tracking a cycle, you’re building awareness.”</p>
+      </section>
+
+      <section className="dashboard-top-grid">
+        <Card className="dash-period-card">
+          <div className="period-card-copy">
+            <p className="dash-eyebrow">Next period</p>
+            <h2>{nextRange}</h2>
+            <span className="dash-badge">{daysLabel}</span>
+            <p>Your period is predicted from your cycle history and average cycle length of {stats.averageCycle} days.</p>
+            <Button onClick={jumpToNextPeriod}><CalendarDays size={16} /> View Calendar</Button>
           </div>
-          <div className="stats">
-            <StatCard icon={Droplet} label="Avg. cycle" value={`${stats.averageCycle} days`} />
-            <StatCard icon={Moon} label="Avg. menstruation" value={`${stats.averagePeriod} days`} />
-            <StatCard icon={HeartPulse} label="Last menstruation" value={stats.last ? formatDate(stats.last.startDate) : "None yet"} />
+          <div className="period-illustration" aria-hidden="true">
+            <div className="mini-calendar-art">
+              <span /> <span /> <span /> <span />
+              <b /> <b /> <b /> <b /> <b /> <b />
+            </div>
           </div>
         </Card>
 
-        <Card className="pad">
-          <div className="card-head">
-            <h2>Upcoming</h2>
-            <div className="actions">
-              <Button onClick={jumpToNextPeriod} variant="secondary">Show next menstruation</Button>
-              <Button onClick={previewReminder} variant="secondary">Preview reminder</Button>
-            </div>
+        <Card className="dash-protected-card">
+          <div className="dash-card-title"><ShieldCheck size={20} /><h2>Your privacy is protected</h2></div>
+          <ul>
+            <li><Lock size={16} /> All data is private and encrypted</li>
+            <li><KeyRound size={16} /> Only you can access your data</li>
+            <li><ShieldCheck size={16} /> We never share your information</li>
+          </ul>
+          <button type="button" className="link-button" onClick={() => setActiveTab("privacy")}>Manage privacy settings <ChevronRight size={16} /></button>
+        </Card>
+      </section>
+
+      <section className="dash-stat-grid">
+        <StatCard icon={Droplet} label="Cycle length" value={`${stats.averageCycle} days`} />
+        <StatCard icon={CalendarDays} label="Period length" value={`${stats.averagePeriod} days`} />
+        <StatCard icon={Sparkles} label="Ovulation day" value={stats.ovulationDay ? "Day 14" : "—"} />
+        <StatCard icon={HeartPulse} label="Symptoms tracked" value={stats.symptomStats?.length ? stats.symptomStats.length : "—"} />
+      </section>
+
+      <section className="dashboard-lower-grid">
+        <Card className="pad dash-list-card">
+          <div className="card-head compact-head">
+            <h2>Recent entries</h2>
+            <span className="small-link">View all</span>
           </div>
-          <div className="tiles">
-            <InfoTile title="Predicted menstruation" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} />
+          {recentCheck ? (
+            <div className="recent-summary-card">
+              <strong>{formatDate(recentCheck.startDate)}{recentCheck.endDate ? ` - ${formatDate(recentCheck.endDate)}` : ""}</strong>
+              <p>Flow: {recentCheck.flow || "N/A"} · Mood: {moodLabel(recentCheck)}</p>
+              <div className="entry-actions-inline">
+                <button type="button" onClick={() => startEdit(recentCheck)}><Pencil size={15} /></button>
+                <button type="button" onClick={() => deleteEntry(recentCheck.id)}><Trash2 size={15} /></button>
+              </div>
+            </div>
+          ) : <p className="muted">No entries yet. Add your first log to start seeing patterns.</p>}
+          <EntryList entries={sortedEntries.slice(0, 2)} onEdit={startEdit} onDelete={deleteEntry} compact />
+        </Card>
+
+        <Card className="pad dash-list-card">
+          <div className="card-head compact-head">
+            <h2>Upcoming</h2>
+            <button className="small-link button-link" type="button" onClick={jumpToNextPeriod}>View calendar</button>
+          </div>
+          <div className="upcoming-list">
+            <InfoTile title="Upcoming period" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} />
             <InfoTile title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} />
             <InfoTile title="Reminder" value={settings.remindersEnabled && stats.reminderDate ? formatDate(stats.reminderDate) : "Off"} />
           </div>
         </Card>
+
+        <Card className="pad dash-insight-card">
+          <h2>Unlock deeper insights</h2>
+          <p>Track trends, spot patterns, and understand your cycle better over time.</p>
+          <Button onClick={() => setActiveTab("insights")}>View Insights</Button>
+        </Card>
       </section>
 
-      <aside className="side-col">
-        <Card className="pad"><h2>Recent entries</h2><EntryList entries={sortedEntries.slice(0, 3)} onEdit={startEdit} onDelete={deleteEntry} compact /></Card>
-        <PrivacyCard settings={settings} setLocked={setLocked} />
-      </aside>
+      <Card className="dash-progress-card">
+        <HeartPulse size={26} />
+        <div>
+          <strong>You’re doing great!</strong>
+          <p>Consistency is key to better cycle awareness.</p>
+        </div>
+        <Button variant="secondary" onClick={previewReminder}><Download size={16} /> Share progress</Button>
+      </Card>
     </main>
   );
 }

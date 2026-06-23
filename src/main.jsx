@@ -2959,86 +2959,105 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
 function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, previewReminder, setLocked, setActiveTab }) {
   const displayName = settings.profileName || "Sara";
   const nextRange = stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Add a cycle to predict";
-  const daysLabel = stats.nextPeriod ? (stats.daysUntil > 0 ? `In ${stats.daysUntil} days` : stats.daysUntil === 0 ? "Expected today" : `${Math.abs(stats.daysUntil)} days past`) : "Not enough data";
+  const daysLabel = stats.nextPeriod ? (stats.daysUntil > 0 ? `In ${stats.daysUntil} days` : stats.daysUntil === 0 ? "Expected today" : `${Math.abs(stats.daysUntil)} days past prediction`) : "Not enough data";
   const recentEntries = sortedEntries.slice(0, 3);
   const symptomCount = stats.symptomStats?.length ? stats.symptomStats.length : "—";
 
   return (
-    <main className="mock-home-dashboard">
-      <section className="mock-home-header">
+    <main className="pretty-home-dashboard">
+      <section className="pretty-home-header">
         <div>
-          <p className="mock-eyebrow">Home</p>
           <h1>Welcome back, {displayName} ♡</h1>
           <p>Here’s your personalized health overview.</p>
         </div>
-        <div className="mock-header-quote">
+        <div className="pretty-header-quote">
+          <span>“You’re not just tracking a cycle, you’re building awareness.”</span>
           <img src="/icons/icon-192.png" alt="" />
-          <span>Private cycle tracking, made simple.</span>
         </div>
       </section>
 
-      <section className="mock-dashboard-grid">
-        <Card className="mock-next-period-card">
-          <div className="mock-next-copy">
-            <p className="mock-eyebrow">Next period</p>
+      <section className="pretty-dashboard-grid">
+        <Card className="pretty-next-period-card">
+          <div className="pretty-next-copy">
+            <p className="pretty-card-label">Next period</p>
             <h2>{nextRange}</h2>
-            <span className="mock-status-pill">{daysLabel}</span>
-            <p>Prediction is based on your cycle history and average cycle length of {stats.averageCycle} days.</p>
-            <div className="mock-actions-row">
-              <Button onClick={jumpToNextPeriod}><CalendarDays size={16} /> View Calendar</Button>
-              <Button variant="secondary" onClick={previewReminder}><Bell size={16} /> Reminder</Button>
-            </div>
+            <span className="pretty-status-pill">{daysLabel}</span>
+            <p>Your period prediction is based on your cycle history and average cycle length of {stats.averageCycle} days.</p>
+            <Button onClick={jumpToNextPeriod}><CalendarDays size={17} /> View Calendar</Button>
           </div>
-          <div className="mock-calendar-card" aria-hidden="true">
-            <div className="mock-calendar-top"><span /><span /><span /></div>
-            <div className="mock-calendar-dots">
-              {Array.from({ length: 20 }).map((_, i) => <i key={i} className={i >= 8 && i <= 11 ? "active" : ""} />)}
+          <div className="pretty-calendar-illustration" aria-hidden="true">
+            <div className="pretty-calendar-rings"><span /><span /><span /><span /></div>
+            <div className="pretty-calendar-grid-mini">
+              {Array.from({ length: 20 }).map((_, i) => <i key={i} className={i === 6 || i === 12 || i === 13 || i === 14 ? "active" : ""} />)}
             </div>
+            <img src="/icons/icon-192.png" alt="" />
           </div>
         </Card>
 
-        <Card className="mock-privacy-panel">
-          <div className="mock-privacy-image-wrap"><img src="/icons/privacy-lock.png" alt="4Sara privacy lock" /></div>
+        <Card className="pretty-privacy-panel">
+          <div className="pretty-card-icon protected"><ShieldCheck size={22} /></div>
           <h2>Your privacy is protected</h2>
-          <p>Your cycle history stays private, with local controls and optional account sync.</p>
-          <button className="link-button" type="button" onClick={() => setActiveTab("privacy")}>Privacy settings <ChevronRight size={16} /></button>
+          <ul>
+            <li><Lock size={18} /> All data is private and encrypted</li>
+            <li><EyeOff size={18} /> Only you can access your data</li>
+            <li><ShieldCheck size={18} /> We never share your information</li>
+          </ul>
+          <button className="pretty-link" type="button" onClick={() => setActiveTab("privacy")}>Manage privacy settings <ChevronRight size={16} /></button>
         </Card>
 
-        <div className="mock-stat-row">
-          <StatCard icon={Droplet} label="Cycle length" value={`${stats.averageCycle} days`} />
-          <StatCard icon={Moon} label="Period length" value={`${stats.averagePeriod} days`} />
-          <StatCard icon={Sparkles} label="Ovulation" value={stats.ovulationDay ? formatDate(stats.ovulationDay) : "—"} />
-          <StatCard icon={HeartPulse} label="Symptoms" value={symptomCount} />
+        <div className="pretty-stat-row">
+          <PrettyStatCard icon={Droplet} label="Cycle length" value={`${stats.averageCycle}`} suffix="days" />
+          <PrettyStatCard icon={CalendarDays} label="Period length" value={`${stats.averagePeriod}`} suffix="days" />
+          <PrettyStatCard icon={Sparkles} label="Ovulation day" value={stats.ovulationDay ? formatDate(stats.ovulationDay).replace(", 2026", "") : "—"} />
+          <PrettyStatCard icon={HeartPulse} label="Symptoms tracked" value={symptomCount} />
         </div>
 
-        <Card className="pad mock-panel mock-recent-panel">
-          <div className="card-head compact-head"><h2>Recent entries</h2><button className="small-link button-link" type="button" onClick={() => setActiveTab("log")}>View all</button></div>
-          {recentEntries.length ? <div className="mock-entry-list">
-            {recentEntries.map((entry) => <div className="mock-entry-row" key={entry.id}>
-              <span className={entry.type === "checkin" ? "mock-entry-dot checkin" : "mock-entry-dot"}>{entry.type === "checkin" ? "✓" : "•"}</span>
+        <Card className="pretty-panel pretty-recent-panel">
+          <div className="pretty-panel-head"><h2>Recent entries</h2><button type="button" onClick={() => setActiveTab("log")}>View all</button></div>
+          {recentEntries.length ? <div className="pretty-entry-list">
+            {recentEntries.map((entry) => <div className="pretty-entry-row" key={entry.id}>
+              <span className={entry.type === "checkin" ? "pretty-entry-icon checkin" : "pretty-entry-icon"}>{entry.type === "checkin" ? "☺" : "•"}</span>
               <div><strong>{formatDate(entry.startDate)}{entry.endDate ? ` - ${formatDate(entry.endDate)}` : ""}</strong><p>{entry.type === "checkin" ? "Daily check-in" : "Menstruation"} · {moodLabel(entry)}</p></div>
               <div className="entry-actions-inline"><button type="button" onClick={() => startEdit(entry)}><Pencil size={15} /></button><button type="button" onClick={() => deleteEntry(entry.id)}><Trash2 size={15} /></button></div>
             </div>)}
           </div> : <p className="muted">No entries yet. Add your first log to start seeing patterns.</p>}
+          <Button className="full pretty-new-checkin" onClick={() => setActiveTab("log")}><Plus size={17} /> New check-in</Button>
         </Card>
 
-        <Card className="pad mock-panel mock-upcoming-panel">
-          <h2>Upcoming</h2>
-          <div className="tiles mock-upcoming-tiles">
-            <InfoTile title="Predicted menstruation" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} />
+        <Card className="pretty-panel pretty-upcoming-panel">
+          <div className="pretty-panel-head"><h2>Upcoming</h2><button type="button" onClick={jumpToNextPeriod}>View calendar</button></div>
+          <div className="pretty-upcoming-list">
+            <InfoTile title="Upcoming period" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} />
             <InfoTile title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} />
             <InfoTile title="Reminder" value={settings.remindersEnabled && stats.reminderDate ? formatDate(stats.reminderDate) : "Off"} />
           </div>
         </Card>
 
-        <Card className="pad mock-panel mock-insight-panel">
-          <h2>Insights</h2>
+        <Card className="pretty-panel pretty-insight-panel">
+          <h2>Unlock deeper insights</h2>
+          <div className="pretty-mini-line" aria-hidden="true"><span /><span /><span /><span /></div>
           <p>Track trends, spot patterns, and understand your cycle better over time.</p>
-          <div className="mock-mini-chart" aria-hidden="true"><span /><span /><span /><span /></div>
           <Button onClick={() => setActiveTab("insights")}>View Insights</Button>
+        </Card>
+
+        <Card className="pretty-progress-card">
+          <HeartPulse size={28} />
+          <div><strong>You’re doing great!</strong><p>Consistency is key to better cycle awareness.</p></div>
+          <Button variant="secondary" onClick={() => downloadCsv(sortedEntries)}><Download size={16} /> Share progress</Button>
         </Card>
       </section>
     </main>
+  );
+}
+
+function PrettyStatCard({ icon: Icon, label, value, suffix = "" }) {
+  return (
+    <div className="pretty-stat-card">
+      <div className="pretty-card-icon"><Icon size={24} /></div>
+      <div className="pretty-stat-value"><strong>{value}</strong>{suffix && <span>{suffix}</span>}</div>
+      <p>{label}</p>
+      <div className="pretty-sparkline" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+    </div>
   );
 }
 

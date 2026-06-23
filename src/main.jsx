@@ -2829,7 +2829,9 @@ function WelcomeScreen({ onStart, onLogin }) {
       </section>
 
       <section id="privacy" className="landing-section landing-privacy-panel">
-        <div className="landing-lock-illustration"><LogoShowcase /></div>
+        <div className="landing-lock-illustration landing-lock-image-wrap" aria-hidden="true">
+          <img className="privacy-lock-image" src="/icons/privacy-lock.png" alt="" loading="lazy" decoding="async" />
+        </div>
         <div>
           <h2>Your privacy is our priority</h2>
           <p>4Sara is built for privacy. Your data stays on your device by default. Choose secure cloud sync if you want backup across devices.</p>

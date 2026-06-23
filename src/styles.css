@@ -4007,3 +4007,56 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   object-position: center !important;
   image-rendering: auto !important;
 }
+
+
+/* === Privacy section image swap only ===
+   This keeps the professional homepage and exact 4Sara logos intact.
+   It only replaces the privacy illustration with public/icons/privacy-lock.png. */
+.landing-privacy-panel .landing-lock-image-wrap {
+  min-height: 210px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+}
+
+.landing-privacy-panel .landing-lock-image-wrap::before,
+.landing-privacy-panel .landing-lock-image-wrap::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: auto !important;
+  display: block !important;
+  width: 210px !important;
+  height: 210px !important;
+  border-radius: 999px !important;
+  background: rgba(251, 113, 133, .08) !important;
+  filter: blur(0) !important;
+  transform: none !important;
+  z-index: 0 !important;
+}
+
+.landing-privacy-panel .landing-lock-image-wrap::after {
+  width: 270px !important;
+  height: 270px !important;
+  background: rgba(236, 72, 153, .05) !important;
+}
+
+.privacy-lock-image {
+  position: relative !important;
+  z-index: 2 !important;
+  display: block !important;
+  width: min(100%, 260px) !important;
+  height: auto !important;
+  object-fit: contain !important;
+  border-radius: 34px !important;
+  box-shadow: 0 24px 60px rgba(190, 18, 60, .12) !important;
+  background: transparent !important;
+}
+
+.landing-privacy-panel .landing-lock-image-wrap .landing-logo-showcase,
+.landing-privacy-panel .landing-lock-image-wrap .landing-lock-card,
+.landing-privacy-panel .landing-lock-image-wrap .landing-lock-shackle,
+.landing-privacy-panel .landing-lock-image-wrap .landing-lock-body,
+.landing-privacy-panel .landing-lock-image-wrap .landing-lock-logo-badge {
+  display: none !important;
+}

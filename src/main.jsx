@@ -3124,11 +3124,15 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             </div>
           </Card>
         </div>
+        <Card className="dashboard-privacy-strip">
+          <div className="dashboard-privacy-strip-icon"><Lock size={22} /></div>
+          <div>
+            <h2>Your privacy is protected</h2>
+            <p>Your data is private and stored securely. Use your account for encrypted sync, export, and deletion controls anytime.</p>
+          </div>
+          <button type="button" onClick={() => setActiveTab("privacy")}>Privacy settings</button>
+        </Card>
       </section>
-
-      <aside className="side-col dashboard-soft-side">
-        <PrivacyCard settings={settings} setLocked={setLocked} />
-      </aside>
     </main>
   );
 }

@@ -3068,6 +3068,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
     { id: "empty-mood", startDate: todayKey(), type: "checkin", mood: "Good", moods: ["Good"], flow: "", symptoms: [], notes: "" },
     { id: "empty-flow", startDate: todayKey(), type: "checkin", mood: "", moods: [], flow: "Light", symptoms: [], notes: "" }
   ];
+
   const nextPhase = getNextDashboardPhase(stats);
 
   return (
@@ -3125,11 +3126,15 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             </div>
           </Card>
         </div>
+        <Card className="dashboard-privacy-strip">
+          <div className="dashboard-privacy-strip-icon"><Lock size={22} /></div>
+          <div>
+            <h2>Your privacy is protected</h2>
+            <p>Your data is private and stored securely. Use your account for encrypted sync, export, and deletion controls anytime.</p>
+          </div>
+          <button type="button" onClick={() => setActiveTab("privacy")}>Privacy settings</button>
+        </Card>
       </section>
-
-      <aside className="side-col dashboard-soft-side">
-        <PrivacyCard settings={settings} setLocked={setLocked} />
-      </aside>
     </main>
   );
 }
@@ -3154,7 +3159,9 @@ function getNextDashboardPhase(stats) {
   const fertileEnd = stats.fertileEnd || addDays(ovulation, 1);
   const lutealStart = addDays(fertileEnd, 1);
   const nextFollicularStart = addDays(nextPeriodEnd, 1);
-  const nextFollicularEnd = addDays(addDays(nextPeriodStart, avgCycle), -20);
+  const followingPeriodStart = addDays(nextPeriodStart, avgCycle);
+  const nextFertileStart = addDays(addDays(followingPeriodStart, -14), -5);
+  const nextFollicularEnd = addDays(nextFertileStart, -1);
 
   const formatBadge = (dateString) => {
     const days = daysBetween(today, dateString);

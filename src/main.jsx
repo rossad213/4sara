@@ -3029,14 +3029,13 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
           <div className="dashboard-calendar-art" aria-hidden="true">
-            <div className="calendar-art-card">
-              <i></i><i></i><i></i><i></i>
-              <div className="calendar-art-grid">
-                {Array.from({ length: 20 }).map((_, index) => <span key={index} className={index === 11 || index === 12 || index === 13 ? "hot" : index === 6 ? "ring" : ""}></span>)}
-              </div>
-            </div>
-            <div className="calendar-art-leaf leaf-one"></div>
-            <div className="calendar-art-leaf leaf-two"></div>
+            <img
+              className="dashboard-calendar-image"
+              src="/icons/calendar-image.png"
+              alt=""
+              loading="eager"
+              decoding="async"
+            />
           </div>
         </Card>
 

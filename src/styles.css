@@ -4488,3 +4488,86 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   box-shadow: none;
   background: transparent;
 }
+
+
+/* Help Center and Contact pages */
+.help-center-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.help-card,
+.contact-panel,
+.help-contact-strip {
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(253,164,175,.34);
+  border-radius: 24px;
+  box-shadow: 0 14px 36px rgba(131,24,67,.08);
+}
+
+.help-card {
+  padding: 22px;
+}
+
+.help-card h3 {
+  color: #5b1431;
+  margin-bottom: 8px;
+}
+
+.help-card p {
+  color: #53627a;
+  margin: 0;
+}
+
+.help-contact-strip,
+.contact-panel {
+  margin-top: 22px;
+  padding: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.help-contact-strip strong,
+.contact-panel strong {
+  display: block;
+  color: #0f172a;
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.help-contact-strip p,
+.contact-panel p {
+  margin: 0;
+  color: #53627a;
+}
+
+.help-mail-button {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.contact-panel a,
+.help-contact-strip a {
+  text-decoration: none;
+}
+
+@media (max-width: 760px) {
+  .help-center-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .help-contact-strip,
+  .contact-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .help-contact-strip .btn,
+  .contact-panel .btn {
+    width: 100%;
+  }
+}

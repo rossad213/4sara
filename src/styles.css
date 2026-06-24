@@ -4436,3 +4436,37 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   .dashboard-entry-row > span, .dashboard-upcoming-row > span { justify-self: start; grid-column: 2; }
   .dashboard-privacy-strip button { justify-self: start; padding-left: 0; }
 }
+
+
+/* Public homepage preview image
+   Uses public/icons/Home-screen-photo.png as the hero app preview. */
+.landing-preview-photo-shell {
+  width: 100%;
+  max-width: 720px;
+  justify-self: end;
+  border-radius: 28px;
+  overflow: hidden;
+  background: rgba(255,255,255,.58);
+  border: 1px solid rgba(253,164,175,.42);
+  box-shadow: 0 30px 80px rgba(131,24,67,.14);
+}
+
+.landing-preview-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 1040px) {
+  .landing-preview-photo-shell {
+    justify-self: center;
+    max-width: 780px;
+  }
+}
+
+@media (max-width: 760px) {
+  .landing-preview-photo-shell {
+    border-radius: 22px;
+  }
+}

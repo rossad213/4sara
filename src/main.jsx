@@ -2213,7 +2213,7 @@ function App() {
 
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 16, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} previewReminder={previewReminder} setLocked={setLocked} />}
+            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} setActiveTab={setActiveTab} setLocked={setLocked} />}
             {activeTab === "calendar" && (
               <CalendarPanel
                 calendarDate={calendarDate}
@@ -3053,46 +3053,128 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
   );
 }
 
-function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, previewReminder, setLocked }) {
+function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, setActiveTab, setLocked }) {
+  const recent = sortedEntries.slice(0, 3);
+  const nextPeriodLabel = stats.nextPeriod ? `${formatDate(stats.nextPeriod)}${stats.predictedEnd ? ` - ${formatDate(stats.predictedEnd)}` : ""}` : "Add a cycle";
+  const daysLabel = stats.nextPeriod
+    ? stats.daysUntil > 0
+      ? `In ${stats.daysUntil} days`
+      : stats.daysUntil === 0
+      ? "Expected today"
+      : `${Math.abs(stats.daysUntil)} days past prediction`
+    : "Needs data";
+
+  const recentRows = recent.length ? recent : [
+    { id: "empty-mood", startDate: todayKey(), type: "checkin", mood: "Good", moods: ["Good"], flow: "", symptoms: [], notes: "" },
+    { id: "empty-flow", startDate: todayKey(), type: "checkin", mood: "", moods: [], flow: "Light", symptoms: [], notes: "" }
+  ];
+
   return (
-    <main className="layout">
-      <section className="main-col">
-        <Card className="hero-card">
-          <div className="hero">
-            <div className="hero-row">
-              <CalendarDays size={34} />
-              <div><p>Next predicted menstruation</p><h2>{stats.nextPeriod ? formatDate(stats.nextPeriod) : "Add a cycle"}</h2></div>
+    <main className="layout dashboard-polished-layout">
+      <section className="main-col dashboard-polished-main">
+        <Card className="dashboard-soft-hero-card">
+          <div className="dashboard-soft-hero-copy">
+            <p className="dashboard-kicker">Next period</p>
+            <div className="dashboard-hero-title-row">
+              <h2>{nextPeriodLabel}</h2>
+              <span>{daysLabel}</span>
             </div>
-            {stats.nextPeriod && <p className="hero-sub">{stats.daysUntil > 0 ? `${stats.daysUntil} days away` : stats.daysUntil === 0 ? "Expected today" : `${Math.abs(stats.daysUntil)} days past prediction`}</p>}
+            <p className="dashboard-hero-note">Your period is predicted from your cycle history and average cycle length of {stats.averageCycle || 28} days.</p>
+            <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
-          <div className="stats">
-            <StatCard icon={Droplet} label="Avg. cycle" value={`${stats.averageCycle} days`} />
-            <StatCard icon={Moon} label="Avg. menstruation" value={`${stats.averagePeriod} days`} />
-            <StatCard icon={HeartPulse} label="Last menstruation" value={stats.last ? formatDate(stats.last.startDate) : "None yet"} />
+          <div className="dashboard-calendar-art" aria-hidden="true">
+            <div className="calendar-art-card">
+              <i></i><i></i><i></i><i></i>
+              <div className="calendar-art-grid">
+                {Array.from({ length: 20 }).map((_, index) => <span key={index} className={index === 11 || index === 12 || index === 13 ? "hot" : index === 6 ? "ring" : ""}></span>)}
+              </div>
+            </div>
+            <div className="calendar-art-leaf leaf-one"></div>
+            <div className="calendar-art-leaf leaf-two"></div>
           </div>
         </Card>
 
-        <Card className="pad">
-          <div className="card-head">
-            <h2>Upcoming</h2>
-            <div className="actions">
-              <Button onClick={jumpToNextPeriod} variant="secondary">Show next menstruation</Button>
+        <div className="dashboard-soft-stats">
+          <SoftStat icon={Droplet} label="Cycle length" sublabel="Average" value={stats.averageCycle || 28} suffix="days" tone="period" />
+          <SoftStat icon={CalendarDays} label="Period length" sublabel="Average" value={stats.averagePeriod || 5} suffix="days" tone="period" />
+          <SoftStat icon={Sparkles} label="Ovulation day" sublabel="Average" value={stats.ovulationDay ? Math.max(1, stats.averageCycle - 14) : 14} suffix="day" tone="ovulation" />
+        </div>
 
+        <div className="dashboard-soft-lower">
+          <Card className="dashboard-list-card recent-card">
+            <div className="dashboard-list-head">
+              <h2>Recent entries</h2>
+              <button type="button" onClick={() => setActiveTab("log")}>View all</button>
             </div>
-          </div>
-          <div className="tiles">
-            <InfoTile title="Predicted menstruation" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} />
-            <InfoTile title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} />
-            <InfoTile title="Reminder" value={settings.remindersEnabled && stats.reminderDate ? formatDate(stats.reminderDate) : "Off"} />
-          </div>
-        </Card>
+            <div className="dashboard-entry-list">
+              {recentRows.map((entry, index) => <RecentDashboardRow key={entry.id || index} entry={entry} fallbackIndex={index} />)}
+            </div>
+            <Button onClick={() => setActiveTab("log")} className="dashboard-new-checkin"><Plus size={20} /> New check-in</Button>
+          </Card>
+
+          <Card className="dashboard-list-card upcoming-card">
+            <div className="dashboard-list-head">
+              <h2>Upcoming</h2>
+              <button type="button" onClick={jumpToNextPeriod}>View calendar</button>
+            </div>
+            <div className="dashboard-upcoming-list">
+              <UpcomingDashboardRow tone="period" icon={Droplet} title="Upcoming period" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} badge={daysLabel} />
+              <UpcomingDashboardRow tone="fertile" icon={Heart} title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} badge={stats.fertileStart ? `${Math.max(0, daysBetween(todayKey(), stats.fertileStart))} days` : "Needs data"} />
+              <UpcomingDashboardRow tone="luteal" icon={Bell} title="Reminder" value={settings.remindersEnabled && stats.reminderDate ? formatDate(stats.reminderDate) : "Off"} badge={settings.remindersEnabled && stats.reminderDate ? "Reminder" : "Off"} />
+            </div>
+          </Card>
+        </div>
       </section>
 
-      <aside className="side-col">
-        <Card className="pad"><h2>Recent entries</h2><EntryList entries={sortedEntries.slice(0, 3)} onEdit={startEdit} onDelete={deleteEntry} compact /></Card>
+      <aside className="side-col dashboard-soft-side">
         <PrivacyCard settings={settings} setLocked={setLocked} />
       </aside>
     </main>
+  );
+}
+
+function SoftStat({ icon: Icon, label, sublabel, value, suffix, tone = "period" }) {
+  return (
+    <div className={`dashboard-soft-stat ${tone}`}>
+      <div className="soft-stat-icon"><Icon size={26} /></div>
+      <div className="soft-stat-value"><strong>{value}</strong><span>{suffix}</span></div>
+      <p>{label}</p>
+      <small>{sublabel}</small>
+      <div className="soft-sparkline" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
+  );
+}
+
+function RecentDashboardRow({ entry, fallbackIndex }) {
+  const mood = moodLabel(entry);
+  const symptoms = Array.isArray(entry.symptoms) ? entry.symptoms : [];
+  const title = entry.type === "period" ? "Menstruation" : fallbackIndex === 1 ? "Flow" : fallbackIndex === 2 ? "Symptoms" : "Mood";
+  const value = entry.flow && entry.flow !== "N/A" ? entry.flow : symptoms[0] || (mood !== "N/A" ? mood : "Logged");
+  const tone = value.toLowerCase().includes("bloat") ? "predicted" : value.toLowerCase().includes("light") ? "follicular" : entry.type === "period" ? "period" : "luteal";
+  const Icon = entry.type === "period" || title === "Flow" ? Droplet : title === "Symptoms" ? Heart : Smile;
+
+  return (
+    <div className={`dashboard-entry-row ${tone}`}>
+      <div className="dashboard-row-icon"><Icon size={20} /></div>
+      <div>
+        <strong>{entry.startDate ? formatDate(entry.startDate) : "Today"}</strong>
+        <p>{title}</p>
+      </div>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function UpcomingDashboardRow({ tone, icon: Icon, title, value, badge }) {
+  return (
+    <div className={`dashboard-upcoming-row ${tone}`}>
+      <div className="dashboard-row-icon"><Icon size={20} /></div>
+      <div>
+        <strong>{title}</strong>
+        <p>{value}</p>
+      </div>
+      <span>{badge}</span>
+    </div>
   );
 }
 
@@ -3606,7 +3688,7 @@ function MobileSetupPage() {
 }
 
 function PrivacyCard({ settings, setLocked }) {
-  return <Card className="pad"><h2><Lock size={20} /> Privacy</h2><p className="muted">Your data is private and stored securely. Use cloud sync only when you choose, and keep control with clear delete and export tools.</p>{settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}</Card>;
+  return <Card className="pad"><h2><Lock size={20} /> Privacy</h2><p className="muted">Your data is private and stored securely. Use your account for encrypted sync, and export or delete your data anytime.</p>{settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}</Card>;
 }
 
 createRoot(document.getElementById("root")).render(<AppErrorBoundary><App /></AppErrorBoundary>);

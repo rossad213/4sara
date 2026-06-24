@@ -1855,14 +1855,7 @@ function App() {
       const key = toDateKey(new Date(year, month, dayNumber));
       const entry = periodDays.get(key);
       const projection = projectedPhaseMap.get(key);
-      const phase = entry
-        ? "Menstruation"
-        : projection?.phase || inferPhase(
-            key,
-            entries.filter((item) => (item.type || "period") === "period"),
-            stats.averageCycle,
-            stats.averagePeriod
-          );
+      const phase = entry ? "Menstruation" : projection?.phase || "";
       const isPredicted = !entry && phase === "Menstruation";
       const isFertile = phase === "Fertile";
       const isOvulation = phase === "Ovulation";
@@ -1889,7 +1882,7 @@ function App() {
         statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
-  }, [calendarDate, entries, projectedPhaseMap, stats.averageCycle, stats.averagePeriod]);
+  }, [calendarDate, entries, projectedPhaseMap]);
 
   const completeOnboarding = () => {
     if (!onboarding.profileName.trim()) return showMessage("Enter a name first.");

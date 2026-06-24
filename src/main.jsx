@@ -3068,6 +3068,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
     { id: "empty-mood", startDate: todayKey(), type: "checkin", mood: "Good", moods: ["Good"], flow: "", symptoms: [], notes: "" },
     { id: "empty-flow", startDate: todayKey(), type: "checkin", mood: "", moods: [], flow: "Light", symptoms: [], notes: "" }
   ];
+  const nextPhase = getNextDashboardPhase(stats);
 
   return (
     <main className="layout dashboard-polished-layout">
@@ -3120,21 +3121,86 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             <div className="dashboard-upcoming-list">
               <UpcomingDashboardRow tone="period" icon={Droplet} title="Upcoming period" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} badge={daysLabel} />
               <UpcomingDashboardRow tone="fertile" icon={Heart} title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} badge={stats.fertileStart ? `${Math.max(0, daysBetween(todayKey(), stats.fertileStart))} days` : "Needs data"} />
-              <UpcomingDashboardRow tone="luteal" icon={Bell} title="Reminder" value={settings.remindersEnabled && stats.reminderDate ? formatDate(stats.reminderDate) : "Off"} badge={settings.remindersEnabled && stats.reminderDate ? "Reminder" : "Off"} />
+              <UpcomingDashboardRow tone={nextPhase.tone} icon={nextPhase.icon} title={nextPhase.title} value={nextPhase.value} badge={nextPhase.badge} />
             </div>
           </Card>
         </div>
-        <Card className="dashboard-privacy-strip">
-          <div className="dashboard-privacy-strip-icon"><Lock size={22} /></div>
-          <div>
-            <h2>Your privacy is protected</h2>
-            <p>Your data is private and stored securely. Use your account for encrypted sync, export, and deletion controls anytime.</p>
-          </div>
-          <button type="button" onClick={() => setActiveTab("privacy")}>Privacy settings</button>
-        </Card>
       </section>
+
+      <aside className="side-col dashboard-soft-side">
+        <PrivacyCard settings={settings} setLocked={setLocked} />
+      </aside>
     </main>
   );
+}
+
+function getNextDashboardPhase(stats) {
+  const needsData = {
+    tone: "follicular",
+    icon: Sparkles,
+    title: "Next phase",
+    value: "Add more cycle history",
+    badge: "Needs data"
+  };
+
+  if (!stats?.nextPeriod) return needsData;
+
+  const today = todayKey();
+  const avgCycle = Number(stats.averageCycle) || 28;
+  const avgPeriod = Number(stats.averagePeriod) || 5;
+  const nextPeriodStart = stats.nextPeriod;
+  const nextPeriodEnd = stats.predictedEnd || addDays(nextPeriodStart, avgPeriod - 1);
+  const ovulation = stats.ovulationDay || addDays(nextPeriodStart, -14);
+  const fertileEnd = stats.fertileEnd || addDays(ovulation, 1);
+  const lutealStart = addDays(fertileEnd, 1);
+  const nextFollicularStart = addDays(nextPeriodEnd, 1);
+  const nextFollicularEnd = addDays(addDays(nextPeriodStart, avgCycle), -20);
+
+  const formatBadge = (dateString) => {
+    const days = daysBetween(today, dateString);
+    if (days <= 0) return "Today";
+    return `In ${days} day${days === 1 ? "" : "s"}`;
+  };
+
+  const candidates = [
+    {
+      start: ovulation,
+      tone: "ovulation",
+      icon: Sparkles,
+      title: "Ovulation",
+      value: formatDate(ovulation)
+    },
+    {
+      start: lutealStart,
+      tone: "luteal",
+      icon: Moon,
+      title: "Luteal phase",
+      value: `${formatDate(lutealStart)} - ${formatDate(addDays(nextPeriodStart, -1))}`
+    },
+    {
+      start: nextFollicularStart,
+      tone: "follicular",
+      icon: CalendarDays,
+      title: "Follicular phase",
+      value: nextFollicularEnd && daysBetween(nextFollicularStart, nextFollicularEnd) >= 0
+        ? `${formatDate(nextFollicularStart)} - ${formatDate(nextFollicularEnd)}`
+        : formatDate(nextFollicularStart)
+    }
+  ];
+
+  const next = candidates
+    .filter((item) => item.start && daysBetween(today, item.start) >= 0)
+    .sort((a, b) => daysBetween(today, a.start) - daysBetween(today, b.start))[0];
+
+  if (!next) return needsData;
+
+  return {
+    tone: next.tone,
+    icon: next.icon,
+    title: next.title,
+    value: next.value,
+    badge: formatBadge(next.start)
+  };
 }
 
 function SoftStat({ icon: Icon, label, sublabel, value, suffix, tone = "period" }) {

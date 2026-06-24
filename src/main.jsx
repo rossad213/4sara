@@ -1782,8 +1782,12 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
+    const supportPeriodEntries = supportEntries
+      .filter((entry) => (entry.type || "period") === "period")
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const firstSupportPeriodStart = supportPeriodEntries[0]?.startDate || null;
 
-    supportEntries.filter((entry) => (entry.type || "period") === "period").forEach((entry) => {
+    supportPeriodEntries.forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -1798,8 +1802,13 @@ function App() {
 
       const key = toDateKey(new Date(year, month, dayNumber));
       const entry = periodDays.get(key);
-      const projection = supportProjectedPhaseMap.get(key);
-      const phase = entry ? "Menstruation" : projection?.phase || inferPhase(key, supportEntries.filter((item) => (item.type || "period") === "period"), supportStats.averageCycle, supportStats.averagePeriod);
+      const canShowProjection = firstSupportPeriodStart && daysBetween(firstSupportPeriodStart, key) >= 0;
+      const projection = canShowProjection ? supportProjectedPhaseMap.get(key) : null;
+      const phase = entry
+        ? "Menstruation"
+        : canShowProjection
+          ? projection?.phase || inferPhase(key, supportPeriodEntries, supportStats.averageCycle, supportStats.averagePeriod)
+          : "";
       const isPredicted = !entry && phase === "Menstruation";
       const isFertile = phase === "Fertile";
       const isOvulation = phase === "Ovulation";
@@ -1838,8 +1847,12 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
+    const periodEntries = entries
+      .filter((entry) => (entry.type || "period") === "period")
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const firstPeriodStart = periodEntries[0]?.startDate || null;
 
-    entries.filter((entry) => (entry.type || "period") === "period").forEach((entry) => {
+    periodEntries.forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -1854,8 +1867,13 @@ function App() {
 
       const key = toDateKey(new Date(year, month, dayNumber));
       const entry = periodDays.get(key);
-      const projection = projectedPhaseMap.get(key);
-      const phase = entry ? "Menstruation" : projection?.phase || "";
+      const canShowProjection = firstPeriodStart && daysBetween(firstPeriodStart, key) >= 0;
+      const projection = canShowProjection ? projectedPhaseMap.get(key) : null;
+      const phase = entry
+        ? "Menstruation"
+        : canShowProjection
+          ? projection?.phase || inferPhase(key, periodEntries, stats.averageCycle, stats.averagePeriod)
+          : "";
       const isPredicted = !entry && phase === "Menstruation";
       const isFertile = phase === "Fertile";
       const isOvulation = phase === "Ovulation";
@@ -1882,7 +1900,7 @@ function App() {
         statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
-  }, [calendarDate, entries, projectedPhaseMap]);
+  }, [calendarDate, entries, projectedPhaseMap, stats.averageCycle, stats.averagePeriod]);
 
   const completeOnboarding = () => {
     if (!onboarding.profileName.trim()) return showMessage("Enter a name first.");

@@ -3077,7 +3077,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             <h2>Upcoming</h2>
             <div className="actions">
               <Button onClick={jumpToNextPeriod} variant="secondary">Show next menstruation</Button>
-              <Button onClick={previewReminder} variant="secondary">Preview reminder</Button>
+
             </div>
           </div>
           <div className="tiles">
@@ -3606,7 +3606,7 @@ function MobileSetupPage() {
 }
 
 function PrivacyCard({ settings, setLocked }) {
-  return <Card className="pad"><h2><Lock size={20} /> Privacy</h2><p className="muted">This prototype stores data only in this browser. For a public app, use encrypted storage, secure accounts, clear delete/export tools, and strict privacy terms.</p>{settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}</Card>;
+  return <Card className="pad"><h2><Lock size={20} /> Privacy</h2><p className="muted">Your data is private and stored securely. Use cloud sync only when you choose, and keep control with clear delete and export tools.</p>{settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}</Card>;
 }
 
 createRoot(document.getElementById("root")).render(<AppErrorBoundary><App /></AppErrorBoundary>);

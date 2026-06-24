@@ -2991,8 +2991,8 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .landing-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  font-size: 34px;
+  gap: 14px;
+  font-size: 38px;
   font-weight: 800;
   letter-spacing: -.04em;
   color: #9f1239;
@@ -3900,10 +3900,10 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 
 /* === Final exact-logo cleanup: use the real uploaded PNG only === */
 .landing-brand .landing-logo-mark.compact {
-  width: 46px !important;
-  height: 46px !important;
-  min-width: 46px !important;
-  border-radius: 14px !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  border-radius: 16px !important;
   object-fit: contain !important;
 }
 
@@ -3921,11 +3921,11 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 }
 
 .mini-lotus {
-  width: 46px !important;
-  height: 46px !important;
-  min-width: 46px !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
   background: transparent !important;
-  border-radius: 14px !important;
+  border-radius: 16px !important;
   overflow: visible !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -3933,9 +3933,9 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 }
 
 .mini-lotus img {
-  width: 46px !important;
-  height: 46px !important;
-  border-radius: 14px !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 16px !important;
   object-fit: contain !important;
   display: block !important;
   background: transparent !important;

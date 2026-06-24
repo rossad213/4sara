@@ -2177,7 +2177,6 @@ function App() {
                 <span>4Sara</span>
               </button>
               <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
-              <CloudStatusBadge authUser={authUser} autoSyncEnabled={autoSyncEnabled} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} syncBusy={syncBusy} lastCloudSave={lastCloudSave} />
               <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTab} sharedProfiles={sharedProfiles} selectedSharedOwnerId={selectedSharedOwnerId} setSelectedSharedOwnerId={setSelectedSharedOwnerId} chooseSharedSupportView={chooseSharedSupportView} />
             </div>
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
@@ -2213,7 +2212,7 @@ function App() {
 
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 16, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} setActiveTab={setActiveTab} setLocked={setLocked} />}
+            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} previewReminder={previewReminder} setLocked={setLocked} logToday={logToday} />}
             {activeTab === "calendar" && (
               <CalendarPanel
                 calendarDate={calendarDate}
@@ -3053,204 +3052,190 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
   );
 }
 
-function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, setActiveTab, setLocked }) {
-  const recent = sortedEntries.slice(0, 3);
-  const nextPeriodLabel = stats.nextPeriod ? `${formatDate(stats.nextPeriod)}${stats.predictedEnd ? ` - ${formatDate(stats.predictedEnd)}` : ""}` : "Add a cycle";
-  const daysLabel = stats.nextPeriod
+function getNextCyclePhase(stats) {
+  if (!stats?.last?.startDate || !stats?.averageCycle || !stats?.averagePeriod) return null;
+
+  const today = todayKey();
+  const cycleLength = Number(stats.averageCycle) || 28;
+  const periodLength = Number(stats.averagePeriod) || 5;
+  let cycleStart = stats.last.startDate;
+
+  const phaseClass = (label) => {
+    const lower = String(label || "").toLowerCase();
+    if (lower.includes("menstruation") || lower.includes("period")) return "period";
+    if (lower.includes("fertile")) return "fertile";
+    if (lower.includes("ovulation")) return "ovulation";
+    if (lower.includes("luteal")) return "luteal";
+    return "follicular";
+  };
+
+  const formatPhaseDate = (start, end) => {
+    if (!start) return "Not enough data";
+    if (!end || start === end) return formatDate(start);
+    return `${formatDate(start)} - ${formatDate(end)}`;
+  };
+
+  for (let cycleIndex = 0; cycleIndex < 24; cycleIndex += 1) {
+    const menstruationStart = cycleStart;
+    const menstruationEnd = addDays(menstruationStart, periodLength - 1);
+    const nextCycleStart = addDays(cycleStart, cycleLength);
+    const ovulation = addDays(nextCycleStart, -14);
+    const fertileStart = addDays(ovulation, -5);
+    const fertileEnd = addDays(ovulation, 1);
+    const follicularStart = addDays(menstruationEnd, 1);
+    const follicularEnd = addDays(fertileStart, -1);
+    const lutealStart = addDays(fertileEnd, 1);
+    const lutealEnd = addDays(nextCycleStart, -1);
+
+    const phases = [
+      { label: "Menstruation", start: menstruationStart, end: menstruationEnd },
+      { label: "Follicular phase", start: follicularStart, end: follicularEnd },
+      { label: "Fertile window", start: fertileStart, end: fertileEnd },
+      { label: "Ovulation", start: ovulation, end: ovulation },
+      { label: "Luteal phase", start: lutealStart, end: lutealEnd }
+    ].filter((phase) => phase.start && phase.end && daysBetween(phase.start, phase.end) >= 0);
+
+    for (const phase of phases) {
+      const daysUntilStart = daysBetween(today, phase.start);
+      if (daysUntilStart > 0) {
+        return {
+          ...phase,
+          dateLabel: formatPhaseDate(phase.start, phase.end),
+          badge: daysUntilStart === 1 ? "Tomorrow" : `In ${daysUntilStart} days`,
+          className: phaseClass(phase.label)
+        };
+      }
+    }
+
+    cycleStart = nextCycleStart;
+  }
+
+  return null;
+}
+
+function formatDashboardRange(start, end) {
+  if (!start) return "Add a cycle";
+  if (!end || start === end) return formatDate(start);
+  return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
+function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, previewReminder, setLocked, logToday }) {
+  const nextPhase = getNextCyclePhase(stats);
+  const periodBadge = stats.nextPeriod
     ? stats.daysUntil > 0
       ? `In ${stats.daysUntil} days`
       : stats.daysUntil === 0
-      ? "Expected today"
-      : `${Math.abs(stats.daysUntil)} days past prediction`
-    : "Needs data";
+        ? "Expected today"
+        : `${Math.abs(stats.daysUntil)} days past prediction`
+    : "Add a cycle";
 
-  const recentRows = recent.length ? recent : [
-    { id: "empty-mood", startDate: todayKey(), type: "checkin", mood: "Good", moods: ["Good"], flow: "", symptoms: [], notes: "" },
-    { id: "empty-flow", startDate: todayKey(), type: "checkin", mood: "", moods: [], flow: "Light", symptoms: [], notes: "" }
-  ];
-
-  const nextPhase = getNextDashboardPhase(stats);
+  const recentItems = sortedEntries.slice(0, 3);
+  const latestEntry = recentItems[0];
+  const symptomCount = Array.isArray(latestEntry?.symptoms) ? latestEntry.symptoms.length : 0;
 
   return (
-    <main className="layout dashboard-polished-layout">
-      <section className="main-col dashboard-polished-main">
-        <Card className="dashboard-soft-hero-card">
-          <div className="dashboard-soft-hero-copy">
-            <p className="dashboard-kicker">Next period</p>
-            <div className="dashboard-hero-title-row">
-              <h2>{nextPeriodLabel}</h2>
-              <span>{daysLabel}</span>
-            </div>
-            <p className="dashboard-hero-note">Your period is predicted from your cycle history and average cycle length of {stats.averageCycle || 28} days.</p>
-            <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
+    <main className="soft-dashboard">
+      <section className="soft-period-hero card">
+        <div className="soft-period-copy">
+          <span className="soft-section-label">Next period</span>
+          <h2>{formatDashboardRange(stats.nextPeriod, stats.predictedEnd)}</h2>
+          <span className="soft-badge period">{periodBadge}</span>
+          <p>Your period is predicted from your cycle history and average cycle length of {stats.averageCycle || 28} days.</p>
+          <Button onClick={jumpToNextPeriod} className="soft-hero-button"><CalendarDays size={16} /> View Calendar</Button>
+        </div>
+        <div className="soft-calendar-art" aria-hidden="true">
+          <div className="soft-blob-one"></div>
+          <div className="soft-blob-two"></div>
+          <div className="soft-mini-calendar">
+            <span></span><span></span><span></span><span></span>
+            <i></i><i></i><i></i><i></i><i></i>
+            <i></i><b></b><i></i><i></i><i></i>
+            <i></i><b></b><b></b><b></b><i></i>
+            <i></i><i></i><i></i><i></i><i></i>
           </div>
-          <div className="dashboard-calendar-art" aria-hidden="true">
-            <div className="calendar-art-card">
-              <i></i><i></i><i></i><i></i>
-              <div className="calendar-art-grid">
-                {Array.from({ length: 20 }).map((_, index) => <span key={index} className={index === 11 || index === 12 || index === 13 ? "hot" : index === 6 ? "ring" : ""}></span>)}
-              </div>
-            </div>
-            <div className="calendar-art-leaf leaf-one"></div>
-            <div className="calendar-art-leaf leaf-two"></div>
+        </div>
+      </section>
+
+      <section className="soft-stat-grid">
+        <SoftStatCard icon={Droplet} label="Cycle length" value={stats.averageCycle || 28} unit="days" tone="period" />
+        <SoftStatCard icon={CalendarDays} label="Period length" value={stats.averagePeriod || 5} unit="days" tone="period" />
+        <SoftStatCard icon={Sparkles} label="Ovulation day" value={stats.ovulationDay ? (getCycleDayForDate(stats.ovulationDay, stats.last?.startDate, stats.averageCycle) || 14) : 14} unit="day" tone="ovulation" />
+      </section>
+
+      <section className="soft-lower-grid">
+        <Card className="soft-list-card">
+          <div className="soft-card-title-row">
+            <h2>Recent entries</h2>
+            <button type="button" className="soft-text-button" onClick={() => {}}>View all</button>
           </div>
+          <div className="soft-entry-list">
+            {recentItems.length ? recentItems.map((entry, index) => {
+              const isPeriod = (entry.type || "period") === "period";
+              const rowLabel = isPeriod ? "Menstruation" : (entry.symptoms?.[0] || moodLabel(entry) || "Check-in");
+              const chipLabel = isPeriod ? "Logged" : (entry.flow && entry.flow !== "N/A" ? entry.flow : moodLabel(entry));
+              return (
+                <div className="soft-entry-row" key={entry.id || `${entry.startDate}-${index}`}>
+                  <span className={`soft-row-icon ${isPeriod ? "period" : "checkin"}`}>{isPeriod ? <Droplet size={18} /> : <Smile size={18} />}</span>
+                  <div>
+                    <strong>{entry.startDate ? formatDate(entry.startDate) : "Today"}</strong>
+                    <p>{rowLabel}</p>
+                  </div>
+                  <span className={`soft-status-pill ${isPeriod ? "period" : "checkin"}`}>{chipLabel || "Logged"}</span>
+                </div>
+              );
+            }) : (
+              <div className="soft-empty-state">No recent entries yet.</div>
+            )}
+          </div>
+          <Button onClick={() => logToday("checkin")} className="soft-checkin-button"><Plus size={18} /> New check-in</Button>
         </Card>
 
-        <div className="dashboard-soft-stats">
-          <SoftStat icon={Droplet} label="Cycle length" sublabel="Average" value={stats.averageCycle || 28} suffix="days" tone="period" />
-          <SoftStat icon={CalendarDays} label="Period length" sublabel="Average" value={stats.averagePeriod || 5} suffix="days" tone="period" />
-          <SoftStat icon={Sparkles} label="Ovulation day" sublabel="Average" value={stats.ovulationDay ? Math.max(1, stats.averageCycle - 14) : 14} suffix="day" tone="ovulation" />
-        </div>
-
-        <div className="dashboard-soft-lower">
-          <Card className="dashboard-list-card recent-card">
-            <div className="dashboard-list-head">
-              <h2>Recent entries</h2>
-              <button type="button" onClick={() => setActiveTab("log")}>View all</button>
-            </div>
-            <div className="dashboard-entry-list">
-              {recentRows.map((entry, index) => <RecentDashboardRow key={entry.id || index} entry={entry} fallbackIndex={index} />)}
-            </div>
-            <Button onClick={() => setActiveTab("log")} className="dashboard-new-checkin"><Plus size={20} /> New check-in</Button>
-          </Card>
-
-          <Card className="dashboard-list-card upcoming-card">
-            <div className="dashboard-list-head">
-              <h2>Upcoming</h2>
-              <button type="button" onClick={jumpToNextPeriod}>View calendar</button>
-            </div>
-            <div className="dashboard-upcoming-list">
-              <UpcomingDashboardRow tone="period" icon={Droplet} title="Upcoming period" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} badge={daysLabel} />
-              <UpcomingDashboardRow tone="fertile" icon={Heart} title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} badge={stats.fertileStart ? `${Math.max(0, daysBetween(todayKey(), stats.fertileStart))} days` : "Needs data"} />
-              <UpcomingDashboardRow tone={nextPhase.tone} icon={nextPhase.icon} title={nextPhase.title} value={nextPhase.value} badge={nextPhase.badge} />
-            </div>
-          </Card>
-        </div>
-        <Card className="dashboard-privacy-strip">
-          <div className="dashboard-privacy-strip-icon"><Lock size={22} /></div>
-          <div>
-            <h2>Your privacy is protected</h2>
-            <p>Your data is private and stored securely. Use your account for encrypted sync, export, and deletion controls anytime.</p>
+        <Card className="soft-list-card">
+          <div className="soft-card-title-row">
+            <h2>Upcoming</h2>
+            <button type="button" className="soft-text-button" onClick={jumpToNextPeriod}>View calendar</button>
           </div>
-          <button type="button" onClick={() => setActiveTab("privacy")}>Privacy settings</button>
+          <div className="soft-upcoming-list">
+            <SoftUpcomingRow tone="period" icon={Droplet} title="Upcoming period" date={formatDashboardRange(stats.nextPeriod, stats.predictedEnd)} badge={periodBadge} />
+            <SoftUpcomingRow tone="fertile" icon={Heart} title="Fertile window" date={stats.fertileStart ? formatDashboardRange(stats.fertileStart, stats.fertileEnd) : "Not enough data"} badge={stats.fertileStart ? (daysBetween(todayKey(), stats.fertileStart) > 0 ? `In ${daysBetween(todayKey(), stats.fertileStart)} days` : "0 days") : ""} />
+            <SoftUpcomingRow tone={nextPhase?.className || "ovulation"} icon={Sparkles} title={nextPhase?.label || "Next phase"} date={nextPhase?.dateLabel || "Add more data"} badge={nextPhase?.badge || "Soon"} />
+          </div>
         </Card>
       </section>
+
+      <Card className="soft-privacy-strip">
+        <span className="soft-row-icon privacy"><Lock size={20} /></span>
+        <div>
+          <h2>Your privacy is protected</h2>
+          <p>Your data is private and stored securely. Use your account for encrypted sync, export, and deletion controls anytime.</p>
+        </div>
+        <button type="button" className="soft-text-button" onClick={() => setLocked(true)}>Privacy settings</button>
+      </Card>
     </main>
   );
 }
 
-function getNextDashboardPhase(stats) {
-  const needsData = {
-    tone: "follicular",
-    icon: Sparkles,
-    title: "Next phase",
-    value: "Add more cycle history",
-    badge: "Needs data"
-  };
-
-  if (!stats?.nextPeriod) return needsData;
-
-  const today = todayKey();
-  const avgCycle = Number(stats.averageCycle) || 28;
-  const avgPeriod = Number(stats.averagePeriod) || 5;
-  const nextPeriodStart = stats.nextPeriod;
-  const nextPeriodEnd = stats.predictedEnd || addDays(nextPeriodStart, avgPeriod - 1);
-  const ovulation = stats.ovulationDay || addDays(nextPeriodStart, -14);
-  const fertileEnd = stats.fertileEnd || addDays(ovulation, 1);
-  const lutealStart = addDays(fertileEnd, 1);
-  const nextFollicularStart = addDays(nextPeriodEnd, 1);
-  const followingPeriodStart = addDays(nextPeriodStart, avgCycle);
-  const nextFertileStart = addDays(addDays(followingPeriodStart, -14), -5);
-  const nextFollicularEnd = addDays(nextFertileStart, -1);
-
-  const formatBadge = (dateString) => {
-    const days = daysBetween(today, dateString);
-    if (days <= 0) return "Today";
-    return `In ${days} day${days === 1 ? "" : "s"}`;
-  };
-
-  const candidates = [
-    {
-      start: ovulation,
-      tone: "ovulation",
-      icon: Sparkles,
-      title: "Ovulation",
-      value: formatDate(ovulation)
-    },
-    {
-      start: lutealStart,
-      tone: "luteal",
-      icon: Moon,
-      title: "Luteal phase",
-      value: `${formatDate(lutealStart)} - ${formatDate(addDays(nextPeriodStart, -1))}`
-    },
-    {
-      start: nextFollicularStart,
-      tone: "follicular",
-      icon: CalendarDays,
-      title: "Follicular phase",
-      value: nextFollicularEnd && daysBetween(nextFollicularStart, nextFollicularEnd) >= 0
-        ? `${formatDate(nextFollicularStart)} - ${formatDate(nextFollicularEnd)}`
-        : formatDate(nextFollicularStart)
-    }
-  ];
-
-  const next = candidates
-    .filter((item) => item.start && daysBetween(today, item.start) >= 0)
-    .sort((a, b) => daysBetween(today, a.start) - daysBetween(today, b.start))[0];
-
-  if (!next) return needsData;
-
-  return {
-    tone: next.tone,
-    icon: next.icon,
-    title: next.title,
-    value: next.value,
-    badge: formatBadge(next.start)
-  };
-}
-
-function SoftStat({ icon: Icon, label, sublabel, value, suffix, tone = "period" }) {
+function SoftStatCard({ icon: Icon, label, value, unit, tone = "period" }) {
   return (
-    <div className={`dashboard-soft-stat ${tone}`}>
-      <div className="soft-stat-icon"><Icon size={26} /></div>
-      <div className="soft-stat-value"><strong>{value}</strong><span>{suffix}</span></div>
+    <Card className="soft-stat-card">
+      <span className={`soft-row-icon ${tone}`}><Icon size={22} /></span>
+      <div className="soft-stat-value"><strong>{value}</strong><span>{unit}</span></div>
       <p>{label}</p>
-      <small>{sublabel}</small>
-      <div className="soft-sparkline" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-    </div>
+      <small>Average</small>
+      <div className={`soft-bars ${tone}`}><i></i><i></i><i></i><i></i><i></i></div>
+    </Card>
   );
 }
 
-function RecentDashboardRow({ entry, fallbackIndex }) {
-  const mood = moodLabel(entry);
-  const symptoms = Array.isArray(entry.symptoms) ? entry.symptoms : [];
-  const title = entry.type === "period" ? "Menstruation" : fallbackIndex === 1 ? "Flow" : fallbackIndex === 2 ? "Symptoms" : "Mood";
-  const value = entry.flow && entry.flow !== "N/A" ? entry.flow : symptoms[0] || (mood !== "N/A" ? mood : "Logged");
-  const tone = value.toLowerCase().includes("bloat") ? "predicted" : value.toLowerCase().includes("light") ? "follicular" : entry.type === "period" ? "period" : "luteal";
-  const Icon = entry.type === "period" || title === "Flow" ? Droplet : title === "Symptoms" ? Heart : Smile;
-
+function SoftUpcomingRow({ tone, icon: Icon, title, date, badge }) {
   return (
-    <div className={`dashboard-entry-row ${tone}`}>
-      <div className="dashboard-row-icon"><Icon size={20} /></div>
-      <div>
-        <strong>{entry.startDate ? formatDate(entry.startDate) : "Today"}</strong>
-        <p>{title}</p>
-      </div>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-function UpcomingDashboardRow({ tone, icon: Icon, title, value, badge }) {
-  return (
-    <div className={`dashboard-upcoming-row ${tone}`}>
-      <div className="dashboard-row-icon"><Icon size={20} /></div>
+    <div className={`soft-upcoming-row ${tone}`}>
+      <span className={`soft-row-icon ${tone}`}><Icon size={18} /></span>
       <div>
         <strong>{title}</strong>
-        <p>{value}</p>
+        <p>{date}</p>
       </div>
-      <span>{badge}</span>
+      {badge && <span className={`soft-status-pill ${tone}`}>{badge}</span>}
     </div>
   );
 }
@@ -3765,7 +3750,7 @@ function MobileSetupPage() {
 }
 
 function PrivacyCard({ settings, setLocked }) {
-  return <Card className="pad"><h2><Lock size={20} /> Privacy</h2><p className="muted">Your data is private and stored securely. Use your account for encrypted sync, and export or delete your data anytime.</p>{settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}</Card>;
+  return <Card className="pad"><h2><Lock size={20} /> Privacy</h2><p className="muted">This prototype stores data only in this browser. For a public app, use encrypted storage, secure accounts, clear delete/export tools, and strict privacy terms.</p>{settings.pinEnabled && settings.pin && <Button onClick={() => setLocked(true)} variant="secondary" className="full">Lock now</Button>}</Card>;
 }
 
 createRoot(document.getElementById("root")).render(<AppErrorBoundary><App /></AppErrorBoundary>);

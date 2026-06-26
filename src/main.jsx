@@ -2713,91 +2713,17 @@ function WelcomeScreen({ onStart, onLogin }) {
     </div>
   );
 
-  const AppPreview = () => {
-    const weeks = [
-      [27, 28, 29, 30, 1, 2, 3],
-      [4, 5, 6, 7, 8, 9, 10],
-      [11, 12, 13, 14, 15, 16, 17],
-      [18, 19, 20, 21, 22, 23, 24],
-      [25, 26, 27, 28, 29, 30, 31],
-      [1, 2, 3, 4, 5, 6, 7]
-    ];
-    const fadedCells = new Set(["0-0", "0-1", "0-2", "0-3", "5-0", "5-1", "5-2", "5-3", "5-4", "5-5", "5-6"]);
-    const periodCells = new Set(["3-3", "3-4", "3-5", "3-6", "4-0"]);
-
-    return (
-      <div className="landing-preview-shell" aria-label="4Sara app preview">
-        <div className="landing-browser-bar">
-          <div className="landing-window-dots"><span /><span /><span /></div>
-          <div className="landing-url">app.4sara.com</div>
-          <div className="landing-browser-actions">♡</div>
-        </div>
-        <div className="landing-app-preview">
-          <aside className="landing-sidebar">
-            <div className="landing-sidebar-brand"><LogoMark compact /><strong>4Sara</strong></div>
-            <div className="landing-side-link active"><Home size={15} /> Dashboard</div>
-            <div className="landing-side-link"><CalendarDays size={15} /> Calendar</div>
-            <div className="landing-side-link"><CheckCircle2 size={15} /> Check-ins</div>
-            <div className="landing-side-link"><BarChart3 size={15} /> Insights</div>
-            <div className="landing-side-link"><FileText size={15} /> Reports</div>
-            <div className="landing-side-link"><Settings size={15} /> Settings</div>
-          </aside>
-
-          <main className="landing-preview-main">
-            <div className="landing-preview-head">
-              <div>
-                <h3>Good morning, Sara <Heart size={13} /></h3>
-                <p>Here’s your overview for today.</p>
-              </div>
-              <button type="button">+ Log check-in</button>
-            </div>
-
-            <div className="landing-preview-grid">
-              <section className="landing-calendar-card">
-                <div className="landing-calendar-title"><span>‹</span><strong>May 2026</strong><span>›</span></div>
-                <div className="landing-weekdays">{["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day) => <span key={day}>{day}</span>)}</div>
-                <div className="landing-calendar-days">
-                  {weeks.flatMap((week, row) => week.map((day, col) => {
-                    const key = `${row}-${col}`;
-                    return <span key={key} className={`${fadedCells.has(key) ? "faded" : ""} ${day === 13 && row === 2 ? "today" : ""} ${periodCells.has(key) ? "period" : ""}`}>{day}</span>;
-                  }))}
-                </div>
-                <div className="landing-calendar-legend">
-                  <span><i className="period-dot" /> Period</span>
-                  <span><i className="fertile-dot" /> Fertile window</span>
-                  <span><i className="ovulation-dot" /> Ovulation</span>
-                  <span><i className="today-dot" /> Today</span>
-                </div>
-              </section>
-
-              <aside className="landing-preview-stack">
-                <div className="landing-phase-card">
-                  <span className="mini-lotus"><img src={LOGO_SRC} alt="" loading="eager" decoding="async" /></span>
-                  <div><small>Current phase</small><strong>Follicular phase</strong><p>Day 7 of 28</p><div className="landing-progress"><span /></div></div>
-                </div>
-                <div className="landing-mini-panel"><small>Next period</small><strong>May 19 – May 23, 2026</strong><em>In 6 days</em></div>
-                <div className="landing-checkin-panel">
-                  <small>Today’s check-in</small>
-                  <p><span>Mood</span><strong>😊 Good</strong></p>
-                  <p><span>Symptoms</span><strong>🫧 Bloating</strong></p>
-                  <p><span>Flow</span><strong>💧 Light</strong></p>
-                  <button type="button">Edit check-in</button>
-                </div>
-              </aside>
-            </div>
-
-            <div className="landing-stat-strip">
-              <div><Droplet size={17} /><strong>28</strong><span>Cycle length<br />days</span></div>
-              <div><CalendarDays size={17} /><strong>5</strong><span>Period length<br />days</span></div>
-              <div><Sparkles size={17} /><strong>2</strong><span>Ovulation<br />day 14</span></div>
-              <div><HeartPulse size={17} /><strong>—</strong><span>Symptoms<br />tracked</span></div>
-              <div><BarChart3 size={17} /><strong>7</strong><span>Avg. cycle<br />days</span></div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  };
+  const AppPreview = () => (
+    <div className="landing-preview-photo-shell" aria-label="4Sara app preview">
+      <img
+        className="landing-preview-photo"
+        src="/icons/Home-screen-photo.png"
+        alt="4Sara home screen preview"
+        loading="eager"
+        decoding="async"
+      />
+    </div>
+  );
 
   const HomePage = () => (
     <>

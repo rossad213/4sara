@@ -1782,12 +1782,8 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
-    const supportPeriodEntries = supportEntries
-      .filter((entry) => (entry.type || "period") === "period")
-      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-    const firstSupportPeriodStart = supportPeriodEntries[0]?.startDate || null;
 
-    supportPeriodEntries.forEach((entry) => {
+    supportEntries.filter((entry) => (entry.type || "period") === "period").forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -1802,13 +1798,8 @@ function App() {
 
       const key = toDateKey(new Date(year, month, dayNumber));
       const entry = periodDays.get(key);
-      const canShowProjection = firstSupportPeriodStart && daysBetween(firstSupportPeriodStart, key) >= 0;
-      const projection = canShowProjection ? supportProjectedPhaseMap.get(key) : null;
-      const phase = entry
-        ? "Menstruation"
-        : canShowProjection
-          ? projection?.phase || inferPhase(key, supportPeriodEntries, supportStats.averageCycle, supportStats.averagePeriod)
-          : "";
+      const projection = supportProjectedPhaseMap.get(key);
+      const phase = entry ? "Menstruation" : projection?.phase || inferPhase(key, supportEntries.filter((item) => (item.type || "period") === "period"), supportStats.averageCycle, supportStats.averagePeriod);
       const isPredicted = !entry && phase === "Menstruation";
       const isFertile = phase === "Fertile";
       const isOvulation = phase === "Ovulation";
@@ -1847,12 +1838,8 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
-    const periodEntries = entries
-      .filter((entry) => (entry.type || "period") === "period")
-      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-    const firstPeriodStart = periodEntries[0]?.startDate || null;
 
-    periodEntries.forEach((entry) => {
+    entries.filter((entry) => (entry.type || "period") === "period").forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -1867,13 +1854,8 @@ function App() {
 
       const key = toDateKey(new Date(year, month, dayNumber));
       const entry = periodDays.get(key);
-      const canShowProjection = firstPeriodStart && daysBetween(firstPeriodStart, key) >= 0;
-      const projection = canShowProjection ? projectedPhaseMap.get(key) : null;
-      const phase = entry
-        ? "Menstruation"
-        : canShowProjection
-          ? projection?.phase || inferPhase(key, periodEntries, stats.averageCycle, stats.averagePeriod)
-          : "";
+      const projection = projectedPhaseMap.get(key);
+      const phase = entry ? "Menstruation" : projection?.phase || "";
       const isPredicted = !entry && phase === "Menstruation";
       const isFertile = phase === "Fertile";
       const isOvulation = phase === "Ovulation";
@@ -1900,7 +1882,7 @@ function App() {
         statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
-  }, [calendarDate, entries, projectedPhaseMap, stats.averageCycle, stats.averagePeriod]);
+  }, [calendarDate, entries, projectedPhaseMap]);
 
   const completeOnboarding = () => {
     if (!onboarding.profileName.trim()) return showMessage("Enter a name first.");
@@ -2700,9 +2682,6 @@ function WelcomeScreen({ onStart, onLogin }) {
     stripeCustom: "https://buy.stripe.com/aFa5kDdxI6yt3Hqbw9gnK03"
   };
 
-  const contactEmail = "4sara.org@gmail.com";
-  const contactHref = `mailto:${contactEmail}?subject=4Sara%20Support%20Request`;
-
   const openSupportLink = (url) => {
     if (!url) {
       alert("Support link coming soon.");
@@ -2734,17 +2713,91 @@ function WelcomeScreen({ onStart, onLogin }) {
     </div>
   );
 
-  const AppPreview = () => (
-    <div className="landing-preview-photo-shell" aria-label="4Sara app preview">
-      <img
-        className="landing-preview-photo"
-        src="/icons/Home-screen-photo.png"
-        alt="4Sara home screen preview"
-        loading="eager"
-        decoding="async"
-      />
-    </div>
-  );
+  const AppPreview = () => {
+    const weeks = [
+      [27, 28, 29, 30, 1, 2, 3],
+      [4, 5, 6, 7, 8, 9, 10],
+      [11, 12, 13, 14, 15, 16, 17],
+      [18, 19, 20, 21, 22, 23, 24],
+      [25, 26, 27, 28, 29, 30, 31],
+      [1, 2, 3, 4, 5, 6, 7]
+    ];
+    const fadedCells = new Set(["0-0", "0-1", "0-2", "0-3", "5-0", "5-1", "5-2", "5-3", "5-4", "5-5", "5-6"]);
+    const periodCells = new Set(["3-3", "3-4", "3-5", "3-6", "4-0"]);
+
+    return (
+      <div className="landing-preview-shell" aria-label="4Sara app preview">
+        <div className="landing-browser-bar">
+          <div className="landing-window-dots"><span /><span /><span /></div>
+          <div className="landing-url">app.4sara.com</div>
+          <div className="landing-browser-actions">♡</div>
+        </div>
+        <div className="landing-app-preview">
+          <aside className="landing-sidebar">
+            <div className="landing-sidebar-brand"><LogoMark compact /><strong>4Sara</strong></div>
+            <div className="landing-side-link active"><Home size={15} /> Dashboard</div>
+            <div className="landing-side-link"><CalendarDays size={15} /> Calendar</div>
+            <div className="landing-side-link"><CheckCircle2 size={15} /> Check-ins</div>
+            <div className="landing-side-link"><BarChart3 size={15} /> Insights</div>
+            <div className="landing-side-link"><FileText size={15} /> Reports</div>
+            <div className="landing-side-link"><Settings size={15} /> Settings</div>
+          </aside>
+
+          <main className="landing-preview-main">
+            <div className="landing-preview-head">
+              <div>
+                <h3>Good morning, Sara <Heart size={13} /></h3>
+                <p>Here’s your overview for today.</p>
+              </div>
+              <button type="button">+ Log check-in</button>
+            </div>
+
+            <div className="landing-preview-grid">
+              <section className="landing-calendar-card">
+                <div className="landing-calendar-title"><span>‹</span><strong>May 2026</strong><span>›</span></div>
+                <div className="landing-weekdays">{["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day) => <span key={day}>{day}</span>)}</div>
+                <div className="landing-calendar-days">
+                  {weeks.flatMap((week, row) => week.map((day, col) => {
+                    const key = `${row}-${col}`;
+                    return <span key={key} className={`${fadedCells.has(key) ? "faded" : ""} ${day === 13 && row === 2 ? "today" : ""} ${periodCells.has(key) ? "period" : ""}`}>{day}</span>;
+                  }))}
+                </div>
+                <div className="landing-calendar-legend">
+                  <span><i className="period-dot" /> Period</span>
+                  <span><i className="fertile-dot" /> Fertile window</span>
+                  <span><i className="ovulation-dot" /> Ovulation</span>
+                  <span><i className="today-dot" /> Today</span>
+                </div>
+              </section>
+
+              <aside className="landing-preview-stack">
+                <div className="landing-phase-card">
+                  <span className="mini-lotus"><img src={LOGO_SRC} alt="" loading="eager" decoding="async" /></span>
+                  <div><small>Current phase</small><strong>Follicular phase</strong><p>Day 7 of 28</p><div className="landing-progress"><span /></div></div>
+                </div>
+                <div className="landing-mini-panel"><small>Next period</small><strong>May 19 – May 23, 2026</strong><em>In 6 days</em></div>
+                <div className="landing-checkin-panel">
+                  <small>Today’s check-in</small>
+                  <p><span>Mood</span><strong>😊 Good</strong></p>
+                  <p><span>Symptoms</span><strong>🫧 Bloating</strong></p>
+                  <p><span>Flow</span><strong>💧 Light</strong></p>
+                  <button type="button">Edit check-in</button>
+                </div>
+              </aside>
+            </div>
+
+            <div className="landing-stat-strip">
+              <div><Droplet size={17} /><strong>28</strong><span>Cycle length<br />days</span></div>
+              <div><CalendarDays size={17} /><strong>5</strong><span>Period length<br />days</span></div>
+              <div><Sparkles size={17} /><strong>2</strong><span>Ovulation<br />day 14</span></div>
+              <div><HeartPulse size={17} /><strong>—</strong><span>Symptoms<br />tracked</span></div>
+              <div><BarChart3 size={17} /><strong>7</strong><span>Avg. cycle<br />days</span></div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  };
 
   const HomePage = () => (
     <>
@@ -2819,9 +2872,9 @@ function WelcomeScreen({ onStart, onLogin }) {
   const SupportPage = () => (
     <section className="landing-info-page">
       <div className="landing-pill"><Sparkles size={16} /> Support 4Sara</div>
-      <h1>Help keep 4Sara free and growing.</h1>
-      <p>4Sara is free to use. Monthly support helps keep the app available, privacy-focused, and continuously improving for users and trusted supporters.</p>
-      <p>Support is optional and appreciated. 4Sara is not currently presented as a tax-deductible nonprofit donation.</p>
+      <h1>Help keep 4Sara free for everyone.</h1>
+      <p>4Sara remains free whether you contribute or not. Optional monthly contributions help cover hosting, maintenance, updates, and privacy-focused improvements so the app can continue growing for everyone.</p>
+      <p>Contributions are optional and appreciated. They are not required to use 4Sara and are not tax-deductible charitable donations.</p>
       <div className="support-tier-grid landing-support-grid">
         <div className="support-tier-card"><span className="support-tier-label">Supporter</span><h3>$3/month</h3><p>Simple monthly support to help keep 4Sara free and improving.</p><Button onClick={() => openSupportLink(supportLinks.stripe3)}>Support with $3/month</Button></div>
         <div className="support-tier-card featured"><span className="support-tier-label">Friend of 4Sara</span><h3>$5/month</h3><p>A little extra support for continued updates, polish, and privacy-focused improvements.</p><Button onClick={() => openSupportLink(supportLinks.stripe5)}>Support with $5/month</Button></div>
@@ -2829,70 +2882,6 @@ function WelcomeScreen({ onStart, onLogin }) {
         <div className="support-tier-card custom-support-card"><span className="support-tier-label">Custom support</span><h3>Custom amount</h3><p>Choose your own support amount through Stripe.</p><Button onClick={() => openSupportLink(supportLinks.stripeCustom)} variant="secondary">Choose custom amount</Button></div>
       </div>
       <div className="support-note-box"><strong>Secure checkout</strong><p>Stripe securely handles the support checkout. Monthly options are recurring, and the custom amount option lets supporters choose their own amount.</p></div>
-    </section>
-  );
-
-  const HelpPage = () => (
-    <section className="landing-info-page">
-      <div className="landing-pill"><FileText size={16} /> Help Center</div>
-      <h1>Help Center</h1>
-      <p>Quick answers for using 4Sara, understanding predictions, and managing your information.</p>
-
-      <div className="help-center-grid">
-        <div className="help-card">
-          <h3>How do I log a period?</h3>
-          <p>Open the Calendar or Log tab, choose the date, then save the entry as menstruation. 4Sara uses logged period dates to estimate future cycle phases.</p>
-        </div>
-        <div className="help-card">
-          <h3>How do predictions work?</h3>
-          <p>Predictions are estimated from your logged cycle history and average cycle length. They are helpful for planning, but they should not be used as medical advice or birth control.</p>
-        </div>
-        <div className="help-card">
-          <h3>What do the calendar colors mean?</h3>
-          <p>Pink shows menstruation, blue shows follicular days, green shows fertile or ovulation days, yellow shows luteal days, and purple shows predicted upcoming menstruation.</p>
-        </div>
-        <div className="help-card">
-          <h3>How private is my data?</h3>
-          <p>4Sara is designed to keep your information private. Your data stays in your browser by default, with account features available when you choose to use them.</p>
-        </div>
-        <div className="help-card">
-          <h3>What is Support View?</h3>
-          <p>Support View lets a trusted person view shared information in a limited way, without giving them control over your private entries.</p>
-        </div>
-        <div className="help-card">
-          <h3>How do I export or delete data?</h3>
-          <p>Use the Privacy or Settings area to manage stored information, export available records, or remove data when you no longer want it saved.</p>
-        </div>
-      </div>
-
-      <div className="help-contact-strip">
-        <div>
-          <strong>Still need help?</strong>
-          <p>Email us and we’ll respond as soon as possible.</p>
-        </div>
-        <a className="btn help-mail-button" href={contactHref}>Contact 4Sara</a>
-      </div>
-    </section>
-  );
-
-  const ContactPage = () => (
-    <section className="landing-info-page">
-      <div className="landing-pill"><Mail size={16} /> Contact Us</div>
-      <h1>Contact 4Sara</h1>
-      <p>Questions, feedback, support issues, or bug reports can be sent directly by email.</p>
-
-      <div className="contact-panel">
-        <div>
-          <strong>Email</strong>
-          <p>{contactEmail}</p>
-        </div>
-        <a className="btn" href={contactHref}>Email 4Sara</a>
-      </div>
-
-      <div className="support-note-box">
-        <strong>Helpful details to include</strong>
-        <p>Tell us what page you were on, what you were trying to do, and what happened. If it is a bug, a screenshot can help.</p>
-      </div>
     </section>
   );
 
@@ -2915,14 +2904,12 @@ function WelcomeScreen({ onStart, onLogin }) {
       {welcomeTab === "home" && <HomePage />}
       {welcomeTab === "about" && <AboutPage />}
       {welcomeTab === "support" && <SupportPage />}
-      {welcomeTab === "help" && <HelpPage />}
-      {welcomeTab === "contact" && <ContactPage />}
 
       <footer className="landing-footer">
         <div><div className="landing-footer-brand"><LogoMark compact /><strong>4Sara</strong></div><p>Private cycle tracking, designed with care. Built for clarity.</p></div>
         <div><strong>Product</strong><button type="button" onClick={() => goToSection("features")}>Features</button><button type="button" onClick={() => goToSection("how-it-works")}>How it Works</button></div>
         <div><strong>Privacy</strong><button type="button" onClick={() => goToSection("privacy")}>Privacy Overview</button><button type="button" onClick={() => goToSection("privacy")}>Data & Security</button></div>
-        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("contact")}>Contact</button></div>
+        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("support")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("support")}>Contact</button></div>
         <div><p>Made with care for your health ♡</p><p>© 2026 4Sara. All rights reserved.</p></div>
       </footer>
     </div>
@@ -3098,13 +3085,14 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
           <div className="dashboard-calendar-art" aria-hidden="true">
-            <img
-              className="dashboard-calendar-image"
-              src="/icons/calendar-image.png"
-              alt=""
-              loading="eager"
-              decoding="async"
-            />
+            <div className="calendar-art-card">
+              <i></i><i></i><i></i><i></i>
+              <div className="calendar-art-grid">
+                {Array.from({ length: 20 }).map((_, index) => <span key={index} className={index === 11 || index === 12 || index === 13 ? "hot" : index === 6 ? "ring" : ""}></span>)}
+              </div>
+            </div>
+            <div className="calendar-art-leaf leaf-one"></div>
+            <div className="calendar-art-leaf leaf-two"></div>
           </div>
         </Card>
 

@@ -1782,8 +1782,12 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
+    const supportPeriodEntries = supportEntries
+      .filter((entry) => (entry.type || "period") === "period")
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const firstSupportPeriodStart = supportPeriodEntries[0]?.startDate || null;
 
-    supportEntries.filter((entry) => (entry.type || "period") === "period").forEach((entry) => {
+    supportPeriodEntries.forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -1798,8 +1802,13 @@ function App() {
 
       const key = toDateKey(new Date(year, month, dayNumber));
       const entry = periodDays.get(key);
-      const projection = supportProjectedPhaseMap.get(key);
-      const phase = entry ? "Menstruation" : projection?.phase || inferPhase(key, supportEntries.filter((item) => (item.type || "period") === "period"), supportStats.averageCycle, supportStats.averagePeriod);
+      const canShowProjection = firstSupportPeriodStart && daysBetween(firstSupportPeriodStart, key) >= 0;
+      const projection = canShowProjection ? supportProjectedPhaseMap.get(key) : null;
+      const phase = entry
+        ? "Menstruation"
+        : canShowProjection
+          ? projection?.phase || inferPhase(key, supportPeriodEntries, supportStats.averageCycle, supportStats.averagePeriod)
+          : "";
       const isPredicted = !entry && phase === "Menstruation";
       const isFertile = phase === "Fertile";
       const isOvulation = phase === "Ovulation";
@@ -1838,8 +1847,12 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
+    const periodEntries = entries
+      .filter((entry) => (entry.type || "period") === "period")
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const firstPeriodStart = periodEntries[0]?.startDate || null;
 
-    entries.filter((entry) => (entry.type || "period") === "period").forEach((entry) => {
+    periodEntries.forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -1854,8 +1867,13 @@ function App() {
 
       const key = toDateKey(new Date(year, month, dayNumber));
       const entry = periodDays.get(key);
-      const projection = projectedPhaseMap.get(key);
-      const phase = entry ? "Menstruation" : projection?.phase || "";
+      const canShowProjection = firstPeriodStart && daysBetween(firstPeriodStart, key) >= 0;
+      const projection = canShowProjection ? projectedPhaseMap.get(key) : null;
+      const phase = entry
+        ? "Menstruation"
+        : canShowProjection
+          ? projection?.phase || inferPhase(key, periodEntries, stats.averageCycle, stats.averagePeriod)
+          : "";
       const isPredicted = !entry && phase === "Menstruation";
       const isFertile = phase === "Fertile";
       const isOvulation = phase === "Ovulation";
@@ -1882,7 +1900,7 @@ function App() {
         statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
-  }, [calendarDate, entries, projectedPhaseMap]);
+  }, [calendarDate, entries, projectedPhaseMap, stats.averageCycle, stats.averagePeriod]);
 
   const completeOnboarding = () => {
     if (!onboarding.profileName.trim()) return showMessage("Enter a name first.");
@@ -2682,6 +2700,9 @@ function WelcomeScreen({ onStart, onLogin }) {
     stripeCustom: "https://buy.stripe.com/aFa5kDdxI6yt3Hqbw9gnK03"
   };
 
+  const contactEmail = "4sara.org@gmail.com";
+  const contactHref = `mailto:${contactEmail}?subject=4Sara%20Support%20Request`;
+
   const openSupportLink = (url) => {
     if (!url) {
       alert("Support link coming soon.");
@@ -2811,6 +2832,70 @@ function WelcomeScreen({ onStart, onLogin }) {
     </section>
   );
 
+  const HelpPage = () => (
+    <section className="landing-info-page">
+      <div className="landing-pill"><FileText size={16} /> Help Center</div>
+      <h1>Help Center</h1>
+      <p>Quick answers for using 4Sara, understanding predictions, and managing your information.</p>
+
+      <div className="help-center-grid">
+        <div className="help-card">
+          <h3>How do I log a period?</h3>
+          <p>Open the Calendar or Log tab, choose the date, then save the entry as menstruation. 4Sara uses logged period dates to estimate future cycle phases.</p>
+        </div>
+        <div className="help-card">
+          <h3>How do predictions work?</h3>
+          <p>Predictions are estimated from your logged cycle history and average cycle length. They are helpful for planning, but they should not be used as medical advice or birth control.</p>
+        </div>
+        <div className="help-card">
+          <h3>What do the calendar colors mean?</h3>
+          <p>Pink shows menstruation, blue shows follicular days, green shows fertile or ovulation days, yellow shows luteal days, and purple shows predicted upcoming menstruation.</p>
+        </div>
+        <div className="help-card">
+          <h3>How private is my data?</h3>
+          <p>4Sara is designed to keep your information private. Your data stays in your browser by default, with account features available when you choose to use them.</p>
+        </div>
+        <div className="help-card">
+          <h3>What is Support View?</h3>
+          <p>Support View lets a trusted person view shared information in a limited way, without giving them control over your private entries.</p>
+        </div>
+        <div className="help-card">
+          <h3>How do I export or delete data?</h3>
+          <p>Use the Privacy or Settings area to manage stored information, export available records, or remove data when you no longer want it saved.</p>
+        </div>
+      </div>
+
+      <div className="help-contact-strip">
+        <div>
+          <strong>Still need help?</strong>
+          <p>Email us and we’ll respond as soon as possible.</p>
+        </div>
+        <a className="btn help-mail-button" href={contactHref}>Contact 4Sara</a>
+      </div>
+    </section>
+  );
+
+  const ContactPage = () => (
+    <section className="landing-info-page">
+      <div className="landing-pill"><Mail size={16} /> Contact Us</div>
+      <h1>Contact 4Sara</h1>
+      <p>Questions, feedback, support issues, or bug reports can be sent directly by email.</p>
+
+      <div className="contact-panel">
+        <div>
+          <strong>Email</strong>
+          <p>{contactEmail}</p>
+        </div>
+        <a className="btn" href={contactHref}>Email 4Sara</a>
+      </div>
+
+      <div className="support-note-box">
+        <strong>Helpful details to include</strong>
+        <p>Tell us what page you were on, what you were trying to do, and what happened. If it is a bug, a screenshot can help.</p>
+      </div>
+    </section>
+  );
+
   return (
     <div className="landing-page">
       <header className="landing-nav">
@@ -2830,12 +2915,14 @@ function WelcomeScreen({ onStart, onLogin }) {
       {welcomeTab === "home" && <HomePage />}
       {welcomeTab === "about" && <AboutPage />}
       {welcomeTab === "support" && <SupportPage />}
+      {welcomeTab === "help" && <HelpPage />}
+      {welcomeTab === "contact" && <ContactPage />}
 
       <footer className="landing-footer">
         <div><div className="landing-footer-brand"><LogoMark compact /><strong>4Sara</strong></div><p>Private cycle tracking, designed with care. Built for clarity.</p></div>
         <div><strong>Product</strong><button type="button" onClick={() => goToSection("features")}>Features</button><button type="button" onClick={() => goToSection("how-it-works")}>How it Works</button></div>
         <div><strong>Privacy</strong><button type="button" onClick={() => goToSection("privacy")}>Privacy Overview</button><button type="button" onClick={() => goToSection("privacy")}>Data & Security</button></div>
-        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("support")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("support")}>Contact</button></div>
+        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("contact")}>Contact</button></div>
         <div><p>Made with care for your health ♡</p><p>© 2026 4Sara. All rights reserved.</p></div>
       </footer>
     </div>
@@ -3011,14 +3098,13 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
           <div className="dashboard-calendar-art" aria-hidden="true">
-            <div className="calendar-art-card">
-              <i></i><i></i><i></i><i></i>
-              <div className="calendar-art-grid">
-                {Array.from({ length: 20 }).map((_, index) => <span key={index} className={index === 11 || index === 12 || index === 13 ? "hot" : index === 6 ? "ring" : ""}></span>)}
-              </div>
-            </div>
-            <div className="calendar-art-leaf leaf-one"></div>
-            <div className="calendar-art-leaf leaf-two"></div>
+            <img
+              className="dashboard-calendar-image"
+              src="/icons/calendar-image.png"
+              alt=""
+              loading="eager"
+              decoding="async"
+            />
           </div>
         </Card>
 

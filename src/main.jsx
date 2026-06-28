@@ -380,7 +380,7 @@ function buildCyclePredictionModel(chronologicalPeriods, allEntries, settings) {
   };
 }
 
-function phaseDescriptionfunction phaseDescription(phase) {
+function phaseDescription(phase) {
   switch (phase) {
     case "Menstruation":
       return "Bleeding days are expected or logged.";

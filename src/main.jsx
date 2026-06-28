@@ -1870,7 +1870,7 @@ function App() {
   // the same robust prediction logic.
   const stats = useMemo(() => calculateStatsForEntries(entries, settings), [entries, settings]);
 
-  const projectedPhaseMap  const projectedPhaseMap = useMemo(() => {
+  const projectedPhaseMap = useMemo(() => {
     return buildProjectedCycleMap(stats.last?.startDate, stats.averageCycle, stats.averagePeriod, 6, stats.predictionCycleLength);
   }, [stats.last?.startDate, stats.averageCycle, stats.averagePeriod, stats.predictionCycleLength]);
 

@@ -179,17 +179,27 @@ function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
   return "Unknown";
 }
 
-function buildProjectedCycleMap(lastPeriodStart, avgCycle, avgPeriod, monthsAhead = 6) {
+// Calendar projection helpers.
+// These functions create the predicted calendar colors. Predictions begin at the
+// first logged period and project forward only, so dates before the user's first
+// real period entry stay blank.
+function buildProjectedCycleMap(lastPeriodStart, avgCycle, avgPeriod, monthsAhead = 6, firstCycleLength = null) {
   const map = new Map();
   if (!lastPeriodStart) return map;
+
+  const safeAverageCycle = Number(avgCycle) || 28;
+  const safeAveragePeriod = Number(avgPeriod) || 5;
+  const safeFirstCycleLength = Number(firstCycleLength) || safeAverageCycle;
 
   const today = todayKey();
   const projectionEnd = addDays(today, monthsAhead * 31);
   let start = lastPeriodStart;
+  let cycleIndex = 0;
 
   while (daysBetween(start, projectionEnd) >= 0) {
-    const menstruationEnd = addDays(start, avgPeriod - 1);
-    const nextStart = addDays(start, avgCycle);
+    const cycleLengthForThisProjection = cycleIndex === 0 ? safeFirstCycleLength : safeAverageCycle;
+    const menstruationEnd = addDays(start, safeAveragePeriod - 1);
+    const nextStart = addDays(start, cycleLengthForThisProjection);
     const ovulation = addDays(nextStart, -14);
     const fertileStart = addDays(ovulation, -5);
     const fertileEnd = addDays(ovulation, 1);
@@ -215,12 +225,162 @@ function buildProjectedCycleMap(lastPeriodStart, avgCycle, avgPeriod, monthsAhea
     });
 
     start = nextStart;
+    cycleIndex += 1;
   }
 
   return map;
 }
 
-function phaseDescription(phase) {
+// Prediction model helpers.
+// These functions keep the user's "typical cycle" separate from the current
+// prediction. That way, a one-off delayed cycle can be discounted as an outlier,
+// while stress/travel/illness notes can still widen or gently shift the current
+// prediction window without permanently changing the user's average.
+const EXTERNAL_FACTOR_PATTERNS = [
+  { label: "Stress", patterns: ["stress", "stressed", "anxiety", "anxious", "overwhelmed", "busy", "burnout"] },
+  { label: "Travel", patterns: ["travel", "trip", "flight", "vacation", "time zone", "timezone", "jet lag"] },
+  { label: "Illness", patterns: ["sick", "ill", "illness", "cold", "flu", "fever", "infection", "covid"] },
+  { label: "Medication", patterns: ["medication", "medicine", "antibiotic", "birth control", "hormone", "prescription"] },
+  { label: "Sleep change", patterns: ["sleep", "insomnia", "tired", "fatigue", "exhausted", "restless"] },
+  { label: "Exercise change", patterns: ["workout", "exercise", "training", "running", "gym", "intense"] },
+  { label: "Weight or diet change", patterns: ["weight", "diet", "fasting", "calorie", "eating", "appetite"] },
+  { label: "Pregnancy concern", patterns: ["pregnant", "pregnancy", "test", "missed period"] }
+];
+
+function averageNumbers(values) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function medianNumber(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function uniqueList(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function extractExternalFactorsFromEntry(entry) {
+  const searchableText = [
+    entry.notes,
+    entry.flow,
+    entry.mood,
+    ...(entry.moods || []),
+    ...(entry.symptoms || [])
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (!searchableText.trim()) return [];
+
+  return EXTERNAL_FACTOR_PATTERNS
+    .filter((factor) => factor.patterns.some((pattern) => searchableText.includes(pattern)))
+    .map((factor) => factor.label);
+}
+
+function getExternalFactorsBetween(entries, startDate, endDate) {
+  if (!startDate || !endDate) return [];
+
+  return uniqueList(
+    entries
+      .filter((entry) => entry.startDate && daysBetween(startDate, entry.startDate) >= 0 && daysBetween(entry.startDate, endDate) >= 0)
+      .flatMap(extractExternalFactorsFromEntry)
+  );
+}
+
+function getCurrentCycleFactors(entries, lastPeriodStart) {
+  if (!lastPeriodStart) return [];
+  return getExternalFactorsBetween(entries, lastPeriodStart, todayKey());
+}
+
+function buildCyclePredictionModel(chronologicalPeriods, allEntries, settings) {
+  const cycleRecords = [];
+
+  for (let i = 1; i < chronologicalPeriods.length; i++) {
+    const previous = chronologicalPeriods[i - 1];
+    const current = chronologicalPeriods[i];
+    const length = daysBetween(previous.startDate, current.startDate);
+    const factors = getExternalFactorsBetween(allEntries, previous.startDate, current.startDate);
+
+    if (length > 0) {
+      cycleRecords.push({
+        startDate: previous.startDate,
+        nextStartDate: current.startDate,
+        length,
+        factors,
+        isOutlier: false,
+        weight: 1
+      });
+    }
+  }
+
+  const recentRecords = cycleRecords.slice(-6);
+  const recentLengths = recentRecords.map((record) => record.length);
+  const fallbackCycle = Number(settings?.cycleLengthOverride) || 28;
+  const baseline = medianNumber(recentLengths) || averageNumbers(recentLengths) || fallbackCycle;
+
+  const weightedRecords = recentRecords.map((record, index) => {
+    const outsideHealthyBounds = record.length < 15 || record.length > 60;
+    const farFromBaseline = Math.abs(record.length - baseline) > 7;
+    const isOutlier = outsideHealthyBounds || farFromBaseline;
+    const hasExternalFactors = record.factors.length > 0;
+    const recencyBoost = index >= recentRecords.length - 2 ? 1.15 : 1;
+    const outlierWeight = isOutlier ? 0.35 : 1;
+    const factorWeight = hasExternalFactors ? 0.75 : 1;
+    const weight = recencyBoost * outlierWeight * factorWeight;
+
+    return { ...record, isOutlier, weight };
+  });
+
+  const weightedTotal = weightedRecords.reduce((sum, record) => sum + record.length * record.weight, 0);
+  const weightTotal = weightedRecords.reduce((sum, record) => sum + record.weight, 0);
+  const typicalCycle = Math.round(weightTotal ? weightedTotal / weightTotal : baseline);
+
+  const normalRecords = weightedRecords.filter((record) => !record.isOutlier);
+  const normalLengths = normalRecords.map((record) => record.length);
+  const normalMinCycle = normalLengths.length ? Math.min(...normalLengths) : null;
+  const normalMaxCycle = normalLengths.length ? Math.max(...normalLengths) : null;
+
+  const currentCycleFactors = getCurrentCycleFactors(allEntries, chronologicalPeriods[chronologicalPeriods.length - 1]?.startDate);
+  const currentCycleAdjustmentDays = currentCycleFactors.length ? Math.min(4, 1 + Math.ceil(currentCycleFactors.length / 2)) : 0;
+
+  const variation = recentLengths.length > 1 ? Math.max(...recentLengths) - Math.min(...recentLengths) : 0;
+  const outlierCount = weightedRecords.filter((record) => record.isOutlier).length;
+  const predictionWindowBefore = outlierCount || variation >= 7 ? 2 : 1;
+  const predictionWindowAfter = Math.max(2, Math.min(7, 2 + Math.ceil(variation / 4) + currentCycleAdjustmentDays));
+
+  const factorCounts = {};
+  cycleRecords.flatMap((record) => record.factors).forEach((factor) => {
+    factorCounts[factor] = (factorCounts[factor] || 0) + 1;
+  });
+
+  const factorInsights = Object.entries(factorCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([factor, count]) => ({ factor, count }));
+
+  return {
+    cycleRecords: weightedRecords,
+    typicalCycle,
+    normalMinCycle,
+    normalMaxCycle,
+    outlierCycles: weightedRecords.filter((record) => record.isOutlier),
+    currentCycleFactors,
+    currentCycleAdjustmentDays,
+    predictionWindowBefore,
+    predictionWindowAfter,
+    factorInsights,
+    predictionModelNote: outlierCount
+      ? "One or more unusual cycles were discounted so a one-off delay does not permanently change the typical cycle length."
+      : "Predictions use recent cycle history, with more weight on recent normal cycles."
+  };
+}
+
+function phaseDescriptionfunction phaseDescription(phase) {
   switch (phase) {
     case "Menstruation":
       return "Bleeding days are expected or logged.";
@@ -649,6 +809,10 @@ async function clearCloudChoiceForAccount(user) {
   }, { merge: true });
 }
 
+// Stats and insight calculation.
+// This is the main shared calculation engine for the user's own dashboard and
+// read-only Support View. It calculates average period length, robust cycle
+// prediction data, phase insights, symptoms, confidence, and suggestions.
 function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const safeEntries = Array.isArray(sourceEntries) ? sourceEntries : [];
   const safeSettings = { ...defaultSettings, ...(sourceSettings || {}) };
@@ -662,14 +826,25 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
     cycleLengths.push(daysBetween(chronological[i - 1].startDate, chronological[i].startDate));
   }
 
-  const calculatedCycle = cycleLengths.length ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 28;
+  const predictionModel = buildCyclePredictionModel(chronological, safeEntries, safeSettings);
+  const calculatedCycle = predictionModel.typicalCycle || 28;
+
   const periodLengths = chronological.filter((entry) => entry.endDate).map((entry) => daysBetween(entry.startDate, entry.endDate) + 1);
   const calculatedPeriod = periodLengths.length ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5;
 
   const averageCycle = Number(safeSettings.cycleLengthOverride) || calculatedCycle;
   const averagePeriod = Number(safeSettings.periodLengthOverride) || calculatedPeriod;
-  const nextPeriod = last ? addDays(last.startDate, averageCycle) : "";
+
+  // If external factors are logged in the current cycle, adjust only the current
+  // prediction. The typical average stays protected unless repeated cycle history
+  // shows the user's pattern has truly changed.
+  const currentCycleAdjustmentDays = Number(safeSettings.cycleLengthOverride) ? 0 : predictionModel.currentCycleAdjustmentDays;
+  const predictionCycleLength = averageCycle + currentCycleAdjustmentDays;
+
+  const nextPeriod = last ? addDays(last.startDate, predictionCycleLength) : "";
   const predictedEnd = nextPeriod ? addDays(nextPeriod, averagePeriod - 1) : "";
+  const predictionWindowStart = nextPeriod ? addDays(nextPeriod, -predictionModel.predictionWindowBefore) : "";
+  const predictionWindowEnd = nextPeriod ? addDays(nextPeriod, predictionModel.predictionWindowAfter) : "";
   const ovulationDay = nextPeriod ? addDays(nextPeriod, -14) : "";
   const fertileStart = ovulationDay ? addDays(ovulationDay, -5) : "";
   const fertileEnd = ovulationDay ? addDays(ovulationDay, 1) : "";
@@ -749,21 +924,68 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const currentCycleDay = last ? Math.max(1, daysBetween(last.startDate, todayKey()) + 1) : null;
   const minCycle = cycleLengths.length ? Math.min(...cycleLengths) : null;
   const maxCycle = cycleLengths.length ? Math.max(...cycleLengths) : null;
-  const dataConfidence = periodEntries.length >= 6 ? "Strong" : periodEntries.length >= 3 ? "Good" : periodEntries.length >= 1 ? "Limited" : "No data";
-  const confidenceNote = periodEntries.length >= 6
-    ? "Predictions are stronger because several cycles are logged."
+  const normalMinCycle = predictionModel.normalMinCycle;
+  const normalMaxCycle = predictionModel.normalMaxCycle;
+
+  const hasOutliers = predictionModel.outlierCycles.length > 0;
+  const hasCurrentFactors = predictionModel.currentCycleFactors.length > 0;
+
+  const dataConfidence = periodEntries.length >= 6 && !hasOutliers && !hasCurrentFactors
+    ? "Strong"
+    : periodEntries.length >= 3
+    ? hasOutliers || hasCurrentFactors ? "Good, with timing notes" : "Good"
+    : periodEntries.length >= 1
+    ? "Limited"
+    : "No data";
+
+  const confidenceNote = periodEntries.length >= 6 && !hasOutliers && !hasCurrentFactors
+    ? "Predictions are stronger because several cycles are logged and recent timing looks consistent."
+    : periodEntries.length >= 3 && hasOutliers
+    ? "Predictions are using a typical cycle estimate while discounting unusual cycle lengths."
+    : periodEntries.length >= 3 && hasCurrentFactors
+    ? "This cycle has logged factors that may shift the prediction window without permanently changing the average."
     : periodEntries.length >= 3
     ? "Predictions are improving as more cycles are logged."
     : periodEntries.length >= 1
     ? "Add at least 3 cycles for better predictions."
     : "Add a menstruation entry to start seeing insights.";
 
-  const baseStats = { last, averageCycle, averagePeriod, nextPeriod, predictedEnd, ovulationDay, fertileStart, fertileEnd, reminderDate, daysUntil, currentCycleDay, minCycle, maxCycle, dataConfidence, confidenceNote, symptomStats, phaseInsights, checkInPhaseInsights, totalEntries: periodEntries.length };
+  const baseStats = {
+    last,
+    averageCycle,
+    averagePeriod,
+    predictionCycleLength,
+    currentCycleAdjustmentDays,
+    nextPeriod,
+    predictedEnd,
+    predictionWindowStart,
+    predictionWindowEnd,
+    ovulationDay,
+    fertileStart,
+    fertileEnd,
+    reminderDate,
+    daysUntil,
+    currentCycleDay,
+    minCycle,
+    maxCycle,
+    normalMinCycle,
+    normalMaxCycle,
+    dataConfidence,
+    confidenceNote,
+    symptomStats,
+    phaseInsights,
+    checkInPhaseInsights,
+    totalEntries: periodEntries.length,
+    outlierCycles: predictionModel.outlierCycles,
+    currentCycleFactors: predictionModel.currentCycleFactors,
+    factorInsights: predictionModel.factorInsights,
+    predictionModelNote: predictionModel.predictionModelNote
+  };
 
   return { ...baseStats, dynamicSuggestions: buildSuggestions(baseStats) };
 }
 
-function App() {
+function App()function App() {
   const [entries, setEntries] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || demoEntries; }
     catch { return demoEntries; }
@@ -1643,120 +1865,14 @@ function App() {
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)), [entries]);
   const allSymptoms = useMemo(() => [...new Set([...presetSymptoms, ...(settings.customSymptoms || [])])], [settings.customSymptoms]);
 
-  const stats = useMemo(() => {
-    const periodEntries = entries.filter((entry) => (entry.type || "period") === "period");
-    const chronological = [...periodEntries].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-    const last = chronological[chronological.length - 1];
+  // User dashboard stats.
+  // Uses the shared stats engine so the normal dashboard and Support View use
+  // the same robust prediction logic.
+  const stats = useMemo(() => calculateStatsForEntries(entries, settings), [entries, settings]);
 
-    const cycleLengths = [];
-    for (let i = 1; i < chronological.length; i++) {
-      cycleLengths.push(daysBetween(chronological[i - 1].startDate, chronological[i].startDate));
-    }
-
-    const calculatedCycle = cycleLengths.length ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 28;
-    const periodLengths = chronological.filter((entry) => entry.endDate).map((entry) => daysBetween(entry.startDate, entry.endDate) + 1);
-    const calculatedPeriod = periodLengths.length ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5;
-
-    const averageCycle = Number(settings.cycleLengthOverride) || calculatedCycle;
-    const averagePeriod = Number(settings.periodLengthOverride) || calculatedPeriod;
-    const nextPeriod = last ? addDays(last.startDate, averageCycle) : "";
-    const predictedEnd = nextPeriod ? addDays(nextPeriod, averagePeriod - 1) : "";
-    const ovulationDay = nextPeriod ? addDays(nextPeriod, -14) : "";
-    const fertileStart = ovulationDay ? addDays(ovulationDay, -5) : "";
-    const fertileEnd = ovulationDay ? addDays(ovulationDay, 1) : "";
-    const reminderDate = nextPeriod ? addDays(nextPeriod, -Number(settings.reminderDaysBefore || 0)) : "";
-    const daysUntil = nextPeriod ? daysBetween(todayKey(), nextPeriod) : null;
-
-    const symptomStats = Object.entries(entries.flatMap((entry) => entry.symptoms || []).reduce((acc, symptom) => {
-      acc[symptom] = (acc[symptom] || 0) + 1;
-      return acc;
-    }, {})).sort((a, b) => b[1] - a[1]);
-
-    const phaseSymptoms = {};
-    const phaseMoods = {};
-
-    entries.forEach((entry) => {
-      const phase = inferPhase(entry.startDate, chronological, averageCycle, averagePeriod);
-      phaseSymptoms[phase] ||= {};
-      phaseMoods[phase] ||= {};
-
-      (entry.symptoms || []).forEach((symptom) => {
-        phaseSymptoms[phase][symptom] = (phaseSymptoms[phase][symptom] || 0) + 1;
-      });
-
-      normalizeMoods(entry).forEach((mood) => {
-        if (mood !== "N/A") phaseMoods[phase][mood] = (phaseMoods[phase][mood] || 0) + 1;
-      });
-    });
-
-    const phaseInsights = Object.entries(phaseSymptoms)
-      .filter(([phase]) => phase !== "Unknown")
-      .map(([phase, symptoms]) => ({
-        phase,
-        topSymptoms: Object.entries(symptoms).sort((a, b) => b[1] - a[1]).slice(0, 3),
-        topMood: Object.entries(phaseMoods[phase] || {}).sort((a, b) => b[1] - a[1])[0]
-      }))
-      .filter((item) => item.topSymptoms.length || item.topMood);
-
-    const checkInPhaseData = {};
-
-    entries
-      .filter((entry) => (entry.type || "period") === "checkin")
-      .forEach((entry) => {
-        const phase = inferPhase(entry.startDate, chronological, averageCycle, averagePeriod);
-        const key = phase === "Unknown" ? "Unassigned" : phase;
-
-        checkInPhaseData[key] ||= {
-          phase: key,
-          count: 0,
-          symptoms: {},
-          moods: {}
-        };
-
-        checkInPhaseData[key].count += 1;
-
-        (entry.symptoms || []).forEach((symptom) => {
-          checkInPhaseData[key].symptoms[symptom] = (checkInPhaseData[key].symptoms[symptom] || 0) + 1;
-        });
-
-        normalizeMoods(entry).forEach((mood) => {
-          if (mood !== "N/A") {
-            checkInPhaseData[key].moods[mood] = (checkInPhaseData[key].moods[mood] || 0) + 1;
-          }
-        });
-      });
-
-    const checkInPhaseInsights = Object.values(checkInPhaseData)
-      .map((item) => ({
-        ...item,
-        topSymptoms: Object.entries(item.symptoms).sort((a, b) => b[1] - a[1]).slice(0, 3),
-        topMood: Object.entries(item.moods).sort((a, b) => b[1] - a[1])[0]
-      }))
-      .sort((a, b) => {
-        const order = ["Menstruation", "Follicular", "Fertile", "Ovulation", "Luteal", "Unassigned"];
-        return order.indexOf(a.phase) - order.indexOf(b.phase);
-      });
-
-    const currentCycleDay = last ? Math.max(1, daysBetween(last.startDate, todayKey()) + 1) : null;
-    const minCycle = cycleLengths.length ? Math.min(...cycleLengths) : null;
-    const maxCycle = cycleLengths.length ? Math.max(...cycleLengths) : null;
-    const dataConfidence = periodEntries.length >= 6 ? "Strong" : periodEntries.length >= 3 ? "Good" : periodEntries.length >= 1 ? "Limited" : "No data";
-    const confidenceNote = periodEntries.length >= 6
-      ? "Predictions are stronger because several cycles are logged."
-      : periodEntries.length >= 3
-      ? "Predictions are improving as more cycles are logged."
-      : periodEntries.length >= 1
-      ? "Add at least 3 cycles for better predictions."
-      : "Add a menstruation entry to start seeing insights.";
-
-    const baseStats = { last, averageCycle, averagePeriod, nextPeriod, predictedEnd, ovulationDay, fertileStart, fertileEnd, reminderDate, daysUntil, currentCycleDay, minCycle, maxCycle, dataConfidence, confidenceNote, symptomStats, phaseInsights, checkInPhaseInsights, totalEntries: periodEntries.length };
-
-    return { ...baseStats, dynamicSuggestions: buildSuggestions(baseStats) };
-  }, [entries, settings]);
-
-  const projectedPhaseMap = useMemo(() => {
-    return buildProjectedCycleMap(stats.last?.startDate, stats.averageCycle, stats.averagePeriod, 6);
-  }, [stats.last?.startDate, stats.averageCycle, stats.averagePeriod]);
+  const projectedPhaseMap  const projectedPhaseMap = useMemo(() => {
+    return buildProjectedCycleMap(stats.last?.startDate, stats.averageCycle, stats.averagePeriod, 6, stats.predictionCycleLength);
+  }, [stats.last?.startDate, stats.averageCycle, stats.averagePeriod, stats.predictionCycleLength]);
 
   const selectedPhase = useMemo(() => {
     if (!form.startDate) return { phase: "Unknown" };
@@ -1769,8 +1885,8 @@ function App() {
   const supportStats = useMemo(() => calculateStatsForEntries(supportEntries, supportSettings), [supportEntries, supportSettings]);
   const supportCalendarDate = calendarDate;
   const supportProjectedPhaseMap = useMemo(() => {
-    return buildProjectedCycleMap(supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, 6);
-  }, [supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod]);
+    return buildProjectedCycleMap(supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, 6, supportStats.predictionCycleLength);
+  }, [supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, supportStats.predictionCycleLength]);
 
   const supportCalendarData = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -3094,7 +3210,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
               <h2>{nextPeriodLabel}</h2>
               <span>{daysLabel}</span>
             </div>
-            <p className="dashboard-hero-note">Your period is predicted from your cycle history and average cycle length of {stats.averageCycle || 28} days.</p>
+            <p className="dashboard-hero-note">Your period is predicted from your typical cycle length of {stats.averageCycle || 28} days. {stats.currentCycleAdjustmentDays ? "Current-cycle factors may shift this prediction window." : "Unusual cycles are discounted so one late cycle does not rewrite your average."}</p>
             <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
           <div className="dashboard-calendar-art" aria-hidden="true">
@@ -3132,7 +3248,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
               <button type="button" onClick={jumpToNextPeriod}>View calendar</button>
             </div>
             <div className="dashboard-upcoming-list">
-              <UpcomingDashboardRow tone="period" icon={Droplet} title="Upcoming period" value={stats.nextPeriod ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)}` : "Not enough data"} badge={daysLabel} />
+              <UpcomingDashboardRow tone="period" icon={Droplet} title="Upcoming period" value={stats.predictionWindowStart ? `${formatDate(stats.predictionWindowStart)} - ${formatDate(stats.predictionWindowEnd)}` : "Not enough data"} badge={daysLabel} />
               <UpcomingDashboardRow tone="fertile" icon={Heart} title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} badge={stats.fertileStart ? `${Math.max(0, daysBetween(todayKey(), stats.fertileStart))} days` : "Needs data"} />
               <UpcomingDashboardRow tone={nextPhase.tone} icon={nextPhase.icon} title={nextPhase.title} value={nextPhase.value} badge={nextPhase.badge} />
             </div>
@@ -3515,6 +3631,8 @@ function EntryList({ entries, onEdit, onDelete, compact = false }) {
   );
 }
 
+// Insights screen.
+// Shows prediction confidence, robust cycle model details, phase patterns, symptom counts, and wellness suggestions.
 function Insights({ stats, settings, setLocked }) {
   return (
     <main className="layout">
@@ -3534,6 +3652,28 @@ function Insights({ stats, settings, setLocked }) {
           <InfoTile title="Average menstruation" value={`${stats.averagePeriod} days`} />
           <InfoTile title="Cycle range" value={stats.minCycle ? `${stats.minCycle} - ${stats.maxCycle} days` : "Log 2+ cycles"} />
           <InfoTile title="Estimated ovulation" value={stats.ovulationDay ? formatDate(stats.ovulationDay) : "Not enough data"} />
+        </div>
+
+        <div className="summary-box">
+          <h3>Prediction model</h3>
+          <p className="muted">{stats.predictionModelNote}</p>
+          <div className="phase-insights">
+            <div className="mini-card">
+              <strong>Typical range</strong>
+              <p>{stats.normalMinCycle ? `${stats.normalMinCycle} - ${stats.normalMaxCycle} days from recent normal cycles` : "Log more cycles to build a normal range."}</p>
+            </div>
+            <div className="mini-card">
+              <strong>Outliers discounted</strong>
+              <p>{stats.outlierCycles?.length ? `${stats.outlierCycles.length} unusual cycle${stats.outlierCycles.length === 1 ? "" : "s"} reduced in the average` : "No recent outlier cycles detected."}</p>
+            </div>
+            <div className="mini-card">
+              <strong>Current factors</strong>
+              <p>{stats.currentCycleFactors?.length ? `${stats.currentCycleFactors.join(", ")} may shift the current prediction window.` : "No current external timing factors detected in notes or check-ins."}</p>
+            </div>
+          </div>
+          {stats.factorInsights?.length ? (
+            <p className="muted">Repeated timing notes: {stats.factorInsights.map((item) => `${item.factor} (${item.count})`).join(", ")}.</p>
+          ) : null}
         </div>
 
         <div className="summary-box purple-box">

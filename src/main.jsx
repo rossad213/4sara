@@ -3598,7 +3598,7 @@ function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdi
           {customSymptoms.length > 0 && <div className="custom-list"><p>Custom symptoms</p><div className="chips">{customSymptoms.map((symptom) => <button key={symptom} onClick={() => removeCustomSymptom(symptom)} className="chip rose-chip">{symptom} ×</button>)}</div></div>}
         </div>
 
-        <label><span>Notes</span><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Add anything you noticed..." /></label>
+        <label><span>Notes</span><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Current-cycle changes such as stress, travel, illness, medication, sleep, exercise habits, or anything else that may affect your cycle..." /></label>
         <Button onClick={saveEntry} className="full"><Save size={16} /> {editingId ? "Update entry" : "Save entry"}</Button>
         {editingId && <Button onClick={cancelEdit} variant="secondary" className="full"><X size={16} /> Cancel edit</Button>}
       </div>

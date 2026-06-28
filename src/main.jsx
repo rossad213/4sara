@@ -985,7 +985,7 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   return { ...baseStats, dynamicSuggestions: buildSuggestions(baseStats) };
 }
 
-function App()function App() {
+function App() {
   const [entries, setEntries] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || demoEntries; }
     catch { return demoEntries; }

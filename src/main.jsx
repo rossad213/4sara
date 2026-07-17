@@ -3159,8 +3159,8 @@ function WelcomeScreen({ onStart, onLogin }) {
       <footer className="landing-footer">
         <div><div className="landing-footer-brand"><LogoMark compact /><strong>4Sara</strong></div><p>Private cycle tracking, designed with care. Built for clarity.</p></div>
         <div><strong>Product</strong><button type="button" onClick={() => goToSection("features")}>Features</button><button type="button" onClick={() => goToSection("how-it-works")}>How it Works</button></div>
-        <div><strong>Privacy</strong><button type="button" onClick={() => goToSection("privacy")}>Privacy Overview</button><button type="button" onClick={() => goToSection("privacy")}>Data & Security</button></div>
-        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("contact")}>Contact</button><button type="button" onClick={() => setWelcomeTab("privacy-policy")}>Privacy Policy</button><button type="button" onClick={() => setWelcomeTab("terms")}>Terms of Use</button><button type="button" onClick={() => setWelcomeTab("medical-disclaimer")}>Medical Disclaimer</button></div>
+        <div><strong>Privacy</strong><button type="button" onClick={() => goToSection("privacy")}>Privacy Overview</button><button type="button" onClick={() => goToSection("privacy")}>Data & Security</button><button type="button" onClick={() => setWelcomeTab("privacy-policy")}>Privacy Policy</button></div>
+        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("contact")}>Contact</button><button type="button" onClick={() => setWelcomeTab("terms")}>Terms of Use</button><button type="button" onClick={() => setWelcomeTab("medical-disclaimer")}>Medical Disclaimer</button></div>
         <div><p>Made with care for your health ♡</p><p>© 2026 4Sara. All rights reserved.</p></div>
       </footer>
     </div>

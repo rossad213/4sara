@@ -64,6 +64,8 @@ const defaultSettings = {
   onboardingComplete: false,
   profileName: "",
   profileAge: "",
+  // Dark mode has intentionally been removed from the UI.
+// Keep darkMode false for older saved settings so the app always uses the soft light theme.
   darkMode: false,
   pinEnabled: false,
   pin: "",
@@ -2241,12 +2243,12 @@ function App() {
   const hasLoadedExistingAccount = Boolean(existingAccountLoaded || (authUser && cloudHasData && cloudCheckedForAccount));
 
   if (!settings.welcomeSeen) {
-    return <div className={settings.darkMode ? "app dark" : "app"}><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onLogin={() => updateSettings({ welcomeSeen: true })} /></div>;
+    return <div className="app"><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onLogin={() => updateSettings({ welcomeSeen: true })} /></div>;
   }
 
   if (!settings.accountPromptSeen) {
     return (
-      <div className={settings.darkMode ? "app dark" : "app"}>
+      <div className="app">
         <AccountPromptScreen
           authUser={authUser}
           authLoading={authLoading}
@@ -2282,12 +2284,12 @@ function App() {
   if (authUser && hasLoadedExistingAccount) {
     // Existing signed-in accounts with cloud data should never be sent back through onboarding on any device or browser.
   } else if (!settings.onboardingComplete) {
-    return <div className={settings.darkMode ? "app dark" : "app"}><OnboardingScreen onboarding={onboarding} setOnboarding={setOnboarding} completeOnboarding={completeOnboarding} skipOnboarding={skipOnboarding} message={message} /></div>;
+    return <div className="app"><OnboardingScreen onboarding={onboarding} setOnboarding={setOnboarding} completeOnboarding={completeOnboarding} skipOnboarding={skipOnboarding} message={message} /></div>;
   }
 
   if (locked && settings.pinEnabled && settings.pin) {
     return (
-      <div className={settings.darkMode ? "app dark" : "app"}>
+      <div className="app">
         <div className="screen-center">
           <Card className="lock-card">
             <EyeOff className="big-icon" />
@@ -2303,7 +2305,7 @@ function App() {
   }
 
   return (
-    <div className={settings.darkMode ? "app dark" : "app"}>
+    <div className="app">
       <div className="container">
         <header className="header">
           <div>
@@ -3851,7 +3853,6 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
 
         <h3>Reminders & predictions</h3>
 
-        <label className="setting-row"><span>Dark mode</span><input type="checkbox" checked={settings.darkMode} onChange={(e) => updateSettings({ darkMode: e.target.checked })} /></label>
         <label className="setting-row"><span>Reminder enabled</span><input type="checkbox" checked={settings.remindersEnabled} onChange={(e) => updateSettings({ remindersEnabled: e.target.checked })} /></label>
 
         <div className="three-fields">

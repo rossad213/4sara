@@ -1650,10 +1650,46 @@ function App() {
     }
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (localDataChoice = "keep-device") => {
+    const clearThisDevice = localDataChoice === "clear-device";
+
     await signOut(auth);
-    setSyncStatus("Signed out. Data is saved locally on this device.");
-    showMessage("Signed out.");
+
+    if (clearThisDevice) {
+      // Clear only this browser/device copy. This does not delete the user's
+      // Firebase account or cloud-saved 4Sara data.
+      setEntries([]);
+      setSettings(defaultSettings);
+      setForm(blankForm());
+      setEditingId(null);
+      setSelectedCalendarDay(null);
+      setSharedProfiles({});
+      setSupportViewers({});
+      setSharedSupportData(null);
+      setSelectedSharedOwnerId("");
+      setViewMode("owner");
+      setActiveTab("dashboard");
+      setCloudHasData(false);
+      setCloudUpdatedAt("");
+      setCloudCheckedForAccount(false);
+      setCloudSyncAllowed(false);
+      setExistingAccountLoaded(false);
+      setAccountDataChecked(false);
+      setLastCloudSave("");
+      setLastInviteLink("");
+      setInviteToken("");
+      setPendingInvite(null);
+      setInviteStatus("");
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SETTINGS_KEY);
+      localStorage.removeItem(CLOUD_CHOICE_KEY);
+      setSyncStatus("Signed out. This device's local 4Sara copy was cleared. Cloud data was not deleted.");
+      showMessage("Signed out and cleared this device.");
+      return;
+    }
+
+    setSyncStatus("Signed out. Local data remains saved on this private device.");
+    showMessage("Signed out. Local data kept on this device.");
   };
 
   const buildCloudPayload = () => ({
@@ -2399,6 +2435,68 @@ function App() {
 
 
 function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, confirmRevokeViewerId, setConfirmRevokeViewerId, confirmRemoveSharedOwnerId, setConfirmRemoveSharedOwnerId, revokeSupportViewer, chooseSharedSupportView, removeSharedSupportView }) {
+  const [showSignOutPrivacy, setShowSignOutPrivacy] = useState(false);
+
+  if (authUser && showSignOutPrivacy) {
+    return (
+      <main className="layout">
+        <Card className="pad main-col signout-privacy-card">
+          <div className="signout-privacy-header">
+            <div className="signout-privacy-icon"><Lock size={24} /></div>
+            <div>
+              <p className="account-eyebrow">Before you sign out</p>
+              <h2>Choose what happens to this device’s local copy.</h2>
+            </div>
+          </div>
+
+          <p className="muted">
+            Signing out disconnects your 4Sara account. It does not delete cloud data saved to your account unless you separately delete cloud data from Privacy settings.
+          </p>
+
+          <div className="signout-explain-grid">
+            <div className="mini-card">
+              <strong>Cloud data</strong>
+              <p>Saved to your 4Sara account. If you clear this device and sign back in later, 4Sara may reload your account data from the cloud.</p>
+            </div>
+            <div className="mini-card">
+              <strong>Local data</strong>
+              <p>Saved in this browser/device. If kept, someone using this same browser may still be able to open 4Sara and see the local copy while signed out.</p>
+            </div>
+          </div>
+
+          <div className="signout-choice-list">
+            <button type="button" className="signout-choice recommended" onClick={() => handleSignOut("clear-device")}>
+              <span className="signout-choice-badge">Recommended</span>
+              <strong>Sign out and clear this device</strong>
+              <p>Best for shared, public, or borrowed devices. This removes 4Sara data from this browser, but does not delete your cloud account data.</p>
+            </button>
+
+            <button type="button" className="signout-choice" onClick={() => handleSignOut("keep-device")}>
+              <strong>Sign out but keep data on this device</strong>
+              <p>Use this only on a private device. Your account signs out, but the local browser copy stays available on this device.</p>
+            </button>
+          </div>
+
+          <div className="account-actions">
+            <Button onClick={() => setShowSignOutPrivacy(false)} variant="secondary">Cancel</Button>
+          </div>
+        </Card>
+
+        <Card className="pad side-col">
+          <h3>Important</h3>
+          <div className="mini-card">
+            <strong>Clearing this device is not account deletion</strong>
+            <p>Your cloud account data stays saved unless you use Delete cloud data or Delete account.</p>
+          </div>
+          <div className="mini-card">
+            <strong>Signing back in</strong>
+            <p>If cloud data exists, signing back in can bring your 4Sara information back onto this device.</p>
+          </div>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -2558,7 +2656,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
             <div className="account-actions">
               <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
               <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
-              <Button onClick={handleSignOut} variant="secondary">Sign out</Button>
+              <Button onClick={() => setShowSignOutPrivacy(true)} variant="secondary">Sign out</Button>
             </div>
 
             <div className="danger-zone">

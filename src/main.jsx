@@ -50,6 +50,9 @@ const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
 
+// Demo data.
+// This stays available for testing and for the Restore Demo Data setting.
+// It should not be loaded automatically for new users; new users start with [] entries.
 const demoEntries = [
   { id: 1, type: "period", startDate: "2026-04-28", endDate: "2026-05-02", flow: "Medium", mood: "Calm", symptoms: ["Cramps", "Fatigue"], notes: "Mild cramps on day one." },
   { id: 2, type: "period", startDate: "2026-05-26", endDate: "2026-05-30", flow: "Light", mood: "Sensitive", symptoms: ["Bloating", "Back pain"], notes: "Started lighter than normal." }
@@ -987,8 +990,8 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
 
 function App() {
   const [entries, setEntries] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || demoEntries; }
-    catch { return demoEntries; }
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
   });
 
   const [settings, setSettings] = useState(() => {

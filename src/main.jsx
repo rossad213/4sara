@@ -2218,6 +2218,7 @@ function App() {
     { id: "insights", label: "Insights", icon: Sparkles },
     { id: "settings", label: "Settings", icon: Settings },
     { id: "privacy", label: "Privacy", icon: Lock },
+    { id: "legal", label: "Legal", icon: FileText },
     { id: "account", label: "Account", icon: Mail },
     { id: "mobile", label: "Mobile", icon: Home }
   ];
@@ -2372,7 +2373,8 @@ function App() {
             )}
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
-            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} />}
+            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTab} />}
+            {activeTab === "legal" && <LegalDocumentsPage />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
@@ -2982,6 +2984,10 @@ function WelcomeScreen({ onStart, onLogin }) {
           <h3>How do I export or delete data?</h3>
           <p>Use the Privacy or Settings area to manage stored information, export available records, or remove data when you no longer want it saved.</p>
         </div>
+        <div className="help-card">
+          <h3>Is 4Sara medical advice?</h3>
+          <p>No. 4Sara is for personal wellness tracking only. Predictions are estimates and should not be used as medical advice, diagnosis, treatment, or birth control.</p>
+        </div>
       </div>
 
       <div className="help-contact-strip">
@@ -3015,6 +3021,116 @@ function WelcomeScreen({ onStart, onLogin }) {
     </section>
   );
 
+  const PrivacyPolicyPage = () => (
+    <section className="landing-info-page">
+      <div className="landing-pill"><Lock size={16} /> Privacy Policy</div>
+      <h1>Privacy Policy</h1>
+      <p>4Sara is designed to be private, simple, and user-controlled. This policy explains what information the app stores and how it is used.</p>
+
+      <div className="help-center-grid">
+        <div className="help-card">
+          <h3>Information you enter</h3>
+          <p>4Sara may store cycle dates, period entries, symptoms, moods, notes, settings, reports, and Support View preferences that you choose to enter.</p>
+        </div>
+        <div className="help-card">
+          <h3>Local-first storage</h3>
+          <p>Your information is saved in your browser by default. If you clear browser storage or use another device without syncing, local information may not be available.</p>
+        </div>
+        <div className="help-card">
+          <h3>Optional account features</h3>
+          <p>If you create an account or use cloud sync, 4Sara may save your app data to your account so you can access it later or across devices.</p>
+        </div>
+        <div className="help-card">
+          <h3>No third-party analytics</h3>
+          <p>4Sara does not use third-party analytics, advertising pixels, or cross-site tracking tools.</p>
+        </div>
+        <div className="help-card">
+          <h3>No selling personal data</h3>
+          <p>4Sara does not sell your cycle, symptom, mood, note, or account data.</p>
+        </div>
+        <div className="help-card">
+          <h3>Your controls</h3>
+          <p>You can export, clear, or delete available data from the app’s privacy and settings tools. Shared Support View access can also be managed by the account owner.</p>
+        </div>
+      </div>
+
+      <div className="support-note-box">
+        <strong>Contact</strong>
+        <p>Questions about privacy can be sent to {contactEmail}.</p>
+      </div>
+    </section>
+  );
+
+  const TermsPage = () => (
+    <section className="landing-info-page">
+      <div className="landing-pill"><FileText size={16} /> Terms of Use</div>
+      <h1>Terms of Use</h1>
+      <p>By using 4Sara, you agree to use the app responsibly and understand that it is a personal wellness tracking tool.</p>
+
+      <div className="help-center-grid">
+        <div className="help-card">
+          <h3>Personal use</h3>
+          <p>4Sara is provided for personal cycle and wellness tracking. You are responsible for the information you enter and how you use it.</p>
+        </div>
+        <div className="help-card">
+          <h3>Estimates only</h3>
+          <p>Predictions, phases, reminders, reports, and insights are estimates based on logged data. They may be incomplete or inaccurate.</p>
+        </div>
+        <div className="help-card">
+          <h3>No emergency use</h3>
+          <p>Do not use 4Sara for emergencies or urgent health decisions. Contact a qualified healthcare professional or emergency service when needed.</p>
+        </div>
+        <div className="help-card">
+          <h3>Account responsibility</h3>
+          <p>You are responsible for protecting your login, device, browser, exports, and any Support View links you choose to share.</p>
+        </div>
+        <div className="help-card">
+          <h3>Support contributions</h3>
+          <p>Optional contributions help support 4Sara. Contributions are not required to use the app and are not tax-deductible charitable donations.</p>
+        </div>
+        <div className="help-card">
+          <h3>Changes</h3>
+          <p>4Sara may change over time as features, wording, privacy tools, and support options are improved.</p>
+        </div>
+      </div>
+    </section>
+  );
+
+  const MedicalDisclaimerPage = () => (
+    <section className="landing-info-page">
+      <div className="landing-pill"><HeartPulse size={16} /> Medical Disclaimer</div>
+      <h1>Medical Disclaimer</h1>
+      <p>4Sara is a personal wellness and cycle tracking app. It is not medical advice, not a diagnosis tool, and not a medical device.</p>
+
+      <div className="help-center-grid">
+        <div className="help-card">
+          <h3>Not medical advice</h3>
+          <p>Information in 4Sara is for personal tracking and general wellness awareness only. It should not replace advice from a qualified healthcare professional.</p>
+        </div>
+        <div className="help-card">
+          <h3>Predictions are estimates</h3>
+          <p>Period dates, cycle phases, fertile windows, ovulation estimates, reminders, and insights are predictions based on logged information and may be wrong.</p>
+        </div>
+        <div className="help-card">
+          <h3>Not birth control</h3>
+          <p>Do not use 4Sara predictions as contraception, pregnancy prevention, fertility treatment, or the only basis for pregnancy-related decisions.</p>
+        </div>
+        <div className="help-card">
+          <h3>External factors</h3>
+          <p>Stress, travel, illness, medication, sleep, exercise, weight changes, and other factors can affect cycle timing in ways the app may not fully predict.</p>
+        </div>
+        <div className="help-card">
+          <h3>When to seek care</h3>
+          <p>Talk to a healthcare professional about severe pain, very heavy bleeding, missed periods, unusual symptoms, pregnancy concerns, or any urgent health issue.</p>
+        </div>
+        <div className="help-card">
+          <h3>Your judgment matters</h3>
+          <p>Use 4Sara as a support tool, not as a substitute for professional care, medical testing, or personal judgment.</p>
+        </div>
+      </div>
+    </section>
+  );
+
   return (
     <div className="landing-page">
       <header className="landing-nav">
@@ -3036,12 +3152,15 @@ function WelcomeScreen({ onStart, onLogin }) {
       {welcomeTab === "support" && <SupportPage />}
       {welcomeTab === "help" && <HelpPage />}
       {welcomeTab === "contact" && <ContactPage />}
+      {welcomeTab === "privacy-policy" && <PrivacyPolicyPage />}
+      {welcomeTab === "terms" && <TermsPage />}
+      {welcomeTab === "medical-disclaimer" && <MedicalDisclaimerPage />}
 
       <footer className="landing-footer">
         <div><div className="landing-footer-brand"><LogoMark compact /><strong>4Sara</strong></div><p>Private cycle tracking, designed with care. Built for clarity.</p></div>
         <div><strong>Product</strong><button type="button" onClick={() => goToSection("features")}>Features</button><button type="button" onClick={() => goToSection("how-it-works")}>How it Works</button></div>
         <div><strong>Privacy</strong><button type="button" onClick={() => goToSection("privacy")}>Privacy Overview</button><button type="button" onClick={() => goToSection("privacy")}>Data & Security</button></div>
-        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("contact")}>Contact</button></div>
+        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("contact")}>Contact</button><button type="button" onClick={() => setWelcomeTab("privacy-policy")}>Privacy Policy</button><button type="button" onClick={() => setWelcomeTab("terms")}>Terms of Use</button><button type="button" onClick={() => setWelcomeTab("medical-disclaimer")}>Medical Disclaimer</button></div>
         <div><p>Made with care for your health ♡</p><p>© 2026 4Sara. All rights reserved.</p></div>
       </footer>
     </div>
@@ -3720,7 +3839,7 @@ function Insights({ stats, settings, setLocked }) {
   );
 }
 
-function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearData, resetDemo, importText, setImportText, importJson, sortedEntries, stats }) {
+function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearData, resetDemo, importText, setImportText, importJson, sortedEntries, stats, setActiveTab }) {
   return (
     <main className="settings-grid">
       <Card className="pad">
@@ -3753,6 +3872,15 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
         </div>
       </Card>
 
+      <Card className="pad">
+        <h2><FileText size={20} /> Legal & privacy</h2>
+        <p className="muted">Review the documents that explain privacy, app terms, and medical limitations.</p>
+        <div className="two-actions">
+          <Button onClick={() => setActiveTab("legal")} variant="secondary">Open legal pages</Button>
+          <Button onClick={() => setActiveTab("privacy")} variant="secondary">Open privacy controls</Button>
+        </div>
+      </Card>
+
       <Card className="pad wide">
         <h2><Download size={20} /> Data tools</h2>
         <p className="muted">Backup, restore, export to spreadsheet, or open a printable doctor summary report.</p>
@@ -3762,6 +3890,51 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
           <Button onClick={importJson}>Restore JSON</Button>
           <Button onClick={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} variant="secondary">Spreadsheet CSV</Button>
           <Button onClick={() => showMessage(printReport(sortedEntries, stats) ? "Report opened. Use Print or Save as PDF." : "Pop-up blocked. Allow pop-ups to print the report.")} variant="secondary">Doctor report</Button>
+        </div>
+      </Card>
+    </main>
+  );
+}
+
+function LegalDocumentsPage() {
+  return (
+    <main className="layout">
+      <Card className="pad main-col">
+        <h2><FileText size={20} /> Legal & safety</h2>
+        <p className="muted">These documents explain 4Sara’s privacy approach, terms of use, and medical limitations.</p>
+
+        <div className="privacy-section">
+          <h3>Privacy Policy</h3>
+          <p>4Sara may store cycle dates, period entries, symptoms, moods, notes, settings, reports, and Support View preferences that you choose to enter.</p>
+          <p>Your information is saved in your browser by default. If you create an account or use cloud sync, 4Sara may save your data to your account so it can be used later or across devices.</p>
+          <p>4Sara does not use third-party analytics, advertising pixels, or cross-site tracking tools. 4Sara does not sell your cycle, symptom, mood, note, or account data.</p>
+        </div>
+
+        <div className="privacy-section">
+          <h3>Terms of Use</h3>
+          <p>4Sara is provided for personal cycle and wellness tracking. You are responsible for the information you enter and how you use it.</p>
+          <p>Predictions, phases, reminders, reports, and insights are estimates based on logged data and may be incomplete or inaccurate.</p>
+          <p>Optional contributions help support 4Sara. Contributions are not required to use the app and are not tax-deductible charitable donations.</p>
+        </div>
+
+        <div className="privacy-section danger-zone">
+          <h3>Medical Disclaimer</h3>
+          <p>4Sara is not medical advice, not a diagnosis tool, and not a medical device. It should not replace advice from a qualified healthcare professional.</p>
+          <p>Do not use 4Sara predictions as contraception, pregnancy prevention, fertility treatment, or the only basis for pregnancy-related decisions.</p>
+          <p>Talk to a healthcare professional about severe pain, very heavy bleeding, missed periods, unusual symptoms, pregnancy concerns, or any urgent health issue.</p>
+        </div>
+      </Card>
+
+      <Card className="pad side-col">
+        <h3>Quick reminder</h3>
+        <p>4Sara predictions are estimates based on logged data. They are for personal wellness tracking only.</p>
+        <div className="mini-card">
+          <strong>No analytics</strong>
+          <p>4Sara does not use third-party analytics or advertising pixels.</p>
+        </div>
+        <div className="mini-card">
+          <strong>Not birth control</strong>
+          <p>Do not rely on cycle predictions for pregnancy prevention.</p>
         </div>
       </Card>
     </main>

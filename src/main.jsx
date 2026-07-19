@@ -1111,6 +1111,7 @@ function App() {
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [confirmClearLocal, setConfirmClearLocal] = useState(false);
   const [inviteToken, setInviteToken] = useState("");
   const [pendingInvite, setPendingInvite] = useState(null);
   const [inviteStatus, setInviteStatus] = useState("");
@@ -1146,6 +1147,7 @@ function App() {
       setSharedSupportData(null);
       setCloudUpdatedAt("");
       setConfirmDeleteAccount(false);
+      setConfirmClearLocal(false);
       setSyncStatus(user ? "Signed in. Cloud sync is ready." : "Signed out. Data is saved locally on this device.");
     });
 
@@ -1609,6 +1611,7 @@ function App() {
         displayName: invite.ownerDisplayName || invite.ownerEmail || "Shared 4Sara",
         role: "viewer",
         permissions: invite.permissions || {},
+        inviteToken: token,
         acceptedAt
       };
 
@@ -1625,6 +1628,7 @@ function App() {
             viewerEmail: authUser.email,
             role: "viewer",
             permissions: invite.permissions || {},
+            inviteToken: token,
             acceptedAt
           }
         }
@@ -2260,11 +2264,52 @@ function App() {
     showMessage("Entry deleted.");
   };
 
-  const clearAllData = () => {
+  const clearLocalDeviceData = async () => {
+    if (!confirmClearLocal) {
+      setConfirmClearLocal(true);
+      setSyncStatus(authUser
+        ? "Click Clear local data again to confirm. Cloud sync will be turned off first so the empty local copy is not auto-saved to cloud."
+        : "Click Clear local data again to confirm.");
+      showMessage("Click Clear local data again to confirm.");
+      return;
+    }
+
+    // Safety: when signed in, turn off cloud sync before clearing the local state.
+    // This prevents an empty local tracker from being auto-saved over the cloud copy.
+    setAutoSyncEnabled(false);
+    setCloudSyncAllowed(false);
+    setCloudCheckedForAccount(false);
+
+    if (authUser) {
+      try {
+        await clearCloudChoiceForAccount(authUser);
+      } catch {
+        clearCloudChoice(authUser.uid);
+      }
+    }
+
     setEntries([]);
+    setSettings(defaultSettings);
+    setForm(blankForm());
+    setEditingId(null);
+    setSelectedCalendarDay(null);
+    setSharedProfiles({});
+    setSupportViewers({});
+    setSharedSupportData(null);
+    setSelectedSharedOwnerId("");
+    setViewMode("owner");
+    setCloudHasData(Boolean(authUser && cloudHasData));
+    setLastCloudSave("");
+    setConfirmClearLocal(false);
+
     localStorage.removeItem(STORAGE_KEY);
-    updateSettings({ onboardingComplete: false });
-    showMessage("Local cycle data cleared.");
+    localStorage.removeItem(SETTINGS_KEY);
+    localStorage.removeItem(CLOUD_CHOICE_KEY);
+
+    setSyncStatus(authUser
+      ? "Local data cleared on this device only. Cloud data was not deleted, and auto-sync was turned off."
+      : "Local data cleared on this device.");
+    showMessage("Local data cleared on this device.");
   };
 
   const logToday = (type = "period") => {
@@ -2500,9 +2545,9 @@ function App() {
             )}
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
-            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearAllData} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTab} />}
+            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTab} />}
             {activeTab === "legal" && <LegalDocumentsPage />}
-            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearAllData} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
+            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && viewMode === "support" && (
@@ -4028,7 +4073,7 @@ function Insights({ stats, settings, setLocked }) {
   );
 }
 
-function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearData, resetDemo, importText, setImportText, importJson, sortedEntries, stats, setActiveTab }) {
+function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearData, confirmClearLocal, setConfirmClearLocal, resetDemo, importText, setImportText, importJson, sortedEntries, stats, setActiveTab }) {
   return (
     <main className="settings-grid">
       <Card className="pad">
@@ -4055,9 +4100,11 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
         <label className="form single"><span>PIN</span><input type="password" value={settings.pin} onChange={(e) => updateSettings({ pin: e.target.value })} placeholder="Create a simple PIN" /></label>
         <div className="two-actions">
           <Button onClick={() => settings.pinEnabled && settings.pin ? setLocked(true) : showMessage("Turn on PIN and enter a PIN first.")} variant="secondary">Lock now</Button>
-          <Button onClick={clearData} variant="secondary">Clear data</Button>
+          <Button onClick={clearData} variant="secondary">{confirmClearLocal ? "Confirm clear local data" : "Clear local data"}</Button>
+          {confirmClearLocal && <Button onClick={() => setConfirmClearLocal(false)} variant="secondary">Cancel clear</Button>}
           <Button onClick={resetDemo} variant="secondary" className="full">Restore demo data</Button>
         </div>
+        {confirmClearLocal && <p className="danger-confirm">This clears this browser/device only. Cloud sync will be turned off first so an empty tracker is not auto-saved to cloud.</p>}
       </Card>
 
       <Card className="pad">
@@ -4133,7 +4180,7 @@ function NumberField({ label, value, onChange, placeholder, min, max }) {
   return <label className="form single"><span>{label}</span><input type="number" min={min} max={max} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></label>;
 }
 
-function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, exportJson, exportCsv }) {
+function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, confirmClearLocal, setConfirmClearLocal, exportJson, exportCsv }) {
   return (
     <main className="layout">
       <Card className="pad main-col">
@@ -4212,7 +4259,7 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
             <li><strong>Local data:</strong> Your entries, check-ins, symptoms, moods, and settings may be saved on this device/browser.</li>
             <li><strong>Cloud data:</strong> If you create an account and use cloud sync, a copy of your 4Sara data may be saved to your account so it can be used across devices.</li>
             <li><strong>Export:</strong> You can export your data as a backup file or spreadsheet.</li>
-            <li><strong>Delete:</strong> You can clear local data from this device and delete cloud data from your account.</li>
+            <li><strong>Delete:</strong> You can clear local data from this device without deleting cloud data. If you are signed in, 4Sara turns off cloud sync first so an empty local tracker is not auto-saved to your cloud copy.</li>
             <li><strong>Account email:</strong> If you create an account, your email address is used for login, password reset, and account verification.</li>
           </ul>
           <p className="legal-note">
@@ -4240,7 +4287,12 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
         <div className="privacy-section danger-zone">
           <h3>Clear local data</h3>
           <p>This removes 4Sara data from this browser/device. It does not delete cloud data from your account.</p>
-          <Button onClick={clearData} variant="secondary">Clear local data on this device</Button>
+          {authUser && <p className="danger-confirm">Safety: clearing local data turns off cloud sync first, so the empty local tracker is not auto-saved over your cloud copy.</p>}
+          {confirmClearLocal && <p className="danger-confirm">Confirm clear: click the button again to clear this device only.</p>}
+          <div className="actions">
+            <Button onClick={clearData} variant="secondary">{confirmClearLocal ? "Confirm clear local data" : "Clear local data on this device"}</Button>
+            {confirmClearLocal && <Button onClick={() => setConfirmClearLocal(false)} variant="secondary">Cancel</Button>}
+          </div>
         </div>
       </Card>
 

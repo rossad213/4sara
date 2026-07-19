@@ -184,6 +184,63 @@ function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
   return "Unknown";
 }
 
+// Menstruation episode grouping.
+// Users may log menstruation daily during one period. Those daily logs should
+// be treated as one period episode for cycle predictions. Otherwise, entries
+// like Jun 23, Jun 26, and Jun 27 can look like separate 1-3 day "cycles" and
+// incorrectly shift the next prediction.
+function groupMenstruationEpisodes(periodEntries, maxGapDays = 2) {
+  const sorted = [...(periodEntries || [])]
+    .filter((entry) => entry?.startDate)
+    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+  const groups = [];
+
+  sorted.forEach((entry) => {
+    const startDate = entry.startDate;
+    const endDate = entry.endDate || entry.startDate;
+    const lastGroup = groups[groups.length - 1];
+
+    if (!lastGroup) {
+      groups.push({
+        ...entry,
+        startDate,
+        endDate,
+        entries: [entry],
+        entryIds: [entry.id],
+        sourceEntryCount: 1
+      });
+      return;
+    }
+
+    const gapAfterLastGroup = daysBetween(lastGroup.endDate, startDate) - 1;
+    const overlapsOrIsNearby = gapAfterLastGroup <= maxGapDays;
+
+    if (overlapsOrIsNearby) {
+      lastGroup.endDate = daysBetween(lastGroup.endDate, endDate) > 0 ? endDate : lastGroup.endDate;
+      lastGroup.entries.push(entry);
+      lastGroup.entryIds.push(entry.id);
+      lastGroup.sourceEntryCount = lastGroup.entries.length;
+      lastGroup.symptoms = uniqueList(lastGroup.entries.flatMap((item) => item.symptoms || []));
+      lastGroup.moods = uniqueList(lastGroup.entries.flatMap((item) => normalizeMoods(item)));
+      lastGroup.mood = lastGroup.moods.filter((item) => item !== "N/A").join(", ") || "N/A";
+      lastGroup.notes = lastGroup.entries.map((item) => item.notes).filter(Boolean).join(" ");
+      lastGroup.flow = lastGroup.entries.find((item) => item.flow && item.flow !== "N/A")?.flow || "N/A";
+    } else {
+      groups.push({
+        ...entry,
+        startDate,
+        endDate,
+        entries: [entry],
+        entryIds: [entry.id],
+        sourceEntryCount: 1
+      });
+    }
+  });
+
+  return groups;
+}
+
 // Calendar projection helpers.
 // These functions create the predicted calendar colors. Predictions begin at the
 // first logged period and project forward only, so dates before the user's first
@@ -823,7 +880,7 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const safeSettings = { ...defaultSettings, ...(sourceSettings || {}) };
 
   const periodEntries = safeEntries.filter((entry) => (entry.type || "period") === "period");
-  const chronological = [...periodEntries].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  const chronological = groupMenstruationEpisodes(periodEntries);
   const last = chronological[chronological.length - 1];
 
   const cycleLengths = [];
@@ -834,7 +891,9 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const predictionModel = buildCyclePredictionModel(chronological, safeEntries, safeSettings);
   const calculatedCycle = predictionModel.typicalCycle || 28;
 
-  const periodLengths = chronological.filter((entry) => entry.endDate).map((entry) => daysBetween(entry.startDate, entry.endDate) + 1);
+  const periodLengths = chronological
+    .filter((entry) => entry.endDate)
+    .map((entry) => daysBetween(entry.startDate, entry.endDate) + 1);
   const calculatedPeriod = periodLengths.length ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5;
 
   const averageCycle = Number(safeSettings.cycleLengthOverride) || calculatedCycle;
@@ -935,23 +994,23 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const hasOutliers = predictionModel.outlierCycles.length > 0;
   const hasCurrentFactors = predictionModel.currentCycleFactors.length > 0;
 
-  const dataConfidence = periodEntries.length >= 6 && !hasOutliers && !hasCurrentFactors
+  const dataConfidence = chronological.length >= 6 && !hasOutliers && !hasCurrentFactors
     ? "Strong"
-    : periodEntries.length >= 3
+    : chronological.length >= 3
     ? hasOutliers || hasCurrentFactors ? "Good, with timing notes" : "Good"
-    : periodEntries.length >= 1
+    : chronological.length >= 1
     ? "Limited"
     : "No data";
 
-  const confidenceNote = periodEntries.length >= 6 && !hasOutliers && !hasCurrentFactors
+  const confidenceNote = chronological.length >= 6 && !hasOutliers && !hasCurrentFactors
     ? "Predictions are stronger because several cycles are logged and recent timing looks consistent."
-    : periodEntries.length >= 3 && hasOutliers
+    : chronological.length >= 3 && hasOutliers
     ? "Predictions are using a typical cycle estimate while discounting unusual cycle lengths."
-    : periodEntries.length >= 3 && hasCurrentFactors
+    : chronological.length >= 3 && hasCurrentFactors
     ? "This cycle has logged factors that may shift the prediction window without permanently changing the average."
-    : periodEntries.length >= 3
+    : chronological.length >= 3
     ? "Predictions are improving as more cycles are logged."
-    : periodEntries.length >= 1
+    : chronological.length >= 1
     ? "Add at least 3 cycles for better predictions."
     : "Add a menstruation entry to start seeing insights.";
 
@@ -980,7 +1039,9 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
     symptomStats,
     phaseInsights,
     checkInPhaseInsights,
-    totalEntries: periodEntries.length,
+    totalEntries: chronological.length,
+    totalPeriodLogs: periodEntries.length,
+    groupedPeriodEpisodes: chronological,
     outlierCycles: predictionModel.outlierCycles,
     currentCycleFactors: predictionModel.currentCycleFactors,
     factorInsights: predictionModel.factorInsights,
@@ -1915,10 +1976,13 @@ function App() {
     return buildProjectedCycleMap(stats.last?.startDate, stats.averageCycle, stats.averagePeriod, 6, stats.predictionCycleLength);
   }, [stats.last?.startDate, stats.averageCycle, stats.averagePeriod, stats.predictionCycleLength]);
 
+  // Entry-form phase preview.
+  // Daily check-ins use this phase estimate for context only. They do not create
+  // a new cycle or move predictions; only grouped menstruation episodes can do that.
   const selectedPhase = useMemo(() => {
     if (!form.startDate) return { phase: "Unknown" };
-    return projectedPhaseMap.get(form.startDate) || { phase: inferPhase(form.startDate, entries.filter((entry) => (entry.type || "period") === "period"), stats.averageCycle, stats.averagePeriod) };
-  }, [form.startDate, projectedPhaseMap, entries, stats.averageCycle, stats.averagePeriod]);
+    return projectedPhaseMap.get(form.startDate) || { phase: inferPhase(form.startDate, stats.groupedPeriodEpisodes || [], stats.averageCycle, stats.averagePeriod) };
+  }, [form.startDate, projectedPhaseMap, stats.groupedPeriodEpisodes, stats.averageCycle, stats.averagePeriod]);
 
 
   const supportEntries = selectedSharedOwnerId && sharedSupportData ? sharedSupportData.entries : entries;
@@ -1939,12 +2003,13 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
-    const supportPeriodEntries = supportEntries
+    const rawSupportPeriodEntries = supportEntries
       .filter((entry) => (entry.type || "period") === "period")
       .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const supportPeriodEntries = groupMenstruationEpisodes(rawSupportPeriodEntries);
     const firstSupportPeriodStart = supportPeriodEntries[0]?.startDate || null;
 
-    supportPeriodEntries.forEach((entry) => {
+    rawSupportPeriodEntries.forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -1971,6 +2036,7 @@ function App() {
       const isOvulation = phase === "Ovulation";
       const isFollicular = phase === "Follicular";
       const isLuteal = phase === "Luteal";
+      const dayCheckIns = checkInDays.get(key) || [];
 
       return {
         empty: false,
@@ -1979,7 +2045,8 @@ function App() {
         dateKey: key,
         isToday: key === todayKey(),
         entry,
-        checkIns: checkInDays.get(key) || [],
+        checkIns: dayCheckIns,
+        hasCheckIn: dayCheckIns.length > 0,
         isPredicted,
         isFertile,
         isOvulation,
@@ -1989,7 +2056,7 @@ function App() {
         phaseDescription: phaseDescription(phase),
         cycleDay: getCycleDayForDate(key, supportStats.last?.startDate, supportStats.averageCycle),
         isFuture: isFutureDate(key),
-        statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
+        statusLabel: entry ? "Menstruation logged" : dayCheckIns.length ? "Check-in saved" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
   }, [calendarDate, supportEntries, supportProjectedPhaseMap, supportStats.averageCycle, supportStats.averagePeriod, supportStats.last?.startDate]);
@@ -2004,12 +2071,13 @@ function App() {
 
     const periodDays = new Map();
     const checkInDays = new Map();
-    const periodEntries = entries
+    const rawPeriodEntries = entries
       .filter((entry) => (entry.type || "period") === "period")
       .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const periodEntries = groupMenstruationEpisodes(rawPeriodEntries);
     const firstPeriodStart = periodEntries[0]?.startDate || null;
 
-    periodEntries.forEach((entry) => {
+    rawPeriodEntries.forEach((entry) => {
       getDaysInRange(entry.startDate, entry.endDate).forEach((day) => periodDays.set(day, entry));
     });
 
@@ -2036,6 +2104,7 @@ function App() {
       const isOvulation = phase === "Ovulation";
       const isFollicular = phase === "Follicular";
       const isLuteal = phase === "Luteal";
+      const dayCheckIns = checkInDays.get(key) || [];
 
       return {
         empty: false,
@@ -2044,7 +2113,8 @@ function App() {
         dateKey: key,
         isToday: key === todayKey(),
         entry,
-        checkIns: checkInDays.get(key) || [],
+        checkIns: dayCheckIns,
+        hasCheckIn: dayCheckIns.length > 0,
         isPredicted,
         isFertile,
         isOvulation,
@@ -2054,7 +2124,7 @@ function App() {
         phaseDescription: phaseDescription(phase),
         cycleDay: getCycleDayForDate(key, stats.last?.startDate, stats.averageCycle),
         isFuture: isFutureDate(key),
-        statusLabel: entry ? "Logged" : isFutureDate(key) ? "Predicted" : "Not logged"
+        statusLabel: entry ? "Menstruation logged" : dayCheckIns.length ? "Check-in saved" : isFutureDate(key) ? "Predicted" : "Not logged"
       };
     });
   }, [calendarDate, entries, projectedPhaseMap, stats.averageCycle, stats.averagePeriod]);
@@ -3679,7 +3749,7 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
               key={day.key}
               disabled={day.empty}
               onClick={() => handleDayClick(day)}
-              className={`day ${day.empty ? "empty" : ""} ${day.isFuture ? "future-disabled" : ""} ${day.entry ? "period" : ""} ${!day.entry && day.isPredicted ? "predicted" : ""} ${!day.entry && !day.isPredicted && (day.isFertile || day.isOvulation) ? "fertile" : ""} ${day.isFollicular ? "follicular" : ""} ${day.isLuteal ? "luteal" : ""} ${day.isToday ? "today-outline" : ""} ${selectedCalendarDay === (day.dateKey || day.key) ? "selected" : ""}`}
+              className={`day ${day.empty ? "empty" : ""} ${day.isFuture ? "future-disabled" : ""} ${day.entry ? "period" : ""} ${day.hasCheckIn ? "has-checkin" : ""} ${!day.entry && day.isPredicted ? "predicted" : ""} ${!day.entry && !day.isPredicted && (day.isFertile || day.isOvulation) ? "fertile" : ""} ${day.isFollicular ? "follicular" : ""} ${day.isLuteal ? "luteal" : ""} ${day.isToday ? "today-outline" : ""} ${selectedCalendarDay === (day.dateKey || day.key) ? "selected" : ""}`}
               title={day.isFuture ? "Future dates are prediction-only and do not open details." : "View date details"}
             >
               {!day.empty && <>

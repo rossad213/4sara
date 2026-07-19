@@ -359,6 +359,23 @@ function getCurrentCycleFactors(entries, lastPeriodStart) {
   return getExternalFactorsBetween(entries, lastPeriodStart, todayKey());
 }
 
+function getCurrentCycleFactorSignalCount(entries, lastPeriodStart) {
+  if (!lastPeriodStart) return 0;
+
+  return entries
+    .filter((entry) => entry.startDate && daysBetween(lastPeriodStart, entry.startDate) >= 0 && daysBetween(entry.startDate, todayKey()) >= 0)
+    .reduce((total, entry) => total + extractExternalFactorsFromEntry(entry).length, 0);
+}
+
+function getGentleContextAdjustmentDays(signalCount) {
+  // Context can nudge predictions gently, but one mention should not cause a
+  // dramatic delay. Repeated/cumulative timing factors create a small capped
+  // adjustment only.
+  if (signalCount >= 6) return 2;
+  if (signalCount >= 2) return 1;
+  return 0;
+}
+
 function buildCyclePredictionModel(chronologicalPeriods, allEntries, settings) {
   const cycleRecords = [];
 
@@ -389,11 +406,9 @@ function buildCyclePredictionModel(chronologicalPeriods, allEntries, settings) {
     const outsideHealthyBounds = record.length < 15 || record.length > 60;
     const farFromBaseline = Math.abs(record.length - baseline) > 7;
     const isOutlier = outsideHealthyBounds || farFromBaseline;
-    const hasExternalFactors = record.factors.length > 0;
     const recencyBoost = index >= recentRecords.length - 2 ? 1.15 : 1;
     const outlierWeight = isOutlier ? 0.35 : 1;
-    const factorWeight = hasExternalFactors ? 0.75 : 1;
-    const weight = recencyBoost * outlierWeight * factorWeight;
+    const weight = recencyBoost * outlierWeight;
 
     return { ...record, isOutlier, weight };
   });
@@ -407,8 +422,10 @@ function buildCyclePredictionModel(chronologicalPeriods, allEntries, settings) {
   const normalMinCycle = normalLengths.length ? Math.min(...normalLengths) : null;
   const normalMaxCycle = normalLengths.length ? Math.max(...normalLengths) : null;
 
-  const currentCycleFactors = getCurrentCycleFactors(allEntries, chronologicalPeriods[chronologicalPeriods.length - 1]?.startDate);
-  const currentCycleAdjustmentDays = currentCycleFactors.length ? Math.min(4, 1 + Math.ceil(currentCycleFactors.length / 2)) : 0;
+  const currentCycleStart = chronologicalPeriods[chronologicalPeriods.length - 1]?.startDate;
+  const currentCycleFactors = getCurrentCycleFactors(allEntries, currentCycleStart);
+  const currentCycleFactorSignalCount = getCurrentCycleFactorSignalCount(allEntries, currentCycleStart);
+  const currentCycleAdjustmentDays = getGentleContextAdjustmentDays(currentCycleFactorSignalCount);
 
   const variation = recentLengths.length > 1 ? Math.max(...recentLengths) - Math.min(...recentLengths) : 0;
   const outlierCount = weightedRecords.filter((record) => record.isOutlier).length;
@@ -432,13 +449,14 @@ function buildCyclePredictionModel(chronologicalPeriods, allEntries, settings) {
     normalMaxCycle,
     outlierCycles: weightedRecords.filter((record) => record.isOutlier),
     currentCycleFactors,
+    currentCycleFactorSignalCount,
     currentCycleAdjustmentDays,
     predictionWindowBefore,
     predictionWindowAfter,
     factorInsights,
     predictionModelNote: outlierCount
       ? "One or more unusual cycles were discounted so a one-off delay does not permanently change the typical cycle length."
-      : "Predictions use recent cycle history, with more weight on recent normal cycles."
+      : "Predictions use grouped menstruation episode history, with only a small capped nudge for repeated current-cycle context like stress, travel, illness, medication, or sleep changes."
   };
 }
 
@@ -899,9 +917,9 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const averageCycle = Number(safeSettings.cycleLengthOverride) || calculatedCycle;
   const averagePeriod = Number(safeSettings.periodLengthOverride) || calculatedPeriod;
 
-  // If external factors are logged in the current cycle, adjust only the current
-  // prediction. The typical average stays protected unless repeated cycle history
-  // shows the user's pattern has truly changed.
+  // Check-ins are mostly context, not new cycles. Repeated current-cycle factors
+  // like stress, travel, illness, medication, or sleep changes can make only a
+  // small capped nudge, so one stress note does not aggressively move the period.
   const currentCycleAdjustmentDays = Number(safeSettings.cycleLengthOverride) ? 0 : predictionModel.currentCycleAdjustmentDays;
   const predictionCycleLength = averageCycle + currentCycleAdjustmentDays;
 
@@ -992,22 +1010,22 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const normalMaxCycle = predictionModel.normalMaxCycle;
 
   const hasOutliers = predictionModel.outlierCycles.length > 0;
-  const hasCurrentFactors = predictionModel.currentCycleFactors.length > 0;
+  const hasGentleContextNudge = predictionModel.currentCycleAdjustmentDays > 0;
 
-  const dataConfidence = chronological.length >= 6 && !hasOutliers && !hasCurrentFactors
+  const dataConfidence = chronological.length >= 6 && !hasOutliers && !hasGentleContextNudge
     ? "Strong"
     : chronological.length >= 3
-    ? hasOutliers || hasCurrentFactors ? "Good, with timing notes" : "Good"
+    ? hasOutliers || hasGentleContextNudge ? "Good, with timing notes" : "Good"
     : chronological.length >= 1
     ? "Limited"
     : "No data";
 
-  const confidenceNote = chronological.length >= 6 && !hasOutliers && !hasCurrentFactors
+  const confidenceNote = chronological.length >= 6 && !hasOutliers && !hasGentleContextNudge
     ? "Predictions are stronger because several cycles are logged and recent timing looks consistent."
     : chronological.length >= 3 && hasOutliers
     ? "Predictions are using a typical cycle estimate while discounting unusual cycle lengths."
-    : chronological.length >= 3 && hasCurrentFactors
-    ? "This cycle has logged factors that may shift the prediction window without permanently changing the average."
+    : chronological.length >= 3 && hasGentleContextNudge
+    ? "Repeated current-cycle context created a small capped timing nudge, not a major prediction change."
     : chronological.length >= 3
     ? "Predictions are improving as more cycles are logged."
     : chronological.length >= 1
@@ -1044,6 +1062,7 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
     groupedPeriodEpisodes: chronological,
     outlierCycles: predictionModel.outlierCycles,
     currentCycleFactors: predictionModel.currentCycleFactors,
+    currentCycleFactorSignalCount: predictionModel.currentCycleFactorSignalCount,
     factorInsights: predictionModel.factorInsights,
     predictionModelNote: predictionModel.predictionModelNote
   };
@@ -3959,12 +3978,12 @@ function Insights({ stats, settings, setLocked }) {
               <p>{stats.outlierCycles?.length ? `${stats.outlierCycles.length} unusual cycle${stats.outlierCycles.length === 1 ? "" : "s"} reduced in the average` : "No recent outlier cycles detected."}</p>
             </div>
             <div className="mini-card">
-              <strong>Current factors</strong>
-              <p>{stats.currentCycleFactors?.length ? `${stats.currentCycleFactors.join(", ")} may shift the current prediction window.` : "No current external timing factors detected in notes or check-ins."}</p>
+              <strong>Current context</strong>
+              <p>{stats.currentCycleFactors?.length ? `${stats.currentCycleFactors.join(", ")} logged this cycle. ${stats.currentCycleAdjustmentDays ? `Small timing nudge: +${stats.currentCycleAdjustmentDays} day${stats.currentCycleAdjustmentDays === 1 ? "" : "s"}.` : "No timing nudge yet."}` : "No current timing context detected in notes or check-ins."}</p>
             </div>
           </div>
           {stats.factorInsights?.length ? (
-            <p className="muted">Repeated timing notes: {stats.factorInsights.map((item) => `${item.factor} (${item.count})`).join(", ")}.</p>
+            <p className="muted">Repeated context notes: {stats.factorInsights.map((item) => `${item.factor} (${item.count})`).join(", ")}. Context nudges are capped so one-time notes do not aggressively move predictions.</p>
           ) : null}
         </div>
 

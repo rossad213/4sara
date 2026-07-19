@@ -208,7 +208,9 @@ function groupMenstruationEpisodes(periodEntries, maxGapDays = 2) {
         endDate,
         entries: [entry],
         entryIds: [entry.id],
-        sourceEntryCount: 1
+        sourceEntryCount: 1,
+        hasExplicitEndDate: Boolean(entry.endDate),
+        hasExplicitEndDate: Boolean(entry.endDate)
       });
       return;
     }
@@ -221,6 +223,7 @@ function groupMenstruationEpisodes(periodEntries, maxGapDays = 2) {
       lastGroup.entries.push(entry);
       lastGroup.entryIds.push(entry.id);
       lastGroup.sourceEntryCount = lastGroup.entries.length;
+      lastGroup.hasExplicitEndDate = lastGroup.entries.some((item) => Boolean(item.endDate));
       lastGroup.symptoms = uniqueList(lastGroup.entries.flatMap((item) => item.symptoms || []));
       lastGroup.moods = uniqueList(lastGroup.entries.flatMap((item) => normalizeMoods(item)));
       lastGroup.mood = lastGroup.moods.filter((item) => item !== "N/A").join(", ") || "N/A";
@@ -909,8 +912,14 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const predictionModel = buildCyclePredictionModel(chronological, safeEntries, safeSettings);
   const calculatedCycle = predictionModel.typicalCycle || 28;
 
-  const periodLengths = chronological
-    .filter((entry) => entry.endDate)
+  // Average menstruation length should come from completed period episodes.
+  // A new single-day menstruation log without an end date may simply mean the
+  // user just started logging this period, so it should not shrink a 5-day
+  // average down to 3 or 1 day.
+  const completedPeriodEpisodes = chronological.filter((entry) =>
+    entry.endDate && (entry.hasExplicitEndDate || entry.sourceEntryCount > 1)
+  );
+  const periodLengths = completedPeriodEpisodes
     .map((entry) => daysBetween(entry.startDate, entry.endDate) + 1);
   const calculatedPeriod = periodLengths.length ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5;
 
@@ -1059,6 +1068,7 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
     checkInPhaseInsights,
     totalEntries: chronological.length,
     totalPeriodLogs: periodEntries.length,
+    completedPeriodEpisodes: completedPeriodEpisodes.length,
     groupedPeriodEpisodes: chronological,
     outlierCycles: predictionModel.outlierCycles,
     currentCycleFactors: predictionModel.currentCycleFactors,

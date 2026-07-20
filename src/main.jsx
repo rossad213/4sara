@@ -3169,13 +3169,15 @@ function WelcomeScreen({ onStart, onLogin }) {
   const AboutPage = () => (
     <section className="landing-info-page">
       <div className="landing-pill"><HeartPulse size={16} /> About 4Sara</div>
-      <h1>Built with care, privacy, and support in mind.</h1>
-      <p>4Sara began as a personal project created for Sara: a private, thoughtful cycle tracker that could be customized around real needs instead of feeling like a generic app.</p>
-      <p>As the project grew, the goal stayed simple: make cycle tracking feel more personal, more private, and more supportive, with phase estimates, symptom and mood tracking, insights, reports, and read-only Support View sharing for trusted people.</p>
+      <h1>Built for Sara, with care, privacy, and support in mind.</h1>
+      <p>4Sara began as a personal project created for Sara by her partner.</p>
+      <p>After trying other cycle trackers, Sara needed something that felt more personal, more flexible, and more customizable to her real day-to-day experience and not something generic or one-size-fits-all.</p>
+      <p>So 4Sara was built around what she actually needed: a private place to track her cycle, symptoms, moods, notes, patterns, and the kind of support that could help her feel more understood.</p>
+      <p>As the project grew, the purpose stayed simple: make cycle tracking feel more personal, more private, and more supportive, with phase estimates, symptom and mood tracking, insights, reports, and read-only Support View sharing for trusted people.</p>
       <div className="landing-info-grid">
         <div><strong>Personal</strong><p>Designed around real needs, not a one-size-fits-all experience.</p></div>
         <div><strong>Private</strong><p>Built with privacy-focused tracking, cloud choice, and account controls.</p></div>
-        <div><strong>Supportive</strong><p>Support View helps trusted people understand how to help without editing data.</p></div>
+        <div><strong>Supportive</strong><p>Support View helps trusted people understand how to help without editing or controlling data.</p></div>
       </div>
       <div className="landing-actions"><Button onClick={onStart}>Open 4Sara</Button><Button onClick={() => setWelcomeTab("support")} variant="secondary">Support 4Sara</Button></div>
     </section>

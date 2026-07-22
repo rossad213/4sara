@@ -2399,8 +2399,7 @@ function App() {
     { id: "log", label: "Log", icon: Plus },
     { id: "insights", label: "Insights", icon: Sparkles },
     { id: "settings", label: "Settings", icon: Settings },
-    { id: "privacy", label: "Privacy", icon: Lock },
-    { id: "legal", label: "Legal", icon: FileText },
+    { id: "privacy", label: "Privacy", icon: ShieldCheck },
     { id: "account", label: "Account", icon: Mail },
     { id: "mobile", label: "Mobile", icon: Home }
   ];
@@ -2556,7 +2555,6 @@ function App() {
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTab} />}
-            {activeTab === "legal" && <LegalDocumentsPage />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
@@ -4120,11 +4118,10 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
       </Card>
 
       <Card className="pad">
-        <h2><FileText size={20} /> Legal & privacy</h2>
-        <p className="muted">Review the documents that explain privacy, app terms, and medical limitations.</p>
+        <h2><ShieldCheck size={20} /> Privacy</h2>
+        <p className="muted">Review privacy controls, data storage, terms, and medical limitations in one place.</p>
         <div className="two-actions">
-          <Button onClick={() => setActiveTab("legal")} variant="secondary">Open legal pages</Button>
-          <Button onClick={() => setActiveTab("privacy")} variant="secondary">Open privacy controls</Button>
+          <Button onClick={() => setActiveTab("privacy")} variant="secondary">Open privacy center</Button>
         </div>
       </Card>
 
@@ -4196,9 +4193,9 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
   return (
     <main className="layout">
       <Card className="pad main-col">
-        <h2><Lock size={20} /> Privacy & data</h2>
+        <h2><ShieldCheck size={20} /> Privacy</h2>
         <p className="muted">
-          4Sara can use both local device storage and optional cloud storage. This page explains where your data is stored and how to control it.
+          One calm place to manage your data, understand how 4Sara handles privacy, and review the terms and medical safety notes that protect users.
         </p>
 
         <div className="privacy-grid">
@@ -4212,6 +4209,12 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
             <h3>Cloud data</h3>
             <p>If you are logged in and cloud sync is enabled, 4Sara can save a copy of your data to your account so it can be used on another device.</p>
             <strong>{authUser ? `Signed in as ${authUser.email}` : "Not signed in"}</strong>
+          </div>
+
+          <div className="privacy-info-card">
+            <h3>Legal & safety</h3>
+            <p>Privacy, terms, and medical disclaimer details are included here so they are easy to find without jumping between tabs.</p>
+            <strong>Included here</strong>
           </div>
         </div>
 
@@ -4263,7 +4266,7 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
         )}
 
         <div className="privacy-section legal-section">
-          <h3>Privacy Policy</h3>
+          <h3>Privacy policy summary</h3>
           <p>
             4Sara is designed to help users privately track menstruation, symptoms, moods, cycle phases, and related wellness notes.
           </p>
@@ -4280,7 +4283,7 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
         </div>
 
         <div className="privacy-section legal-section">
-          <h3>Terms & Disclaimer</h3>
+          <h3>Terms and medical disclaimer summary</h3>
           <p>
             4Sara is a wellness tracking tool. It is not a medical device, medical provider, or emergency service.
           </p>
@@ -4310,8 +4313,8 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
 
       <Card className="pad side-col">
         <h3>Quick guide</h3>
-        <div className="mini-card"><strong>Local data</strong><p>Saved in this browser/device.</p></div>
-        <div className="mini-card"><strong>Cloud data</strong><p>Saved to your signed-in account when cloud sync is used.</p></div>
+        <div className="mini-card"><strong>Privacy controls</strong><p>Export, clear local data, and manage cloud data from this page.</p></div>
+        <div className="mini-card"><strong>Legal notes</strong><p>Privacy policy, terms, and medical disclaimer summaries are included here.</p></div>
         <div className="mini-card"><strong>Export first</strong><p>Download a backup before deleting data.</p></div>
         <div className="mini-card"><strong>PIN lock</strong><p>Your PIN can lock this device’s app view, but it is not a substitute for your phone or account password.</p></div>
       </Card>

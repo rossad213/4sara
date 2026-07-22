@@ -1176,6 +1176,9 @@ function App() {
   const [cloudHasData, setCloudHasData] = useState(false);
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
   const [cloudOverwriteArmed, setCloudOverwriteArmed] = useState(false);
+  const [cloudLoadingAccountUid, setCloudLoadingAccountUid] = useState("");
+  const [cloudLoadedAccountUid, setCloudLoadedAccountUid] = useState("");
+  const [localStorageWritesPaused, setLocalStorageWritesPaused] = useState(false);
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [confirmClearLocal, setConfirmClearLocal] = useState(false);
@@ -1195,8 +1198,20 @@ function App() {
   const [customSymptomInput, setCustomSymptomInput] = useState("");
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A", consentAccepted: false });
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }, [entries]);
-  useEffect(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }, [settings]);
+  useEffect(() => {
+    // Only signed-out/local tracker data may be written to shared browser storage.
+    // Signed-in account data comes from Firebase by UID and must not become
+    // the next person's local/device data on a shared device.
+    if (localStorageWritesPaused || authUser) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }, [entries, authUser, localStorageWritesPaused]);
+
+  useEffect(() => {
+    // Same rule for settings: do not save signed-in account settings into
+    // shared localStorage where another person could inherit them.
+    if (localStorageWritesPaused || authUser) return;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [settings, authUser, localStorageWritesPaused]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -1209,6 +1224,30 @@ function App() {
       setCloudSyncAllowed(false);
       setCloudHasData(false);
       setCloudOverwriteArmed(false);
+      setCloudLoadingAccountUid(user?.uid || "");
+      setCloudLoadedAccountUid("");
+      setLocalStorageWritesPaused(Boolean(user));
+      setAutoSyncEnabled(false);
+      setSyncBusy(Boolean(user));
+      if (user) {
+        // Strict account isolation: never show or persist signed-out/local tracker data
+        // while a signed-in account's cloud data is being checked.
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(SETTINGS_KEY);
+        setEntries([]);
+        setSettings((current) => ({
+          ...defaultSettings,
+          welcomeSeen: true,
+          accountPromptSeen: true,
+          onboardingComplete: true,
+          pin: current.pin,
+          pinEnabled: current.pinEnabled
+        }));
+        setForm(blankForm());
+        setEditingId(null);
+        setSelectedCalendarDay(null);
+        setActiveTab("dashboard");
+      }
       setSupportViewers({});
       setSupportActivity([]);
       setConfirmRevokeViewerId("");
@@ -1218,7 +1257,8 @@ function App() {
       setCloudUpdatedAt("");
       setConfirmDeleteAccount(false);
       setConfirmClearLocal(false);
-      setSyncStatus(user ? "Signed in. Cloud sync is ready." : "Signed out. Data is saved locally on this device.");
+      if (!user) setLocalStorageWritesPaused(false);
+      setSyncStatus(user ? `Loading cloud data for ${user.email || "this account"}...` : "Signed out. Data is saved locally on this device.");
     });
 
     return unsubscribe;
@@ -1855,6 +1895,7 @@ function App() {
     if (clearThisDevice) {
       // Clear only this browser/device copy. This does not delete the user's
       // Firebase account or cloud-saved 4Sara data.
+      setLocalStorageWritesPaused(true);
       setEntries([]);
       setSettings(defaultSettings);
       setForm(blankForm());
@@ -1881,11 +1922,13 @@ function App() {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(SETTINGS_KEY);
       localStorage.removeItem(CLOUD_CHOICE_KEY);
+      setTimeout(() => setLocalStorageWritesPaused(false), 0);
       setSyncStatus("Signed out. This device's local 4Sara copy was cleared. Cloud data was not deleted.");
       showMessage("Signed out and cleared this device.");
       return;
     }
 
+    setLocalStorageWritesPaused(false);
     setSyncStatus("Signed out. Local data remains saved on this private device.");
     showMessage("Signed out. Local data kept on this device.");
   };
@@ -1903,11 +1946,14 @@ function App() {
     if (!user) return;
 
     // Cloud protection: signed-out/local device data must never silently
-    // overwrite an existing signed-in account's cloud data.
+    // overwrite or visually replace an existing signed-in account's cloud data.
+    setSyncBusy(true);
+    setCloudLoadingAccountUid(user.uid);
+    setCloudLoadedAccountUid("");
     setAutoSyncEnabled(false);
     setCloudSyncAllowed(false);
     setCloudOverwriteArmed(false);
-    setSyncStatus("Checking cloud data before allowing sync...");
+    setSyncStatus(`Checking cloud data for ${user.email || "this account"}...`);
 
     try {
       const snapshot = await getDoc(doc(db, "users", user.uid));
@@ -1941,16 +1987,36 @@ function App() {
           setCloudSyncAllowed(true);
           setAutoSyncEnabled(true);
           setExistingAccountLoaded(true);
-          setSyncStatus("Cloud data loaded for this account. Signed-out local data was not saved to this account.");
+          setCloudLoadedAccountUid(user.uid);
+          setSyncStatus(`Cloud data loaded for ${user.email || "this account"}. Signed-out local data was not saved to this account.`);
           showMessage("Cloud account data loaded.");
         } else {
+          setEntries([]);
+          setSettings((current) => ({
+            ...defaultSettings,
+            welcomeSeen: true,
+            accountPromptSeen: true,
+            onboardingComplete: true,
+            pin: current.pin,
+            pinEnabled: current.pinEnabled
+          }));
           await rememberCloudChoiceForAccount(user, "save-device");
           setCloudSyncAllowed(true);
           setAutoSyncEnabled(true);
           setExistingAccountLoaded(false);
-          setSyncStatus("No existing cloud data found. This device can save data to this account.");
+          setCloudLoadedAccountUid(user.uid);
+          setSyncStatus("No existing cloud data found for this signed-in account. Starting blank.");
         }
       } else {
+        setEntries([]);
+        setSettings((current) => ({
+          ...defaultSettings,
+          welcomeSeen: true,
+          accountPromptSeen: true,
+          onboardingComplete: true,
+          pin: current.pin,
+          pinEnabled: current.pinEnabled
+        }));
         setCloudHasData(false);
         setCloudUpdatedAt("");
         setSharedProfiles({});
@@ -1960,7 +2026,8 @@ function App() {
         setExistingAccountLoaded(false);
         setCloudSyncAllowed(true);
         setAutoSyncEnabled(true);
-        setSyncStatus("No cloud data found yet. This account can save data to cloud.");
+        setCloudLoadedAccountUid(user.uid);
+        setSyncStatus("No cloud data found yet for this signed-in account. Starting blank.");
       }
 
       setCloudCheckedForAccount(true);
@@ -1971,12 +2038,15 @@ function App() {
       setAccountDataChecked(true);
       setCloudSyncAllowed(false);
       setAutoSyncEnabled(false);
+    } finally {
+      setSyncBusy(false);
     }
   };
 
   const saveToCloudSilent = async () => {
     if (!auth.currentUser) return;
     if (!cloudCheckedForAccount || !cloudSyncAllowed) return;
+    if (cloudLoadedAccountUid !== auth.currentUser.uid) return;
 
     await setDoc(doc(db, "users", auth.currentUser.uid), {
       email: auth.currentUser.email,
@@ -2005,6 +2075,12 @@ function App() {
   const saveToCloud = async () => {
     if (!authUser) {
       showMessage("Log in first to save data to cloud.");
+      return;
+    }
+
+    if (!cloudCheckedForAccount || cloudLoadedAccountUid !== authUser.uid) {
+      setSyncStatus("Cloud check is not finished for this account. Load cloud data before saving.");
+      showMessage("Load cloud data before saving.");
       return;
     }
 
@@ -2086,6 +2162,7 @@ function App() {
       setCloudSyncAllowed(true);
       setAutoSyncEnabled(true);
       setCloudOverwriteArmed(false);
+      setCloudLoadedAccountUid(authUser.uid);
       setCloudHasData(true);
       setExistingAccountLoaded(true);
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}. This device will keep using cloud data after refresh.`);
@@ -2445,6 +2522,10 @@ function App() {
       return;
     }
 
+    // Safety: pause browser localStorage writes before clearing React state.
+    // Otherwise the state-saving effect can write the old data back after removeItem().
+    setLocalStorageWritesPaused(true);
+
     // Safety: when signed in, turn off cloud sync before clearing the local state.
     // This prevents an empty local tracker from being auto-saved over the cloud copy.
     setAutoSyncEnabled(false);
@@ -2477,6 +2558,10 @@ function App() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(SETTINGS_KEY);
     localStorage.removeItem(CLOUD_CHOICE_KEY);
+
+    if (!authUser) {
+      setTimeout(() => setLocalStorageWritesPaused(false), 0);
+    }
 
     setSyncStatus(authUser
       ? "Local data cleared on this device only. Cloud data was not deleted, and auto-sync was turned off."
@@ -2583,6 +2668,21 @@ function App() {
   }, [viewMode, activeTab]);
 
   const hasLoadedExistingAccount = Boolean(existingAccountLoaded || (authUser && cloudHasData && cloudCheckedForAccount));
+  const signedInAccountStillLoading = Boolean(authUser && (!accountDataChecked || !cloudCheckedForAccount || cloudLoadedAccountUid !== authUser.uid));
+
+  if (signedInAccountStillLoading) {
+    return (
+      <div className="app">
+        <div className="container">
+          <Card className="pad account-loading-card">
+            <h2>Loading the signed-in account...</h2>
+            <p className="muted">4Sara is checking cloud data for {authUser.email || "this account"} before showing any tracker data.</p>
+            <p className="muted">Signed-out or test tracker data will not be shown or saved into this account.</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (!settings.welcomeSeen) {
     return <div className="app"><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onLogin={() => updateSettings({ welcomeSeen: true })} /></div>;

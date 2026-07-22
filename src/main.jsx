@@ -1175,6 +1175,7 @@ function App() {
   const [existingAccountLoaded, setExistingAccountLoaded] = useState(false);
   const [cloudHasData, setCloudHasData] = useState(false);
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState("");
+  const [cloudOverwriteArmed, setCloudOverwriteArmed] = useState(false);
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [confirmClearLocal, setConfirmClearLocal] = useState(false);
@@ -1207,6 +1208,7 @@ function App() {
       setExistingAccountLoaded(false);
       setCloudSyncAllowed(false);
       setCloudHasData(false);
+      setCloudOverwriteArmed(false);
       setSupportViewers({});
       setSupportActivity([]);
       setConfirmRevokeViewerId("");
@@ -1787,6 +1789,7 @@ function App() {
       await deleteDoc(doc(db, "users", authUser.uid));
       await clearCloudChoiceForAccount(authUser);
       setCloudHasData(false);
+      setCloudOverwriteArmed(false);
       setCloudUpdatedAt("");
       setCloudSyncAllowed(false);
       setAutoSyncEnabled(false);
@@ -1899,26 +1902,30 @@ function App() {
   const checkCloudDataForAccount = async (user = auth.currentUser) => {
     if (!user) return;
 
+    // Cloud protection: signed-out/local device data must never silently
+    // overwrite an existing signed-in account's cloud data.
+    setAutoSyncEnabled(false);
+    setCloudSyncAllowed(false);
+    setCloudOverwriteArmed(false);
+    setSyncStatus("Checking cloud data before allowing sync...");
+
     try {
       const snapshot = await getDoc(doc(db, "users", user.uid));
 
       if (snapshot.exists()) {
-        const cloudData = snapshot.data()?.data || {};
+        const userDoc = snapshot.data() || {};
+        const cloudData = userDoc.data || {};
         const cloudEntries = Array.isArray(cloudData.entries) ? cloudData.entries : [];
         const cloudSettings = cloudData.settings || {};
-        const hasCloudEntries = cloudEntries.length > 0;
-        const hasLocalEntries = entries.length > 0;
+        const hasCloudData = cloudEntries.length > 0 || Boolean(cloudData.updatedAt);
 
-        setCloudHasData(hasCloudEntries);
+        setCloudHasData(hasCloudData);
         setCloudUpdatedAt(cloudData.updatedAt || "");
-        setSharedProfiles(snapshot.data()?.sharedProfiles || {});
-        setSupportViewers(snapshot.data()?.supportViewers || {});
-        setSupportActivity(Array.isArray(snapshot.data()?.supportActivity) ? snapshot.data().supportActivity : []);
+        setSharedProfiles(userDoc.sharedProfiles || {});
+        setSupportViewers(userDoc.supportViewers || {});
+        setSupportActivity(Array.isArray(userDoc.supportActivity) ? userDoc.supportActivity : []);
 
-        const accountChoice = snapshot.data()?.cloudPreference?.choice;
-        const rememberedChoice = accountChoice || getCloudChoice(user.uid)?.choice;
-
-        if (hasCloudEntries && !hasLocalEntries) {
+        if (hasCloudData) {
           setEntries(cloudEntries);
           setSettings((current) => ({
             ...current,
@@ -1929,46 +1936,19 @@ function App() {
             pin: current.pin,
             pinEnabled: current.pinEnabled
           }));
+          setActiveTab("dashboard");
           await rememberCloudChoiceForAccount(user, "load-cloud");
           setCloudSyncAllowed(true);
+          setAutoSyncEnabled(true);
           setExistingAccountLoaded(true);
-          setSyncStatus("Cloud data loaded automatically because this device had no local data.");
-          showMessage("Cloud data loaded.");
-        } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "save-device") {
-          setCloudSyncAllowed(true);
-          setSyncStatus("Cloud sync is allowed because this account previously chose to save device data to cloud.");
-        } else if (hasCloudEntries && hasLocalEntries && rememberedChoice === "load-cloud") {
-          setEntries(cloudEntries);
-          setSettings((current) => ({
-            ...current,
-            ...cloudSettings,
-            welcomeSeen: true,
-            accountPromptSeen: true,
-            onboardingComplete: true,
-            pin: current.pin,
-            pinEnabled: current.pinEnabled
-          }));
-          setActiveTab("dashboard");
-          setExistingAccountLoaded(true);
-          setCloudSyncAllowed(true);
-          setExistingAccountLoaded(true);
-          setSyncStatus("Cloud data loaded. You are signed in and ready to use 4Sara.");
-        } else if (hasCloudEntries && hasLocalEntries) {
-          setSettings((current) => ({
-            ...current,
-            welcomeSeen: true,
-            accountPromptSeen: true,
-            onboardingComplete: true
-          }));
-          setActiveTab("dashboard");
-          setExistingAccountLoaded(true);
-          setCloudSyncAllowed(false);
-          setExistingAccountLoaded(true);
-          setSyncStatus("Cloud data found. Auto-sync is paused until you choose whether to load cloud data or save this device’s data.");
+          setSyncStatus("Cloud data loaded for this account. Signed-out local data was not saved to this account.");
+          showMessage("Cloud account data loaded.");
         } else {
           await rememberCloudChoiceForAccount(user, "save-device");
           setCloudSyncAllowed(true);
-          setSyncStatus("No cloud data found yet. This device can save data to cloud.");
+          setAutoSyncEnabled(true);
+          setExistingAccountLoaded(false);
+          setSyncStatus("No existing cloud data found. This device can save data to this account.");
         }
       } else {
         setCloudHasData(false);
@@ -1979,21 +1959,24 @@ function App() {
         await rememberCloudChoiceForAccount(user, "save-device");
         setExistingAccountLoaded(false);
         setCloudSyncAllowed(true);
+        setAutoSyncEnabled(true);
         setSyncStatus("No cloud data found yet. This account can save data to cloud.");
       }
 
       setCloudCheckedForAccount(true);
       setAccountDataChecked(true);
     } catch (error) {
-      setSyncStatus(error.message || "Could not check cloud data.");
+      setSyncStatus(error.message || "Could not check cloud data. Auto-sync is paused to protect your data.");
       setCloudCheckedForAccount(true);
       setAccountDataChecked(true);
       setCloudSyncAllowed(false);
+      setAutoSyncEnabled(false);
     }
   };
 
   const saveToCloudSilent = async () => {
     if (!auth.currentUser) return;
+    if (!cloudCheckedForAccount || !cloudSyncAllowed) return;
 
     await setDoc(doc(db, "users", auth.currentUser.uid), {
       email: auth.currentUser.email,
@@ -2006,13 +1989,13 @@ function App() {
         updatedAt: new Date().toISOString()
       },
       cloudPreference: {
-        choice: "save-device",
+        choice: "load-cloud",
         updatedAt: new Date().toISOString()
       },
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    rememberCloudChoice(authUser.uid, "save-device");
+    rememberCloudChoice(auth.currentUser.uid, "load-cloud");
     const savedTime = new Date().toLocaleTimeString();
     setLastCloudSave(savedTime);
     setCloudHasData(true);
@@ -2025,6 +2008,17 @@ function App() {
       return;
     }
 
+    // If this account already has cloud data, require a deliberate second click
+    // before replacing it with this device's current data.
+    if (cloudHasData && !cloudOverwriteArmed) {
+      setCloudOverwriteArmed(true);
+      setCloudSyncAllowed(false);
+      setAutoSyncEnabled(false);
+      setSyncStatus("Cloud data already exists for this account. Click Save to cloud again only if you intentionally want to replace the cloud copy with this device's current data.");
+      showMessage("Confirm before replacing cloud data.");
+      return;
+    }
+
     setSyncBusy(true);
     setSyncStatus("Saving to cloud...");
 
@@ -2033,19 +2027,21 @@ function App() {
         email: authUser.email,
         data: buildCloudPayload(),
         cloudPreference: {
-          choice: "save-device",
+          choice: "load-cloud",
           updatedAt: new Date().toISOString()
         },
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      rememberCloudChoice(authUser.uid, "save-device");
+      rememberCloudChoice(authUser.uid, "load-cloud");
       const savedTime = new Date().toLocaleTimeString();
       setLastCloudSave(savedTime);
       setCloudCheckedForAccount(true);
       setCloudSyncAllowed(true);
+      setAutoSyncEnabled(true);
       setCloudHasData(true);
-      setSyncStatus(`Saved to cloud at ${savedTime}. This device will keep using Save to cloud after refresh.`);
+      setCloudOverwriteArmed(false);
+      setSyncStatus(`Saved to cloud at ${savedTime}. Future sign-ins will load this account's cloud data first.`);
       showMessage("Saved to cloud.");
     } catch (error) {
       setSyncStatus("Cloud save failed.");
@@ -2088,6 +2084,8 @@ function App() {
       await rememberCloudChoiceForAccount(authUser, "load-cloud");
       setCloudCheckedForAccount(true);
       setCloudSyncAllowed(true);
+      setAutoSyncEnabled(true);
+      setCloudOverwriteArmed(false);
       setCloudHasData(true);
       setExistingAccountLoaded(true);
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}. This device will keep using cloud data after refresh.`);
@@ -2472,6 +2470,7 @@ function App() {
     setSelectedSharedOwnerId("");
     setViewMode("owner");
     setCloudHasData(Boolean(authUser && cloudHasData));
+    setCloudOverwriteArmed(false);
     setLastCloudSave("");
     setConfirmClearLocal(false);
 
@@ -2970,7 +2969,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <h3>Cloud sync</h3>
               <p>{syncStatus}</p>
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
-              <p className="sync-small">Existing accounts with cloud data open directly into the tracker on any device or browser.</p>
+              <p className="sync-small">Existing accounts with cloud data load their own cloud copy first. Signed-out local data is not auto-saved into an existing account.</p>
             </div>
 
             <label className="setting-row autosync-row">

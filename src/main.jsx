@@ -1306,11 +1306,10 @@ function App() {
 
   const updateSettings = (patch) => setSettings((current) => ({ ...current, ...patch }));
 
-  useEffect(() => {
-    const hasPeriodEntry = entries.some((entry) => (entry.type || "period") === "period");
-    if (settings.onboardingComplete && !hasPeriodEntry) updateSettings({ onboardingComplete: false });
-  }, [entries, settings.onboardingComplete]);
-
+  // Once a user completes or skips setup, keep onboarding complete.
+  // New users may choose to start with no period entry and log later.
+  // Do not automatically send them back to first-time setup just because
+  // the tracker has no menstruation logs yet.
   const showMessage = (text) => {
     setMessage(text);
     setTimeout(() => setMessage(""), 2600);
@@ -2303,7 +2302,12 @@ function App() {
   };
 
   const skipOnboarding = () => {
-    updateSettings({ onboardingComplete: true });
+    updateSettings({
+      onboardingComplete: true,
+      welcomeSeen: true,
+      accountPromptSeen: true
+    });
+    setActiveTab("dashboard");
     showMessage("Setup skipped. You can still log menstruation anytime.");
   };
 
@@ -2602,6 +2606,7 @@ function App() {
           handleAuthSubmit={handleAuthSubmit}
           handlePasswordReset={handlePasswordReset}
           onContinue={() => updateSettings({ accountPromptSeen: true })}
+          onBackHome={() => updateSettings({ welcomeSeen: false })}
         />
       </div>
     );
@@ -3609,7 +3614,7 @@ function PasswordRequirements({ password }) {
   );
 }
 
-function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, onContinue }) {
+function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, onContinue, onBackHome }) {
   useEffect(() => {
     if (authUser) {
       const timer = setTimeout(() => onContinue(), 900);
@@ -3671,6 +3676,7 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
                   {authMode === "signup" ? "Create account" : "Log in"}
                 </Button>
                 <Button onClick={onContinue} variant="secondary">Continue without account</Button>
+                <Button onClick={onBackHome} variant="secondary" className="full account-back-home">Back to home page</Button>
               </div>
             </div>
 
@@ -3740,10 +3746,8 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
       : `${Math.abs(stats.daysUntil)} days past prediction`
     : "Needs data";
 
-  const recentRows = recent.length ? recent : [
-    { id: "empty-mood", startDate: todayKey(), type: "checkin", mood: "Good", moods: ["Good"], flow: "", symptoms: [], notes: "" },
-    { id: "empty-flow", startDate: todayKey(), type: "checkin", mood: "", moods: [], flow: "Light", symptoms: [], notes: "" }
-  ];
+  const hasLoggedData = sortedEntries.length > 0;
+  const recentRows = recent;
 
   const nextPhase = getNextDashboardPhase(stats);
 
@@ -3757,7 +3761,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
               <h2>{nextPeriodLabel}</h2>
               <span>{daysLabel}</span>
             </div>
-            <p className="dashboard-hero-note">Your period is predicted from your typical cycle length of {stats.averageCycle || 28} days. {stats.currentCycleAdjustmentDays ? "Current-cycle factors may shift this prediction window." : "Unusual cycles are discounted so one late cycle does not rewrite your average."}</p>
+            <p className="dashboard-hero-note">{hasLoggedData ? `Your period is predicted from your typical cycle length of ${stats.averageCycle || 28} days. ${stats.currentCycleAdjustmentDays ? "Current-cycle factors may shift this prediction window." : "Unusual cycles are discounted so one late cycle does not rewrite your average."}` : "No cycle data has been logged yet. Add your first menstruation entry or daily check-in whenever you are ready."}</p>
             <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
           <div className="dashboard-calendar-art" aria-hidden="true">
@@ -3772,9 +3776,9 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
         </Card>
 
         <div className="dashboard-soft-stats">
-          <SoftStat icon={Droplet} label="Cycle length" sublabel="Average" value={stats.averageCycle || 28} suffix="days" tone="period" />
-          <SoftStat icon={CalendarDays} label="Period length" sublabel="Average" value={stats.averagePeriod || 5} suffix="days" tone="period" />
-          <SoftStat icon={Sparkles} label="Ovulation day" sublabel="Average" value={stats.ovulationDay ? Math.max(1, stats.averageCycle - 14) : 14} suffix="day" tone="ovulation" />
+          <SoftStat icon={Droplet} label="Cycle length" sublabel="Average" value={hasLoggedData ? (stats.averageCycle || 28) : "—"} suffix={hasLoggedData ? "days" : ""} tone="period" />
+          <SoftStat icon={CalendarDays} label="Period length" sublabel="Average" value={hasLoggedData ? (stats.averagePeriod || 5) : "—"} suffix={hasLoggedData ? "days" : ""} tone="period" />
+          <SoftStat icon={Sparkles} label="Ovulation day" sublabel="Average" value={hasLoggedData && stats.ovulationDay ? Math.max(1, stats.averageCycle - 14) : "—"} suffix={hasLoggedData && stats.ovulationDay ? "day" : ""} tone="ovulation" />
         </div>
 
         <div className="dashboard-soft-lower">
@@ -3784,7 +3788,14 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
               <button type="button" onClick={() => setActiveTab("log")}>View all</button>
             </div>
             <div className="dashboard-entry-list">
-              {recentRows.map((entry, index) => <RecentDashboardRow key={entry.id || index} entry={entry} fallbackIndex={index} />)}
+              {recentRows.length ? (
+                recentRows.map((entry, index) => <RecentDashboardRow key={entry.id || index} entry={entry} fallbackIndex={index} />)
+              ) : (
+                <div className="dashboard-empty-state">
+                  <strong>No entries yet</strong>
+                  <p>Your tracker is blank because setup was skipped. Add a menstruation entry or daily check-in when you are ready.</p>
+                </div>
+              )}
             </div>
             <Button onClick={() => setActiveTab("log")} className="dashboard-new-checkin"><Plus size={20} /> New check-in</Button>
           </Card>
@@ -3795,8 +3806,8 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
               <button type="button" onClick={jumpToNextPeriod}>View calendar</button>
             </div>
             <div className="dashboard-upcoming-list">
-              <UpcomingDashboardRow tone="period" icon={Droplet} title="Upcoming period" value={stats.predictionWindowStart ? `${formatDate(stats.predictionWindowStart)} - ${formatDate(stats.predictionWindowEnd)}` : "Not enough data"} badge={daysLabel} />
-              <UpcomingDashboardRow tone="fertile" icon={Heart} title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Not enough data"} badge={stats.fertileStart ? `${Math.max(0, daysBetween(todayKey(), stats.fertileStart))} days` : "Needs data"} />
+              <UpcomingDashboardRow tone="period" icon={Droplet} title="Upcoming period" value={stats.predictionWindowStart ? `${formatDate(stats.predictionWindowStart)} - ${formatDate(stats.predictionWindowEnd)}` : "No prediction yet"} badge={hasLoggedData ? daysLabel : "Blank"} />
+              <UpcomingDashboardRow tone="fertile" icon={Heart} title="Fertile window" value={stats.fertileStart ? `${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "No estimate yet"} badge={stats.fertileStart ? `${Math.max(0, daysBetween(todayKey(), stats.fertileStart))} days` : "Blank"} />
               <UpcomingDashboardRow tone={nextPhase.tone} icon={nextPhase.icon} title={nextPhase.title} value={nextPhase.value} badge={nextPhase.badge} />
             </div>
           </Card>

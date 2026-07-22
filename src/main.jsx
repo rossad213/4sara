@@ -12,6 +12,7 @@ import {
   signOut
 } from "firebase/auth";
 import {
+  arrayUnion,
   deleteDoc,
   deleteField,
   doc,
@@ -821,6 +822,61 @@ function getSharedDisplayName(ownerSettings, ownerDoc, fallbackProfile) {
     || "Shared 4Sara";
 }
 
+function getSupportActor(authUser) {
+  return {
+    uid: authUser?.uid || "",
+    email: authUser?.email || "",
+    name: authUser?.displayName || authUser?.email || "Support person"
+  };
+}
+
+function supportActorLabel(actor) {
+  return actor?.name || actor?.email || "Support person";
+}
+
+function buildSupportActivity({ action, entry, actor }) {
+  const entryType = (entry?.type || "period") === "checkin" ? "daily check-in" : "menstruation entry";
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    action,
+    entryId: entry?.id || "",
+    entryDate: entry?.startDate || "",
+    entryType,
+    actorUid: actor?.uid || "",
+    actorEmail: actor?.email || "",
+    actorName: supportActorLabel(actor),
+    createdAt: new Date().toISOString(),
+    summary: `${supportActorLabel(actor)} ${action === "created" ? "added" : "edited"} a ${entryType}${entry?.startDate ? ` for ${formatDate(entry.startDate)}` : ""}.`
+  };
+}
+
+function addSupportAudit(entry, actor, action) {
+  const now = new Date().toISOString();
+  const label = supportActorLabel(actor);
+  const auditTrail = Array.isArray(entry.auditTrail) ? entry.auditTrail : [];
+
+  return {
+    ...entry,
+    createdBySupport: entry.createdBySupport || action === "created",
+    supportEdited: true,
+    supportLastAction: action,
+    supportLastEditedAt: now,
+    supportLastEditedBy: label,
+    supportLastEditedByEmail: actor?.email || "",
+    supportLastEditedByUid: actor?.uid || "",
+    auditTrail: [
+      ...auditTrail,
+      {
+        action,
+        actorUid: actor?.uid || "",
+        actorEmail: actor?.email || "",
+        actorName: label,
+        at: now
+      }
+    ]
+  };
+}
+
 function daysUntilDate(dateString) {
   if (!dateString) return null;
   return Math.ceil((new Date(dateString) - new Date()) / 86400000);
@@ -1129,6 +1185,7 @@ function App() {
   const [lastInviteLink, setLastInviteLink] = useState("");
   const [sharedProfiles, setSharedProfiles] = useState({});
   const [supportViewers, setSupportViewers] = useState({});
+  const [supportActivity, setSupportActivity] = useState([]);
   const [confirmRevokeViewerId, setConfirmRevokeViewerId] = useState("");
   const [confirmRemoveSharedOwnerId, setConfirmRemoveSharedOwnerId] = useState("");
   const [selectedSharedOwnerId, setSelectedSharedOwnerId] = useState("");
@@ -1151,6 +1208,7 @@ function App() {
       setCloudSyncAllowed(false);
       setCloudHasData(false);
       setSupportViewers({});
+      setSupportActivity([]);
       setConfirmRevokeViewerId("");
       setConfirmRemoveSharedOwnerId("");
       setSelectedSharedOwnerId("");
@@ -1355,6 +1413,8 @@ function App() {
       const ownerEntries = Array.isArray(ownerData.entries) ? ownerData.entries : [];
       const ownerSettings = ownerData.settings || {};
       const profile = sharedProfiles?.[ownerUserId] || {};
+      const viewerRecord = authUser ? ownerDoc.supportViewers?.[authUser.uid] : null;
+      const resolvedPermissions = viewerRecord?.permissions || profile.permissions || {};
 
       const resolvedDisplayName = getSharedDisplayName(ownerSettings, ownerDoc, profile);
 
@@ -1366,7 +1426,8 @@ function App() {
           ...defaultSettings,
           ...ownerSettings
         },
-        permissions: profile.permissions || {},
+        permissions: resolvedPermissions,
+        supportActivity: Array.isArray(ownerDoc.supportActivity) ? ownerDoc.supportActivity : [],
         updatedAt: ownerData.updatedAt || ownerDoc.updatedAt || ""
       });
 
@@ -1479,6 +1540,45 @@ function App() {
     }
   };
 
+  const updateSupportViewerPermission = async (viewerUserId, canEdit) => {
+    if (!authUser || !viewerUserId) {
+      showMessage("No support viewer selected.");
+      return;
+    }
+
+    setInviteBusy(true);
+    setInviteStatus(canEdit ? "Giving edit permission..." : "Changing supporter to view only...");
+
+    try {
+      const viewer = supportViewers?.[viewerUserId] || {};
+      const updatedPermissions = {
+        ...(viewer.permissions || {}),
+        canEdit: Boolean(canEdit)
+      };
+
+      await updateDoc(doc(db, "users", authUser.uid), {
+        [`supportViewers.${viewerUserId}.permissions`]: updatedPermissions
+      });
+
+      setSupportViewers((current) => ({
+        ...(current || {}),
+        [viewerUserId]: {
+          ...(current?.[viewerUserId] || {}),
+          permissions: updatedPermissions
+        }
+      }));
+
+      setInviteStatus(canEdit ? "Edit permission granted." : "Supporter changed to view only.");
+      showMessage(canEdit ? "Supporter can now edit." : "Supporter is now view only.");
+    } catch (error) {
+      const friendly = friendlyPermissionMessage(error.message);
+      setInviteStatus(friendly);
+      showMessage(friendly);
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
   const makeInviteToken = () => {
     if (window.crypto?.randomUUID) return window.crypto.randomUUID();
     return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -1510,7 +1610,8 @@ function App() {
           howToHelp: true,
           moods: true,
           symptoms: true,
-          notes: false
+          notes: false,
+          canEdit: false
         },
         createdAt: new Date().toISOString(),
         expiresAt
@@ -1759,6 +1860,7 @@ function App() {
       setSelectedCalendarDay(null);
       setSharedProfiles({});
       setSupportViewers({});
+      setSupportActivity([]);
       setSharedSupportData(null);
       setSelectedSharedOwnerId("");
       setViewMode("owner");
@@ -1812,6 +1914,7 @@ function App() {
         setCloudUpdatedAt(cloudData.updatedAt || "");
         setSharedProfiles(snapshot.data()?.sharedProfiles || {});
         setSupportViewers(snapshot.data()?.supportViewers || {});
+        setSupportActivity(Array.isArray(snapshot.data()?.supportActivity) ? snapshot.data().supportActivity : []);
 
         const accountChoice = snapshot.data()?.cloudPreference?.choice;
         const rememberedChoice = accountChoice || getCloudChoice(user.uid)?.choice;
@@ -1873,6 +1976,7 @@ function App() {
         setCloudUpdatedAt("");
         setSharedProfiles({});
         setSupportViewers({});
+        setSupportActivity([]);
         await rememberCloudChoiceForAccount(user, "save-device");
         setExistingAccountLoaded(false);
         setCloudSyncAllowed(true);
@@ -1998,7 +2102,6 @@ function App() {
   };
 
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)), [entries]);
-  const allSymptoms = useMemo(() => [...new Set([...presetSymptoms, ...(settings.customSymptoms || [])])], [settings.customSymptoms]);
 
   // User dashboard stats.
   // Uses the shared stats engine so the normal dashboard and Support View use
@@ -2009,15 +2112,6 @@ function App() {
     return buildProjectedCycleMap(stats.last?.startDate, stats.averageCycle, stats.averagePeriod, 6, stats.predictionCycleLength);
   }, [stats.last?.startDate, stats.averageCycle, stats.averagePeriod, stats.predictionCycleLength]);
 
-  // Entry-form phase preview.
-  // Daily check-ins use this phase estimate for context only. They do not create
-  // a new cycle or move predictions; only grouped menstruation episodes can do that.
-  const selectedPhase = useMemo(() => {
-    if (!form.startDate) return { phase: "Unknown" };
-    return projectedPhaseMap.get(form.startDate) || { phase: inferPhase(form.startDate, stats.groupedPeriodEpisodes || [], stats.averageCycle, stats.averagePeriod) };
-  }, [form.startDate, projectedPhaseMap, stats.groupedPeriodEpisodes, stats.averageCycle, stats.averagePeriod]);
-
-
   const supportEntries = selectedSharedOwnerId && sharedSupportData ? sharedSupportData.entries : entries;
   const supportSettings = selectedSharedOwnerId && sharedSupportData ? sharedSupportData.settings : settings;
   const supportStats = useMemo(() => calculateStatsForEntries(supportEntries, supportSettings), [supportEntries, supportSettings]);
@@ -2025,6 +2119,18 @@ function App() {
   const supportProjectedPhaseMap = useMemo(() => {
     return buildProjectedCycleMap(supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, 6, supportStats.predictionCycleLength);
   }, [supportStats.last?.startDate, supportStats.averageCycle, supportStats.averagePeriod, supportStats.predictionCycleLength]);
+
+  const activeStatsForForm = viewMode === "support" ? supportStats : stats;
+  const activeProjectedPhaseMap = viewMode === "support" ? supportProjectedPhaseMap : projectedPhaseMap;
+  const selectedPhase = useMemo(() => {
+    if (!form.startDate) return { phase: "Unknown" };
+    return activeProjectedPhaseMap.get(form.startDate) || { phase: inferPhase(form.startDate, activeStatsForForm.groupedPeriodEpisodes || [], activeStatsForForm.averageCycle, activeStatsForForm.averagePeriod) };
+  }, [form.startDate, activeProjectedPhaseMap, activeStatsForForm.groupedPeriodEpisodes, activeStatsForForm.averageCycle, activeStatsForForm.averagePeriod]);
+
+  const supportCanEdit = viewMode === "support" && Boolean(selectedSharedOwnerId && sharedSupportData?.permissions?.canEdit);
+  const activeEntriesForLog = viewMode === "support" ? [...supportEntries].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)) : sortedEntries;
+  const activeSettingsForLog = viewMode === "support" ? supportSettings : settings;
+  const activeSymptomsForLog = useMemo(() => [...new Set([...presetSymptoms, ...(activeSettingsForLog.customSymptoms || [])])], [activeSettingsForLog.customSymptoms]);
 
   const supportCalendarData = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -2226,7 +2332,7 @@ function App() {
     showMessage("Custom symptom removed.");
   };
 
-  const saveEntry = () => {
+  const saveEntry = async () => {
     if (!form.startDate) return showMessage("Start date is required.");
     if (isFutureDate(form.startDate)) return showMessage("Future dates are prediction-only. Choose today or a past date to log.");
     if (form.type === "period" && form.endDate && daysBetween(form.startDate, form.endDate) < 0) return showMessage("End date cannot be before start date.");
@@ -2240,12 +2346,55 @@ function App() {
       flow: form.type === "checkin" ? "N/A" : (form.flow || "N/A")
     };
 
-    if (editingId) {
-      setEntries((current) => current.map((entry) => entry.id === editingId ? { ...entry, ...cleanForm } : entry));
-      showMessage("Entry updated.");
+    const isSupportEditing = viewMode === "support" && selectedSharedOwnerId && sharedSupportData?.permissions?.canEdit;
+    const actor = getSupportActor(authUser);
+
+    if (isSupportEditing) {
+      const action = editingId ? "edited" : "created";
+      const existingSupportEntry = editingId ? supportEntries.find((entry) => entry.id === editingId) : null;
+      const targetEntry = editingId
+        ? { ...(existingSupportEntry || {}), ...cleanForm, id: editingId }
+        : { id: Date.now(), ...cleanForm };
+      const auditedEntry = addSupportAudit(targetEntry, actor, action);
+      const nextEntries = editingId
+        ? supportEntries.map((entry) => entry.id === editingId ? { ...entry, ...auditedEntry } : entry)
+        : [...supportEntries, auditedEntry];
+      const activity = buildSupportActivity({ action, entry: auditedEntry, actor });
+      const updatedAt = new Date().toISOString();
+
+      try {
+        await updateDoc(doc(db, "users", selectedSharedOwnerId), {
+          data: {
+            entries: nextEntries,
+            settings: sharedSupportData.settings,
+            updatedAt
+          },
+          supportActivity: arrayUnion(activity),
+          updatedAt: serverTimestamp()
+        });
+
+        setSharedSupportData((current) => ({
+          ...(current || {}),
+          entries: nextEntries,
+          supportActivity: [...(current?.supportActivity || []), activity],
+          updatedAt
+        }));
+        setSharedSupportStatus(`${activity.summary} Permission-based edit saved.`);
+        showMessage(action === "created" ? "Support entry added." : "Support edit saved.");
+      } catch (error) {
+        const friendly = friendlyPermissionMessage(error.message || "Support edit failed.");
+        setSharedSupportStatus(friendly);
+        showMessage(friendly);
+        return;
+      }
     } else {
-      setEntries((current) => [...current, { id: Date.now(), ...cleanForm }]);
-      showMessage("Entry saved.");
+      if (editingId) {
+        setEntries((current) => current.map((entry) => entry.id === editingId ? { ...entry, ...cleanForm } : entry));
+        showMessage("Entry updated.");
+      } else {
+        setEntries((current) => [...current, { id: Date.now(), ...cleanForm }]);
+        showMessage("Entry saved.");
+      }
     }
 
     setCalendarDate(new Date(form.startDate + "T00:00:00"));
@@ -2254,6 +2403,11 @@ function App() {
   };
 
   const startEdit = (entry) => {
+    if (viewMode === "support" && !sharedSupportData?.permissions?.canEdit) {
+      showMessage("This Support View is view only. Ask the owner for edit permission.");
+      return;
+    }
+
     setForm({
       type: entry.type || "period",
       startDate: entry.startDate,
@@ -2270,6 +2424,11 @@ function App() {
   };
 
   const deleteEntry = (id) => {
+    if (viewMode === "support") {
+      showMessage("Support people cannot delete entries. Ask the owner to remove anything that should be deleted.");
+      return;
+    }
+
     setEntries((current) => current.filter((entry) => entry.id !== id));
     showMessage("Entry deleted.");
   };
@@ -2330,8 +2489,8 @@ function App() {
   };
 
   const startLogForSelectedDate = (dateKey, type = "period") => {
-    if (viewMode === "support") {
-      showMessage("Support View is read-only. Logging is not available.");
+    if (viewMode === "support" && !sharedSupportData?.permissions?.canEdit) {
+      showMessage("This Support View is view only. Ask the owner for edit permission.");
       return;
     }
 
@@ -2406,6 +2565,7 @@ function App() {
 
   const supportNavItems = [
     { id: "calendar", label: "Calendar", icon: CalendarDays },
+    ...(supportCanEdit ? [{ id: "log", label: "Log", icon: Plus }] : []),
     { id: "insights", label: "Insights", icon: Sparkles },
     { id: "howtohelp", label: "How to Help", icon: HeartPulse }
   ];
@@ -2502,14 +2662,14 @@ function App() {
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
             <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
           </div>
-          <div className="actions">{viewMode === "owner" && <Button onClick={() => logToday("period")}><Plus size={16} /> Log Today</Button>}</div>
+          <div className="actions">{viewMode === "owner" && <Button onClick={() => logToday("period")}><Plus size={16} /> Log Today</Button>}{supportCanEdit && <Button onClick={() => startLogForSelectedDate(todayKey(), "checkin")}><Plus size={16} /> Add Support Check-in</Button>}</div>
         </header>
 
         {message && <div className="message">{message}</div>}
         {viewMode === "support" && (
           <div className="support-mode-banner">
             <strong>{sharedSupportData ? `${sharedSupportData.displayName}'s Support View` : "Support View preview"}</strong>
-            <span>{sharedSupportStatus || (selectedSharedOwnerId ? "Read-only access is active. Logging, editing, settings, privacy, and account controls are hidden." : "This is your own read-only Support View preview. It shows what supporters can see without allowing edits.")}</span>
+            <span>{sharedSupportStatus || (selectedSharedOwnerId ? (supportCanEdit ? "Edit access is active. All support edits are marked with your name and saved to the owner activity history." : "View-only access is active. Logging, editing, settings, privacy, and account controls are hidden.") : "This is your own read-only Support View preview. It shows what supporters can see without allowing edits.")}</span>
           </div>
         )}
 
@@ -2549,14 +2709,14 @@ function App() {
                 selectedCalendarDay={selectedCalendarDay}
                 onLogSelectedDate={startLogForSelectedDate}
                 stats={viewMode === "support" ? supportStats : stats}
-                readOnly={viewMode === "support"}
+                readOnly={viewMode === "support" && !supportCanEdit}
               />
             )}
-            {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={allSymptoms} customSymptoms={settings.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} />}
+            {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={activeEntriesForLog} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={activeSymptomsForLog} customSymptoms={activeSettingsForLog.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} isSupportEditMode={supportCanEdit} allowDelete={viewMode !== "support"} allowCustomSymptoms={viewMode !== "support"} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTab} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
-            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
+            {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} updateSupportViewerPermission={updateSupportViewerPermission} supportActivity={supportActivity} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && viewMode === "support" && (
               <HowToHelpPage
@@ -2576,7 +2736,7 @@ function App() {
 
 
 
-function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, confirmRevokeViewerId, setConfirmRevokeViewerId, confirmRemoveSharedOwnerId, setConfirmRemoveSharedOwnerId, revokeSupportViewer, chooseSharedSupportView, removeSharedSupportView }) {
+function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, handleResendVerification, handleSignOut, syncStatus, syncBusy, saveToCloud, loadFromCloud, autoSyncEnabled, setAutoSyncEnabled, lastCloudSave, cloudCheckedForAccount, cloudSyncAllowed, cloudHasData, cloudUpdatedAt, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, createSupportInvite, copyInviteLink, lastInviteLink, inviteToken, pendingInvite, inviteStatus, inviteBusy, acceptSupportInvite, checkSupportInvite, sharedProfiles, supportViewers, confirmRevokeViewerId, setConfirmRevokeViewerId, confirmRemoveSharedOwnerId, setConfirmRemoveSharedOwnerId, revokeSupportViewer, updateSupportViewerPermission, supportActivity, chooseSharedSupportView, removeSharedSupportView }) {
   const [showSignOutPrivacy, setShowSignOutPrivacy] = useState(false);
 
   if (authUser && showSignOutPrivacy) {
@@ -2693,7 +2853,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
             <div className="support-sharing-card">
               <h3>Support sharing</h3>
-              <p>Create a read-only support invite. The invited person must log in or create an account before accepting.</p>
+              <p>Create a support invite. New supporters start as view only. You can give edit permission later from Support viewers.</p>
 
               {inviteStatus && <p className="invite-status">{inviteStatus}</p>}
 
@@ -2733,7 +2893,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                   {Object.values(sharedProfiles).map((profile) => (
                     <div className="mini-card" key={profile.ownerUserId}>
                       <strong>{profile.displayName || "Shared 4Sara"}</strong>
-                      <p>Role: read-only supporter</p>
+                      <p>Access: {profile.permissions?.canEdit ? "Can edit" : "View only"}</p>
                       {confirmRemoveSharedOwnerId === profile.ownerUserId && (
                         <p className="danger-confirm">Click Remove from my account again to confirm, or cancel below.</p>
                       )}
@@ -2756,17 +2916,21 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
             <div className="support-sharing-card">
               <h3>Support viewers</h3>
-              <p>These people have read-only Support View access to your shared calendar, insights, and How to Help view.</p>
+              <p>These people can view your shared Support View. You can keep them view only or give edit permission. Support people cannot delete entries.</p>
 
               {Object.keys(supportViewers || {}).length > 0 ? (
                 <div className="shared-profile-list">
                   {Object.entries(supportViewers).map(([viewerUserId, viewer]) => (
                     <div className="mini-card support-viewer-card" key={viewerUserId}>
                       <strong>{viewer.viewerEmail || "Support viewer"}</strong>
-                      <p>Role: read-only supporter</p>
+                      <p>Access: {viewer.permissions?.canEdit ? "Can edit" : "View only"}</p>
+                      {viewer.permissions?.canEdit && <p className="support-edit-note">Edits by this supporter are marked with their account email/name in entries and activity history.</p>}
                       {viewer.acceptedAt && <p>Accepted: {new Date(viewer.acceptedAt).toLocaleString()}</p>}
                       {confirmRevokeViewerId === viewerUserId && <p className="danger-confirm">Click Revoke access again to confirm, or cancel below.</p>}
                       <div className="account-actions">
+                        <Button onClick={() => updateSupportViewerPermission(viewerUserId, !viewer.permissions?.canEdit)} variant="secondary" disabled={inviteBusy}>
+                          {viewer.permissions?.canEdit ? "Change to view only" : "Give edit permission"}
+                        </Button>
                         <Button onClick={() => revokeSupportViewer(viewerUserId)} variant="secondary" disabled={inviteBusy}>
                           {confirmRevokeViewerId === viewerUserId ? "Confirm revoke access" : "Revoke access"}
                         </Button>
@@ -2777,6 +2941,23 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                 </div>
               ) : (
                 <p className="muted">No active support viewers yet.</p>
+              )}
+            </div>
+
+            <div className="support-sharing-card">
+              <h3>Support activity</h3>
+              <p>When a support person adds or edits an entry, 4Sara records who did it and when.</p>
+              {Array.isArray(supportActivity) && supportActivity.length > 0 ? (
+                <div className="activity-list">
+                  {[...supportActivity].slice(-8).reverse().map((item) => (
+                    <div className="mini-card activity-card" key={item.id || `${item.createdAt}-${item.summary}`}>
+                      <strong>{item.summary || "Support activity saved."}</strong>
+                      <p>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No support edits have been recorded yet.</p>
               )}
             </div>
 
@@ -3783,6 +3964,7 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
         {moodLabel(entry) !== "N/A" && <p><span>Mood(s):</span> {moodLabel(entry)}</p>}
         {(entry.symptoms || []).length > 0 && <p><span>Symptoms:</span> {(entry.symptoms || []).join(", ")}</p>}
         {entry.notes && <p><span>Notes:</span> {entry.notes}</p>}
+        {entry.supportEdited && <p className="support-entry-marker"><span>Support edit:</span> {entry.supportLastAction === "created" ? "Added" : "Edited"} by {entry.supportLastEditedBy || entry.supportLastEditedByEmail || "support person"}{entry.supportLastEditedAt ? ` on ${new Date(entry.supportLastEditedAt).toLocaleString()}` : ""}</p>}
       </div>
     );
   };
@@ -3912,13 +4094,14 @@ function PhaseCard({ kind, title, text }) {
 }
 
 function LogTab(props) {
-  return <main className="layout"><section className="side-col"><LogForm {...props} /></section><section className="main-col"><Card className="pad"><h2>All entries</h2><EntryList entries={props.entries} onEdit={props.startEdit} onDelete={props.deleteEntry} /></Card></section></main>;
+  return <main className="layout"><section className="side-col"><LogForm {...props} /></section><section className="main-col"><Card className="pad"><h2>All entries</h2><EntryList entries={props.entries} onEdit={props.startEdit} onDelete={props.deleteEntry} allowDelete={props.allowDelete} /></Card></section></main>;
 }
 
-function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdit, allSymptoms, customSymptoms, customSymptomInput, setCustomSymptomInput, addCustomSymptom, removeCustomSymptom, selectedPhase }) {
+function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdit, allSymptoms, customSymptoms, customSymptomInput, setCustomSymptomInput, addCustomSymptom, removeCustomSymptom, selectedPhase, isSupportEditMode = false, allowCustomSymptoms = true }) {
   return (
     <Card className="pad">
       <h2>{editingId ? "Edit entry" : form.type === "checkin" ? "Add daily check-in" : "Add menstruation entry"}</h2>
+      {isSupportEditMode && <p className="support-edit-note">Support edit mode is on. Entries you add or edit will be marked with your account name/email.</p>}
       <div className="form">
         <div>
           <span className="label">Entry type</span>
@@ -3960,8 +4143,8 @@ function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdi
         <div>
           <span className="label">Symptoms</span>
           <div className="symptom-grid">{allSymptoms.map((symptom) => <button key={symptom} onClick={() => toggleSymptom(symptom)} className={`symptom ${form.symptoms.includes(symptom) ? "active" : ""}`}>{symptom}</button>)}</div>
-          <div className="custom-symptom"><input value={customSymptomInput} onChange={(e) => setCustomSymptomInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomSymptom()} placeholder="Add custom symptom" /><Button onClick={addCustomSymptom} variant="secondary">Add</Button></div>
-          {customSymptoms.length > 0 && <div className="custom-list"><p>Custom symptoms</p><div className="chips">{customSymptoms.map((symptom) => <button key={symptom} onClick={() => removeCustomSymptom(symptom)} className="chip rose-chip">{symptom} ×</button>)}</div></div>}
+          {allowCustomSymptoms && <div className="custom-symptom"><input value={customSymptomInput} onChange={(e) => setCustomSymptomInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomSymptom()} placeholder="Add custom symptom" /><Button onClick={addCustomSymptom} variant="secondary">Add</Button></div>}
+          {allowCustomSymptoms && customSymptoms.length > 0 && <div className="custom-list"><p>Custom symptoms</p><div className="chips">{customSymptoms.map((symptom) => <button key={symptom} onClick={() => removeCustomSymptom(symptom)} className="chip rose-chip">{symptom} ×</button>)}</div></div>}
         </div>
 
         <label><span>Notes</span><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Current-cycle changes such as stress, travel, illness, medication, sleep, exercise habits, or anything else that may affect your cycle..." /></label>
@@ -3972,7 +4155,7 @@ function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdi
   );
 }
 
-function EntryList({ entries, onEdit, onDelete, compact = false }) {
+function EntryList({ entries, onEdit, onDelete, compact = false, allowDelete = true }) {
   if (!entries.length) return <p className="empty">No entries yet. Add a menstruation start date to begin tracking.</p>;
 
   return (
@@ -3986,9 +4169,15 @@ function EntryList({ entries, onEdit, onDelete, compact = false }) {
             </div>
             <div>
               <button onClick={() => onEdit(entry)} className="icon-btn"><Pencil size={16} /></button>
-              <button onClick={() => onDelete(entry.id)} className="icon-btn"><Trash2 size={16} /></button>
+              {allowDelete && <button onClick={() => onDelete(entry.id)} className="icon-btn"><Trash2 size={16} /></button>}
             </div>
           </div>
+          {entry.supportEdited && (
+            <p className="support-entry-marker">
+              {entry.supportLastAction === "created" ? "Added" : "Edited"} by {entry.supportLastEditedBy || entry.supportLastEditedByEmail || "support person"}
+              {entry.supportLastEditedAt ? ` on ${new Date(entry.supportLastEditedAt).toLocaleString()}` : ""}
+            </p>
+          )}
           {!compact && entry.symptoms?.length > 0 && <div className="chips">{entry.symptoms.map((symptom) => <span key={symptom} className="chip rose-chip">{symptom}</span>)}</div>}
           {!compact && entry.notes && <p>{entry.notes}</p>}
         </div>

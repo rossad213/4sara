@@ -4188,65 +4188,159 @@ function EntryList({ entries, onEdit, onDelete, compact = false, allowDelete = t
 
 // Insights screen.
 // Shows prediction confidence, robust cycle model details, phase patterns, symptom counts, and wellness suggestions.
-function Insights({ stats, settings, setLocked }) {
+function InsightPill({ label, value, tone = "rose" }) {
   return (
-    <main className="layout">
-      <Card className="pad main-col">
-        <h2><Sparkles size={20} /> Insights</h2>
+    <span className={`insight-pill ${tone}`}>
+      <span>{label}</span>
+      {value !== undefined && value !== null && <strong>{value}</strong>}
+    </span>
+  );
+}
 
-        <div className="confidence">
-          <div><p className="muted">Data confidence</p><h3>{stats.dataConfidence}</h3></div>
-          <span>{stats.totalEntries} logged {stats.totalEntries === 1 ? "cycle" : "cycles"}</span>
-          <p>{stats.confidenceNote}</p>
+function InsightChipList({ items, emptyText, tone = "rose" }) {
+  if (!items?.length) return <p className="muted">{emptyText}</p>;
+
+  return (
+    <div className="insight-chip-list">
+      {items.map((item) => {
+        const label = Array.isArray(item) ? item[0] : item;
+        const count = Array.isArray(item) ? item[1] : null;
+        return <InsightPill key={label} label={label} value={count} tone={tone} />;
+      })}
+    </div>
+  );
+}
+
+function InsightMiniStat({ title, value, note }) {
+  return (
+    <div className="insight-mini-stat">
+      <span>{title}</span>
+      <strong>{value}</strong>
+      {note && <p>{note}</p>}
+    </div>
+  );
+}
+
+function Insights({ stats, settings, setLocked }) {
+  const nextPeriodText = stats.nextPeriod
+    ? `${formatDate(stats.nextPeriod)}${stats.predictedEnd ? ` - ${formatDate(stats.predictedEnd)}` : ""}`
+    : "Log a cycle first";
+
+  const currentPhase = stats.currentCycleDay
+    ? inferPhase(todayKey(), stats.groupedPeriodEpisodes || [], stats.averageCycle, stats.averagePeriod)
+    : "Not enough data";
+
+  const currentStatusText = stats.currentCycleDay
+    ? `Cycle day ${stats.currentCycleDay}`
+    : "Add a menstruation entry to start building insights.";
+
+  const topSymptoms = stats.symptomStats?.slice(0, 6) || [];
+  const topMoods = (stats.phaseInsights || [])
+    .map((item) => item.topMood)
+    .filter(Boolean)
+    .reduce((acc, mood) => {
+      acc[mood[0]] = (acc[mood[0]] || 0) + mood[1];
+      return acc;
+    }, {});
+  const topMoodItems = Object.entries(topMoods).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+  const phaseHighlights = stats.phaseInsights?.slice(0, 4) || [];
+  const checkInHighlights = stats.checkInPhaseInsights?.slice(0, 4) || [];
+  const currentContextItems = stats.currentCycleFactors?.map((factor) => [factor, null]) || [];
+  const repeatedContextItems = stats.factorInsights?.slice(0, 6).map((item) => [item.factor, item.count]) || [];
+
+  return (
+    <main className="layout insights-clean-layout">
+      <Card className="pad main-col insights-main-card">
+        <div className="insights-hero">
+          <div>
+            <span className="insights-eyebrow"><Sparkles size={16} /> Insights</span>
+            <h2>Your cycle at a glance</h2>
+            <p className="muted">{stats.confidenceNote}</p>
+          </div>
+          <div className="insights-confidence-badge">
+            <span>Confidence</span>
+            <strong>{stats.dataConfidence}</strong>
+          </div>
         </div>
 
-        <div className="tiles">
-          <InfoTile title="Current cycle day" value={stats.currentCycleDay ? `Day ${stats.currentCycleDay}` : "Not enough data"} />
-          <InfoTile title="Logged cycles" value={`${stats.totalEntries}`} />
-          <InfoTile title="Average cycle" value={`${stats.averageCycle} days`} />
-          <InfoTile title="Average menstruation" value={`${stats.averagePeriod} days`} />
-          <InfoTile title="Cycle range" value={stats.minCycle ? `${stats.minCycle} - ${stats.maxCycle} days` : "Log 2+ cycles"} />
-          <InfoTile title="Estimated ovulation" value={stats.ovulationDay ? formatDate(stats.ovulationDay) : "Not enough data"} />
+        <div className="insights-summary-grid">
+          <div className="insight-summary-card featured">
+            <span>Current estimate</span>
+            <strong>{currentPhase}</strong>
+            <p>{currentStatusText}</p>
+          </div>
+          <div className="insight-summary-card">
+            <span>Next predicted menstruation</span>
+            <strong>{nextPeriodText}</strong>
+            <p>{stats.daysUntil !== null ? `${stats.daysUntil} day${stats.daysUntil === 1 ? "" : "s"} away` : "Predictions begin after your first cycle log."}</p>
+          </div>
+          <div className="insight-summary-card">
+            <span>Estimated ovulation</span>
+            <strong>{stats.ovulationDay ? formatDate(stats.ovulationDay) : "Not enough data"}</strong>
+            <p>{stats.fertileStart && stats.fertileEnd ? `Fertile estimate: ${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Add more cycle history for timing estimates."}</p>
+          </div>
         </div>
 
-        <div className="summary-box">
-          <h3>Prediction model</h3>
-          <p className="muted">{stats.predictionModelNote}</p>
-          <div className="phase-insights">
-            <div className="mini-card">
-              <strong>Typical range</strong>
-              <p>{stats.normalMinCycle ? `${stats.normalMinCycle} - ${stats.normalMaxCycle} days from recent normal cycles` : "Log more cycles to build a normal range."}</p>
+        <div className="insights-stat-row">
+          <InsightMiniStat title="Average cycle" value={`${stats.averageCycle} days`} note={stats.minCycle ? `Range: ${stats.minCycle} - ${stats.maxCycle}` : "Range builds after 2+ cycles"} />
+          <InsightMiniStat title="Average menstruation" value={`${stats.averagePeriod} days`} note={`${stats.completedPeriodEpisodes || 0} completed ${stats.completedPeriodEpisodes === 1 ? "episode" : "episodes"}`} />
+          <InsightMiniStat title="Logged cycles" value={`${stats.totalEntries}`} note={`${stats.totalPeriodLogs || 0} total menstruation logs`} />
+          <InsightMiniStat title="Prediction window" value={stats.predictionWindowStart ? `${formatDate(stats.predictionWindowStart)} - ${formatDate(stats.predictionWindowEnd)}` : "Not ready"} note="A soft estimate, not a guarantee" />
+        </div>
+
+        <div className="insights-section-card">
+          <div className="insights-section-head">
+            <h3>Patterns showing up</h3>
+            <p className="muted">Soft summaries based on what has been logged so far.</p>
+          </div>
+          <div className="insights-two-column">
+            <div>
+              <h4>Most logged symptoms</h4>
+              <InsightChipList items={topSymptoms} emptyText="Add symptoms to see patterns." tone="rose" />
             </div>
-            <div className="mini-card">
-              <strong>Outliers discounted</strong>
-              <p>{stats.outlierCycles?.length ? `${stats.outlierCycles.length} unusual cycle${stats.outlierCycles.length === 1 ? "" : "s"} reduced in the average` : "No recent outlier cycles detected."}</p>
-            </div>
-            <div className="mini-card">
-              <strong>Current context</strong>
-              <p>{stats.currentCycleFactors?.length ? `${stats.currentCycleFactors.join(", ")} logged this cycle. ${stats.currentCycleAdjustmentDays ? `Small timing nudge: +${stats.currentCycleAdjustmentDays} day${stats.currentCycleAdjustmentDays === 1 ? "" : "s"}.` : "No timing nudge yet."}` : "No current timing context detected in notes or check-ins."}</p>
+            <div>
+              <h4>Most logged moods</h4>
+              <InsightChipList items={topMoodItems} emptyText="Add moods or daily check-ins to see mood patterns." tone="purple" />
             </div>
           </div>
-          {stats.factorInsights?.length ? (
-            <p className="muted">Repeated context notes: {stats.factorInsights.map((item) => `${item.factor} (${item.count})`).join(", ")}. Context nudges are capped so one-time notes do not aggressively move predictions.</p>
-          ) : null}
         </div>
 
-        <div className="summary-box purple-box">
-          <h3>Phase patterns</h3>
-          {stats.phaseInsights?.length ? <div className="phase-insights">{stats.phaseInsights.map((item) => <div key={item.phase} className="mini-card"><strong>{item.phase}</strong>{item.topSymptoms.length > 0 && <p>Top symptoms: {item.topSymptoms.map(([symptom, count]) => `${symptom} (${count})`).join(", ")}</p>}{item.topMood && <p>Common mood: {item.topMood[0]}</p>}</div>)}</div> : <p className="muted">Add daily check-ins and symptoms to see phase patterns.</p>}
+        <div className="insights-section-card">
+          <div className="insights-section-head">
+            <h3>Phase patterns</h3>
+            <p className="muted">A cleaner look at symptoms and moods by estimated phase.</p>
+          </div>
+
+          {phaseHighlights.length ? (
+            <div className="insights-phase-grid">
+              {phaseHighlights.map((item) => (
+                <div key={item.phase} className="insight-phase-card">
+                  <strong>{item.phase}</strong>
+                  <InsightChipList items={item.topSymptoms} emptyText="No symptom pattern yet." tone="rose" />
+                  {item.topMood && <InsightPill label="Common mood" value={item.topMood[0]} tone="purple" />}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">Add daily check-ins and symptoms to see phase patterns.</p>
+          )}
         </div>
 
-        <div className="summary-box blue-box">
-          <h3>Daily check-ins by phase</h3>
-          <p className="muted">4Sara keeps the daily check-in simple, then automatically groups each check-in by the phase estimated for that calendar day.</p>
-          {stats.checkInPhaseInsights?.length ? (
-            <div className="phase-insights">
-              {stats.checkInPhaseInsights.map((item) => (
-                <div key={item.phase} className="mini-card">
+        <div className="insights-section-card soft-blue">
+          <div className="insights-section-head">
+            <h3>Daily check-ins</h3>
+            <p className="muted">Check-ins are grouped by estimated phase for context. They do not create new cycles.</p>
+          </div>
+
+          {checkInHighlights.length ? (
+            <div className="insights-phase-grid">
+              {checkInHighlights.map((item) => (
+                <div key={item.phase} className="insight-phase-card">
                   <strong>{item.phase}</strong>
                   <p>{item.count} daily {item.count === 1 ? "check-in" : "check-ins"}</p>
-                  {item.topSymptoms.length > 0 && <p>Common symptoms: {item.topSymptoms.map(([symptom, count]) => `${symptom} (${count})`).join(", ")}</p>}
-                  {item.topMood && <p>Common mood: {item.topMood[0]}</p>}
+                  <InsightChipList items={item.topSymptoms} emptyText="No common symptoms yet." tone="sky" />
+                  {item.topMood && <InsightPill label="Mood" value={item.topMood[0]} tone="purple" />}
                 </div>
               ))}
             </div>
@@ -4255,16 +4349,56 @@ function Insights({ stats, settings, setLocked }) {
           )}
         </div>
 
-        <div className="summary-box green-box">
-          <h3>4Sara Suggestions</h3>
-          {stats.dynamicSuggestions?.length ? <div className="suggestions">{stats.dynamicSuggestions.map((suggestion, index) => <div key={`${suggestion.title}-${index}`} className="mini-card"><strong>{suggestion.title}</strong><ul><li><b>Food:</b> {suggestion.food}</li><li><b>Movement:</b> {suggestion.movement}</li><li><b>Comfort:</b> {suggestion.comfort}</li></ul></div>)}</div> : <p className="muted">Add more symptoms and check-ins to unlock personalized suggestions.</p>}
-          <p className="disclaimer">Suggestions are general wellness ideas, not medical advice. Ask a healthcare professional before starting supplements or if symptoms are severe, unusual, or persistent.</p>
+        <div className="insights-section-card soft-green">
+          <div className="insights-section-head">
+            <h3>Helpful suggestions</h3>
+            <p className="muted">Simple wellness ideas based on logged symptoms and phase patterns.</p>
+          </div>
+
+          {stats.dynamicSuggestions?.length ? (
+            <div className="insight-suggestion-grid">
+              {stats.dynamicSuggestions.slice(0, 3).map((suggestion, index) => (
+                <div key={`${suggestion.title}-${index}`} className="insight-suggestion-card">
+                  <strong>{suggestion.title}</strong>
+                  <p><b>Food:</b> {suggestion.food}</p>
+                  <p><b>Movement:</b> {suggestion.movement}</p>
+                  <p><b>Comfort:</b> {suggestion.comfort}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">Add more symptoms and check-ins to unlock personalized suggestions.</p>
+          )}
+          <p className="disclaimer">Suggestions are general wellness ideas, not medical advice. Ask a healthcare professional if symptoms are severe, unusual, or persistent.</p>
         </div>
 
-        <div className="summary-box">
-          <h3>Symptom counts</h3>
-          {stats.symptomStats.length ? <div className="count-grid">{stats.symptomStats.slice(0, 8).map(([symptom, count]) => <div key={symptom} className="count-row"><span>{symptom}</span><strong>{count}</strong></div>)}</div> : <p className="muted">Add symptoms to see patterns.</p>}
-        </div>
+        <details className="insights-details">
+          <summary>How 4Sara is making these estimates</summary>
+          <div className="insights-details-body">
+            <p>{stats.predictionModelNote}</p>
+            <div className="insights-two-column">
+              <div>
+                <h4>Timing context</h4>
+                <InsightChipList items={currentContextItems} emptyText="No current timing context detected in notes or check-ins." tone="amber" />
+                {stats.currentCycleAdjustmentDays ? <p className="muted">Small capped timing nudge: +{stats.currentCycleAdjustmentDays} day{stats.currentCycleAdjustmentDays === 1 ? "" : "s"}.</p> : <p className="muted">No timing nudge is currently applied.</p>}
+              </div>
+              <div>
+                <h4>Repeated context notes</h4>
+                <InsightChipList items={repeatedContextItems} emptyText="No repeated context patterns yet." tone="amber" />
+              </div>
+            </div>
+            <div className="insights-two-column">
+              <div className="mini-card">
+                <strong>Typical range</strong>
+                <p>{stats.normalMinCycle ? `${stats.normalMinCycle} - ${stats.normalMaxCycle} days from recent normal cycles` : "Log more cycles to build a normal range."}</p>
+              </div>
+              <div className="mini-card">
+                <strong>Outliers</strong>
+                <p>{stats.outlierCycles?.length ? `${stats.outlierCycles.length} unusual cycle${stats.outlierCycles.length === 1 ? "" : "s"} reduced in the average` : "No recent outlier cycles detected."}</p>
+              </div>
+            </div>
+          </div>
+        </details>
       </Card>
 
       <PrivacyCard settings={settings} setLocked={setLocked} />

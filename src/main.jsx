@@ -4401,7 +4401,6 @@ function Insights({ stats, settings, setLocked }) {
         </details>
       </Card>
 
-      <PrivacyCard settings={settings} setLocked={setLocked} />
     </main>
   );
 }

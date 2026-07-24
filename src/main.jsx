@@ -30,7 +30,7 @@ import {
 import { createRoot } from "react-dom/client";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BarChart3, Bell, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Download, Droplet, EyeOff,
+  BarChart3, Bell, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Download, Droplet, Eye, EyeOff,
   FileText, Heart, HeartPulse, Home, KeyRound, Lock, Mail, Moon, Pencil, Plus, Save, Settings,
   ShieldCheck, Smile, Sparkles, Trash2, UserPlus, X
 } from "lucide-react";
@@ -2965,7 +2965,7 @@ function App() {
             <EyeOff className="big-icon" />
             <h1>4Sara is locked</h1>
             <p className="muted">Enter your PIN to open your tracker on this device.</p>
-            <input className="center-input" type="password" value={pinAttempt} onChange={(event) => setPinAttempt(event.target.value)} onKeyDown={(event) => event.key === "Enter" && tryUnlock()} placeholder="Enter PIN" />
+            <PasswordInput className="center-password-input" value={pinAttempt} onChange={(event) => setPinAttempt(event.target.value)} onKeyDown={(event) => event.key === "Enter" && tryUnlock()} placeholder="Enter PIN" ariaLabel="PIN" inputMode="numeric" />
             <Button onClick={tryUnlock} className="full">Unlock</Button>
             {message && <p className="message small-message">{message}</p>}
           </Card>
@@ -3365,7 +3365,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" />
+                <PasswordInput value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" ariaLabel="Password" />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}
@@ -3970,6 +3970,35 @@ function PasswordRequirements({ password }) {
   );
 }
 
+function PasswordInput({ value, onChange, placeholder, className = "", onKeyDown, ariaLabel = "Password", inputMode, maxLength }) {
+  const [visible, setVisible] = useState(false);
+  const ToggleIcon = visible ? EyeOff : Eye;
+
+  return (
+    <div className={`password-input-wrap ${className}`}>
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        inputMode={inputMode}
+        maxLength={maxLength}
+      />
+      <button
+        type="button"
+        className="password-toggle-btn"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? "Hide password" : "Show password"}
+        title={visible ? "Hide" : "Show"}
+      >
+        <ToggleIcon size={18} />
+      </button>
+    </div>
+  );
+}
+
 function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, authEmail, setAuthEmail, authPassword, setAuthPassword, authError, authNotice, handleAuthSubmit, handlePasswordReset, onContinue, onBackHome }) {
   useEffect(() => {
     if (authUser) {
@@ -4015,7 +4044,7 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
 
               <label>
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" />
+                <PasswordInput value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" ariaLabel="Password" />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}
@@ -4801,7 +4830,7 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
       <Card className="pad">
         <h2><KeyRound size={20} /> Privacy & PIN</h2>
         <label className="setting-row"><span>Enable PIN lock</span><input type="checkbox" checked={settings.pinEnabled} onChange={(e) => updateSettings({ pinEnabled: e.target.checked })} /></label>
-        <label className="form single"><span>PIN</span><input type="password" value={settings.pin} onChange={(e) => updateSettings({ pin: e.target.value })} placeholder="Create a simple PIN" /></label>
+        <label className="form single"><span>PIN</span><PasswordInput value={settings.pin} onChange={(e) => updateSettings({ pin: e.target.value })} placeholder="Create a simple PIN" ariaLabel="PIN" inputMode="numeric" /></label>
         <div className="two-actions">
           <Button onClick={() => settings.pinEnabled && settings.pin ? setLocked(true) : showMessage("Turn on PIN and enter a PIN first.")} variant="secondary">Lock now</Button>
           <Button onClick={clearData} variant="secondary">{confirmClearLocal ? "Confirm clear local data" : "Clear local data"}</Button>

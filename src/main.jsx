@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
@@ -948,6 +948,23 @@ async function clearCloudChoiceForAccount(user) {
   }, { merge: true });
 }
 
+function stableCloudSettings(settings) {
+  const safeSettings = { ...settings, pin: "" };
+  return Object.keys(safeSettings)
+    .sort()
+    .reduce((acc, key) => {
+      acc[key] = safeSettings[key];
+      return acc;
+    }, {});
+}
+
+function makeCloudPayloadSignature(entries, settings) {
+  return JSON.stringify({
+    entries: Array.isArray(entries) ? entries : [],
+    settings: stableCloudSettings(settings || {})
+  });
+}
+
 // Stats and insight calculation.
 // This is the main shared calculation engine for the user's own dashboard and
 // read-only Support View. It calculates average period length, robust cycle
@@ -1196,6 +1213,8 @@ function App() {
   const [sharedSupportData, setSharedSupportData] = useState(null);
   const [sharedSupportStatus, setSharedSupportStatus] = useState("");
   const [customSymptomInput, setCustomSymptomInput] = useState("");
+  const lastCloudPayloadSignatureRef = useRef("");
+  const cloudSaveInFlightRef = useRef(false);
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A", consentAccepted: false });
 
   useEffect(() => {
@@ -1335,15 +1354,21 @@ function App() {
 
   useEffect(() => {
     if (!authUser || !autoSyncEnabled || !cloudReady || !cloudCheckedForAccount || !cloudSyncAllowed) return;
+    if (cloudLoadedAccountUid !== authUser.uid) return;
 
+    const currentSignature = makeCloudPayloadSignature(entries, settings);
+    if (currentSignature === lastCloudPayloadSignatureRef.current) return;
+
+    // Scale guard: debounce cloud writes so quick edits/check-ins only create one Firestore write.
+    // 10 seconds keeps Firebase usage lower while still saving soon after meaningful changes.
     const timer = setTimeout(() => {
       saveToCloudSilent().catch((error) => {
         setSyncStatus(error.message || "Auto-sync failed.");
       });
-    }, 1200);
+    }, 10000);
 
     return () => clearTimeout(timer);
-  }, [entries, settings, authUser, autoSyncEnabled, cloudReady, cloudCheckedForAccount, cloudSyncAllowed]);
+  }, [entries, settings, authUser, autoSyncEnabled, cloudReady, cloudCheckedForAccount, cloudSyncAllowed, cloudLoadedAccountUid]);
 
 
   const updateSettings = (patch) => setSettings((current) => ({ ...current, ...patch }));
@@ -1935,10 +1960,7 @@ function App() {
 
   const buildCloudPayload = () => ({
     entries,
-    settings: {
-      ...settings,
-      pin: ""
-    },
+    settings: stableCloudSettings(settings),
     updatedAt: new Date().toISOString()
   });
 
@@ -1988,6 +2010,7 @@ function App() {
           setAutoSyncEnabled(true);
           setExistingAccountLoaded(true);
           setCloudLoadedAccountUid(user.uid);
+          lastCloudPayloadSignatureRef.current = makeCloudPayloadSignature(cloudEntries, { ...defaultSettings, ...cloudSettings });
           setSyncStatus(`Cloud data loaded for ${user.email || "this account"}. Signed-out local data was not saved to this account.`);
           showMessage("Cloud account data loaded.");
         } else {
@@ -2047,29 +2070,37 @@ function App() {
     if (!auth.currentUser) return;
     if (!cloudCheckedForAccount || !cloudSyncAllowed) return;
     if (cloudLoadedAccountUid !== auth.currentUser.uid) return;
+    if (cloudSaveInFlightRef.current) return;
 
-    await setDoc(doc(db, "users", auth.currentUser.uid), {
-      email: auth.currentUser.email,
-      data: {
-        entries,
-        settings: {
-          ...settings,
-          pin: ""
+    const payloadSignature = makeCloudPayloadSignature(entries, settings);
+    if (payloadSignature === lastCloudPayloadSignatureRef.current) return;
+
+    cloudSaveInFlightRef.current = true;
+
+    try {
+      await setDoc(doc(db, "users", auth.currentUser.uid), {
+        email: auth.currentUser.email,
+        data: {
+          entries,
+          settings: stableCloudSettings(settings),
+          updatedAt: new Date().toISOString()
         },
-        updatedAt: new Date().toISOString()
-      },
-      cloudPreference: {
-        choice: "load-cloud",
-        updatedAt: new Date().toISOString()
-      },
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+        cloudPreference: {
+          choice: "load-cloud",
+          updatedAt: new Date().toISOString()
+        },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
-    rememberCloudChoice(auth.currentUser.uid, "load-cloud");
-    const savedTime = new Date().toLocaleTimeString();
-    setLastCloudSave(savedTime);
-    setCloudHasData(true);
-    setSyncStatus(`Auto-saved to cloud at ${savedTime}.`);
+      lastCloudPayloadSignatureRef.current = payloadSignature;
+      rememberCloudChoice(auth.currentUser.uid, "load-cloud");
+      const savedTime = new Date().toLocaleTimeString();
+      setLastCloudSave(savedTime);
+      setCloudHasData(true);
+      setSyncStatus(`Auto-saved to cloud at ${savedTime}.`);
+    } finally {
+      cloudSaveInFlightRef.current = false;
+    }
   };
 
   const saveToCloud = async () => {
@@ -2095,6 +2126,14 @@ function App() {
       return;
     }
 
+    const payloadSignature = makeCloudPayloadSignature(entries, settings);
+    if (payloadSignature === lastCloudPayloadSignatureRef.current && cloudHasData) {
+      setCloudOverwriteArmed(false);
+      setSyncStatus("No cloud save needed. This device already matches the cloud copy.");
+      showMessage("Already saved.");
+      return;
+    }
+
     setSyncBusy(true);
     setSyncStatus("Saving to cloud...");
 
@@ -2109,6 +2148,7 @@ function App() {
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+      lastCloudPayloadSignatureRef.current = payloadSignature;
       rememberCloudChoice(authUser.uid, "load-cloud");
       const savedTime = new Date().toLocaleTimeString();
       setLastCloudSave(savedTime);
@@ -2163,6 +2203,7 @@ function App() {
       setAutoSyncEnabled(true);
       setCloudOverwriteArmed(false);
       setCloudLoadedAccountUid(authUser.uid);
+      lastCloudPayloadSignatureRef.current = makeCloudPayloadSignature(cloudEntries, { ...defaultSettings, ...cloudSettings });
       setCloudHasData(true);
       setExistingAccountLoaded(true);
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}. This device will keep using cloud data after refresh.`);
@@ -3070,6 +3111,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <p>{syncStatus}</p>
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
               <p className="sync-small">Existing accounts with cloud data load their own cloud copy first. Signed-out local data is not auto-saved into an existing account.</p>
+              <p className="sync-small">Scale guard: 4Sara waits about 10 seconds before auto-saving and skips duplicate cloud writes when nothing changed.</p>
             </div>
 
             <label className="setting-row autosync-row">

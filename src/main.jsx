@@ -13,11 +13,16 @@ import {
 } from "firebase/auth";
 import {
   arrayUnion,
+  collection,
   deleteDoc,
   deleteField,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
+  limit,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc
@@ -49,6 +54,60 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
+
+const APP_ROUTES = {
+  dashboard: "/dashboard",
+  calendar: "/calendar",
+  log: "/log",
+  insights: "/insights",
+  settings: "/settings",
+  privacy: "/privacy",
+  account: "/account",
+  mobile: "/mobile",
+  howtohelp: "/how-to-help"
+};
+
+const ROUTE_TO_APP_TAB = Object.entries(APP_ROUTES).reduce((acc, [tab, route]) => {
+  acc[route] = tab;
+  return acc;
+}, {});
+
+const PUBLIC_ROUTES = {
+  "/": "home",
+  "/about": "about",
+  "/support": "support",
+  "/help": "help",
+  "/contact": "contact",
+  "/privacy-policy": "privacy-policy",
+  "/terms": "terms",
+  "/medical-disclaimer": "medical-disclaimer"
+};
+
+function currentPath() {
+  return window.location.pathname.replace(/\/$/, "") || "/";
+}
+
+function routeForAppTab(tab) {
+  return APP_ROUTES[tab] || "/dashboard";
+}
+
+function appTabFromPath(path = currentPath()) {
+  return ROUTE_TO_APP_TAB[path] || "";
+}
+
+function publicTabFromPath(path = currentPath()) {
+  return PUBLIC_ROUTES[path] || "";
+}
+
+function navigateToPath(path, { replace = false } = {}) {
+  const target = path || "/";
+  const nextUrl = `${target}${window.location.search || ""}${target.includes("#") ? "" : ""}`;
+  if (replace) {
+    window.history.replaceState({}, "", target);
+  } else if (window.location.pathname !== target) {
+    window.history.pushState({}, "", target);
+  }
+}
 
 
 // Demo data.
@@ -1164,7 +1223,7 @@ function App() {
     catch { return defaultSettings; }
   });
 
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(() => appTabFromPath() || "dashboard");
   const [viewMode, setViewMode] = useState("owner");
   const [form, setForm] = useState(blankForm());
   const [editingId, setEditingId] = useState(null);
@@ -1265,7 +1324,7 @@ function App() {
         setForm(blankForm());
         setEditingId(null);
         setSelectedCalendarDay(null);
-        setActiveTab("dashboard");
+        setActiveTabRoute("dashboard");
       }
       setSupportViewers({});
       setSupportActivity([]);
@@ -1300,7 +1359,7 @@ function App() {
 
       if (token) {
         setInviteToken(token);
-        setActiveTab("account");
+        setActiveTabRoute("account");
         setInviteStatus("Support invite found. Log in or create an account to accept it.");
         showMessage("Support invite found.");
       }
@@ -1381,6 +1440,33 @@ function App() {
     setMessage(text);
     setTimeout(() => setMessage(""), 2600);
   };
+
+  const setActiveTabRoute = (tab, { replace = false } = {}) => {
+    setActiveTab(tab);
+    const path = routeForAppTab(tab);
+    if (path) navigateToPath(path, { replace });
+  };
+
+  useEffect(() => {
+    const syncRouteToState = () => {
+      const nextPublicTab = publicTabFromPath();
+      const nextAppTab = appTabFromPath();
+
+      if (nextPublicTab) {
+        setSettings((current) => ({ ...current, welcomeSeen: false }));
+        return;
+      }
+
+      if (nextAppTab) {
+        setSettings((current) => ({ ...current, welcomeSeen: true, accountPromptSeen: true }));
+        setActiveTab(nextAppTab);
+      }
+    };
+
+    syncRouteToState();
+    window.addEventListener("popstate", syncRouteToState);
+    return () => window.removeEventListener("popstate", syncRouteToState);
+  }, []);
 
   const handleAuthSubmit = async () => {
     setAuthError("");
@@ -1547,7 +1633,7 @@ function App() {
         setSelectedSharedOwnerId("");
         setSharedSupportData(null);
         setViewMode("owner");
-        setActiveTab("dashboard");
+        setActiveTabRoute("dashboard");
       }
 
       setConfirmRemoveSharedOwnerId("");
@@ -1565,7 +1651,7 @@ function App() {
   const chooseSharedSupportView = (ownerUserId) => {
     setSelectedSharedOwnerId(ownerUserId);
     setViewMode("support");
-    setActiveTab("calendar");
+    setActiveTabRoute("calendar");
   };
 
   const revokeSupportViewer = async (viewerUserId) => {
@@ -1748,7 +1834,7 @@ function App() {
   const acceptSupportInvite = async () => {
     if (!authUser) {
       setInviteStatus("Log in or create an account before accepting the invite.");
-      setActiveTab("account");
+      setActiveTabRoute("account");
       return;
     }
 
@@ -1848,9 +1934,11 @@ function App() {
     }
 
     setSyncBusy(true);
-    setSyncStatus("Deleting cloud data...");
+    setSyncStatus("Creating backup before deleting cloud data...");
 
     try {
+      await createCloudBackup(authUser, "before-delete-cloud-data");
+      setSyncStatus("Deleting cloud data...");
       await deleteDoc(doc(db, "users", authUser.uid));
       await clearCloudChoiceForAccount(authUser);
       setCloudHasData(false);
@@ -1882,9 +1970,11 @@ function App() {
     }
 
     setSyncBusy(true);
-    setSyncStatus("Deleting account...");
+    setSyncStatus("Creating backup before deleting account...");
 
     try {
+      await createCloudBackup(authUser, "before-delete-account");
+      setSyncStatus("Deleting account...");
       clearCloudChoice(authUser.uid);
       await deleteDoc(doc(db, "users", authUser.uid));
       await deleteUser(auth.currentUser);
@@ -1932,7 +2022,7 @@ function App() {
       setSharedSupportData(null);
       setSelectedSharedOwnerId("");
       setViewMode("owner");
-      setActiveTab("dashboard");
+      setActiveTabRoute("dashboard");
       setCloudHasData(false);
       setCloudUpdatedAt("");
       setCloudCheckedForAccount(false);
@@ -1963,6 +2053,59 @@ function App() {
     settings: stableCloudSettings(settings),
     updatedAt: new Date().toISOString()
   });
+
+  const pruneCloudBackups = async (userId) => {
+    try {
+      const backupsQuery = query(
+        collection(db, "users", userId, "backups"),
+        orderBy("createdAt", "desc"),
+        limit(20)
+      );
+      const snapshot = await getDocs(backupsQuery);
+      const extraBackups = snapshot.docs.slice(10);
+      await Promise.all(extraBackups.map((backupDoc) => deleteDoc(backupDoc.ref)));
+    } catch (error) {
+      console.warn("Could not prune old 4Sara backups.", error);
+    }
+  };
+
+  const createCloudBackup = async (user, reason = "cloud-save") => {
+    if (!user?.uid) return false;
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const snapshot = await getDoc(userRef);
+
+      if (!snapshot.exists()) return false;
+
+      const currentUserDoc = snapshot.data() || {};
+      const currentCloudData = currentUserDoc.data || {};
+      const currentEntries = Array.isArray(currentCloudData.entries) ? currentCloudData.entries : [];
+
+      if (!currentEntries.length && !currentCloudData.updatedAt) return false;
+
+      const createdAtIso = new Date().toISOString();
+      const backupId = `${createdAtIso.replace(/[:.]/g, "-")}-${reason}`;
+
+      await setDoc(doc(db, "users", user.uid, "backups", backupId), {
+        reason,
+        createdAt: createdAtIso,
+        createdAtServer: serverTimestamp(),
+        email: user.email || currentUserDoc.email || "",
+        data: {
+          entries: currentEntries,
+          settings: stableCloudSettings(currentCloudData.settings || {}),
+          updatedAt: currentCloudData.updatedAt || ""
+        }
+      });
+
+      await pruneCloudBackups(user.uid);
+      return true;
+    } catch (error) {
+      console.warn("Could not create 4Sara cloud backup.", error);
+      return false;
+    }
+  };
 
   const checkCloudDataForAccount = async (user = auth.currentUser) => {
     if (!user) return;
@@ -2004,7 +2147,7 @@ function App() {
             pin: current.pin,
             pinEnabled: current.pinEnabled
           }));
-          setActiveTab("dashboard");
+          setActiveTabRoute("dashboard");
           await rememberCloudChoiceForAccount(user, "load-cloud");
           setCloudSyncAllowed(true);
           setAutoSyncEnabled(true);
@@ -2078,6 +2221,7 @@ function App() {
     cloudSaveInFlightRef.current = true;
 
     try {
+      await createCloudBackup(auth.currentUser, "auto-save");
       await setDoc(doc(db, "users", auth.currentUser.uid), {
         email: auth.currentUser.email,
         data: {
@@ -2135,9 +2279,11 @@ function App() {
     }
 
     setSyncBusy(true);
-    setSyncStatus("Saving to cloud...");
+    setSyncStatus("Creating backup before saving...");
 
     try {
+      await createCloudBackup(authUser, cloudHasData ? "before-manual-save" : "manual-save");
+      setSyncStatus("Saving to cloud...");
       await setDoc(doc(db, "users", authUser.uid), {
         email: authUser.email,
         data: buildCloudPayload(),
@@ -2413,7 +2559,7 @@ function App() {
     });
 
     setCalendarDate(new Date(onboarding.lastPeriodStart + "T00:00:00"));
-    setActiveTab("dashboard");
+    setActiveTabRoute("dashboard");
     showMessage("Setup complete. Your first prediction is ready.");
   };
 
@@ -2423,7 +2569,7 @@ function App() {
       welcomeSeen: true,
       accountPromptSeen: true
     });
-    setActiveTab("dashboard");
+    setActiveTabRoute("dashboard");
     showMessage("Setup skipped. You can still log menstruation anytime.");
   };
 
@@ -2539,7 +2685,7 @@ function App() {
       notes: entry.notes || ""
     });
     setEditingId(entry.id);
-    setActiveTab("log");
+    setActiveTabRoute("log");
     showMessage("Editing entry.");
   };
 
@@ -2613,7 +2759,7 @@ function App() {
   const logToday = (type = "period") => {
     setForm({ ...blankForm(), type, startDate: todayKey() });
     setEditingId(null);
-    setActiveTab("log");
+    setActiveTabRoute("log");
     showMessage(type === "checkin" ? "Ready to add today's check-in." : "Ready to log menstruation today.");
   };
 
@@ -2630,14 +2776,14 @@ function App() {
 
     setForm({ ...blankForm(), type, startDate: dateKey });
     setEditingId(null);
-    setActiveTab("log");
+    setActiveTabRoute("log");
     showMessage(type === "checkin" ? `Ready to add a check-in for ${formatDate(dateKey)}.` : `Ready to log menstruation for ${formatDate(dateKey)}.`);
   };
 
   const jumpToNextPeriod = () => {
     if (!stats.nextPeriod) return showMessage("Add a cycle first so 4Sara can predict the next menstruation.");
     setCalendarDate(new Date(stats.nextPeriod + "T00:00:00"));
-    setActiveTab("calendar");
+    setActiveTabRoute("calendar");
     showMessage("Showing the predicted menstruation on the calendar.");
   };
 
@@ -2725,8 +2871,24 @@ function App() {
     );
   }
 
-  if (!settings.welcomeSeen) {
-    return <div className="app"><WelcomeScreen onStart={() => updateSettings({ welcomeSeen: true })} onLogin={() => updateSettings({ welcomeSeen: true })} /></div>;
+  const currentPublicTab = publicTabFromPath();
+
+  if (!settings.welcomeSeen || currentPublicTab) {
+    return (
+      <div className="app">
+        <WelcomeScreen
+          initialTab={currentPublicTab || "home"}
+          onStart={() => {
+            updateSettings({ welcomeSeen: true });
+            setActiveTabRoute("dashboard");
+          }}
+          onLogin={() => {
+            updateSettings({ welcomeSeen: true });
+            setActiveTabRoute("account");
+          }}
+        />
+      </div>
+    );
   }
 
   if (!settings.accountPromptSeen) {
@@ -2745,8 +2907,14 @@ function App() {
           authNotice={authNotice}
           handleAuthSubmit={handleAuthSubmit}
           handlePasswordReset={handlePasswordReset}
-          onContinue={() => updateSettings({ accountPromptSeen: true })}
-          onBackHome={() => updateSettings({ welcomeSeen: false })}
+          onContinue={() => {
+            updateSettings({ accountPromptSeen: true });
+            setActiveTabRoute("dashboard");
+          }}
+          onBackHome={() => {
+            updateSettings({ welcomeSeen: false });
+            navigateToPath("/");
+          }}
         />
       </div>
     );
@@ -2794,7 +2962,7 @@ function App() {
         <header className="header">
           <div>
             <div className="brand-row">
-              <button className="brand-home-btn" onClick={() => updateSettings({ welcomeSeen: false, accountPromptSeen: false })} aria-label="Return to welcome screen">
+              <button className="brand-home-btn" onClick={() => { updateSettings({ welcomeSeen: false, accountPromptSeen: false }); navigateToPath("/"); }} aria-label="Return to welcome screen">
                 <span className="brand-mini-logo" aria-hidden="true">
                   <img src={REAL_4SARA_LOGO} alt="" />
                 </span>
@@ -2802,7 +2970,7 @@ function App() {
               </button>
               <div className="pill"><ShieldCheck size={16} /> Private cycle tracker</div>
               <CloudStatusBadge authUser={authUser} autoSyncEnabled={autoSyncEnabled} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} syncBusy={syncBusy} lastCloudSave={lastCloudSave} />
-              <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTab} sharedProfiles={sharedProfiles} selectedSharedOwnerId={selectedSharedOwnerId} setSelectedSharedOwnerId={setSelectedSharedOwnerId} chooseSharedSupportView={chooseSharedSupportView} />
+              <ViewModeSwitcher viewMode={viewMode} setViewMode={setViewMode} setActiveTab={setActiveTabRoute} sharedProfiles={sharedProfiles} selectedSharedOwnerId={selectedSharedOwnerId} setSelectedSharedOwnerId={setSelectedSharedOwnerId} chooseSharedSupportView={chooseSharedSupportView} />
             </div>
             <h1>{settings.profileName ? `Welcome back, ${settings.profileName}` : "4Sara"}</h1>
             <p className="muted">Track menstruation, symptoms, moods, reminders, fertility estimates, and cycle history.</p>
@@ -2824,20 +2992,20 @@ function App() {
               <strong>Support invite opened</strong>
               <span>{authUser ? "Go to Account to accept this support invite." : "Log in or create an account to accept this support invite."}</span>
             </div>
-            <Button onClick={() => setActiveTab("account")} variant="secondary">Open Account</Button>
+            <Button onClick={() => setActiveTabRoute("account")} variant="secondary">Open Account</Button>
           </div>
         )}
 
         <nav className="tabs">
           {navItems.map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} onClick={() => setActiveTab(item.id)} className={`tab ${activeTab === item.id ? "active" : ""}`}><Icon size={16} />{item.label}</button>;
+            return <button key={item.id} onClick={() => setActiveTabRoute(item.id)} className={`tab ${activeTab === item.id ? "active" : ""}`}><Icon size={16} />{item.label}</button>;
           })}
         </nav>
 
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 16, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} setActiveTab={setActiveTab} setLocked={setLocked} />}
+            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} setActiveTab={setActiveTabRoute} setLocked={setLocked} />}
             {activeTab === "calendar" && (
               <CalendarPanel
                 calendarDate={calendarDate}
@@ -2859,7 +3027,7 @@ function App() {
             )}
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={activeEntriesForLog} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={activeSymptomsForLog} customSymptoms={activeSettingsForLog.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} isSupportEditMode={supportCanEdit} allowDelete={viewMode !== "support"} allowCustomSymptoms={viewMode !== "support"} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
-            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTab} />}
+            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTabRoute} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} updateSupportViewerPermission={updateSupportViewerPermission} supportActivity={supportActivity} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
@@ -3112,6 +3280,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
               <p className="sync-small">Existing accounts with cloud data load their own cloud copy first. Signed-out local data is not auto-saved into an existing account.</p>
               <p className="sync-small">Scale guard: 4Sara waits about 10 seconds before auto-saving and skips duplicate cloud writes when nothing changed.</p>
+              <p className="sync-small">Backup guard: 4Sara keeps recent recovery backups before cloud saves and cloud deletes.</p>
             </div>
 
             <label className="setting-row autosync-row">
@@ -3272,13 +3441,13 @@ function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles,
   const switchToOwner = () => {
     setViewMode("owner");
     setSelectedSharedOwnerId("");
-    setActiveTab("dashboard");
+    setActiveTabRoute("dashboard");
   };
 
   const switchToMySupportPreview = () => {
     setViewMode("support");
     setSelectedSharedOwnerId("");
-    setActiveTab("calendar");
+    setActiveTabRoute("calendar");
   };
 
   return (
@@ -3396,8 +3565,12 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
   );
 }
 
-function WelcomeScreen({ onStart, onLogin }) {
-  const [welcomeTab, setWelcomeTab] = useState("home");
+function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
+  const [welcomeTab, setWelcomeTab] = useState(initialTab || "home");
+
+  useEffect(() => {
+    setWelcomeTab(initialTab || "home");
+  }, [initialTab]);
 
   const supportLinks = {
     stripe3: "https://buy.stripe.com/4gMaEX65g5up6TCgQtgnK00",
@@ -3409,6 +3582,13 @@ function WelcomeScreen({ onStart, onLogin }) {
   const contactEmail = "4sara.org@gmail.com";
   const contactHref = `mailto:${contactEmail}?subject=4Sara%20Support%20Request`;
 
+  const navigateWelcomeTab = (tab) => {
+    setWelcomeTab(tab);
+    const route = Object.entries(PUBLIC_ROUTES).find(([, value]) => value === tab)?.[0] || "/";
+    navigateToPath(route);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const openSupportLink = (url) => {
     if (!url) {
       alert("Support link coming soon.");
@@ -3419,6 +3599,7 @@ function WelcomeScreen({ onStart, onLogin }) {
 
   const goToSection = (sectionId) => {
     setWelcomeTab("home");
+    if (window.location.pathname !== "/") window.history.pushState({}, "", "/");
     window.setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
   };
 
@@ -3520,7 +3701,7 @@ function WelcomeScreen({ onStart, onLogin }) {
         <div><strong>Private</strong><p>Built with privacy-focused tracking, cloud choice, and account controls.</p></div>
         <div><strong>Supportive</strong><p>Support View helps trusted people understand how to help without editing or controlling data.</p></div>
       </div>
-      <div className="landing-actions"><Button onClick={onStart}>Open 4Sara</Button><Button onClick={() => setWelcomeTab("support")} variant="secondary">Support 4Sara</Button></div>
+      <div className="landing-actions"><Button onClick={onStart}>Open 4Sara</Button><Button onClick={() => navigateWelcomeTab("support")} variant="secondary">Support 4Sara</Button></div>
     </section>
   );
 
@@ -3721,14 +3902,14 @@ function WelcomeScreen({ onStart, onLogin }) {
   return (
     <div className="landing-page">
       <header className="landing-nav">
-        <button type="button" className="landing-brand" onClick={() => setWelcomeTab("home")}>
+        <button type="button" className="landing-brand" onClick={() => navigateWelcomeTab("home")}>
           <LogoMark compact /> <span>4Sara</span>
         </button>
         <nav>
           <button type="button" onClick={() => goToSection("features")}>Features</button>
           <button type="button" onClick={() => goToSection("how-it-works")}>How it Works</button>
-          <button type="button" onClick={() => setWelcomeTab("about")}>About</button>
-          <button type="button" onClick={() => setWelcomeTab("support")}>Support</button>
+          <button type="button" onClick={() => navigateWelcomeTab("about")}>About</button>
+          <button type="button" onClick={() => navigateWelcomeTab("support")}>Support</button>
           <button type="button" onClick={() => goToSection("privacy")}>Privacy</button>
         </nav>
         <Button onClick={onStart}>Open 4Sara</Button>
@@ -3746,8 +3927,8 @@ function WelcomeScreen({ onStart, onLogin }) {
       <footer className="landing-footer">
         <div><div className="landing-footer-brand"><LogoMark compact /><strong>4Sara</strong></div><p>Private cycle tracking, designed with care. Built for clarity.</p></div>
         <div><strong>Product</strong><button type="button" onClick={() => goToSection("features")}>Features</button><button type="button" onClick={() => goToSection("how-it-works")}>How it Works</button></div>
-        <div><strong>Privacy</strong><button type="button" onClick={() => goToSection("privacy")}>Privacy Overview</button><button type="button" onClick={() => goToSection("privacy")}>Data & Security</button><button type="button" onClick={() => setWelcomeTab("privacy-policy")}>Privacy Policy</button></div>
-        <div><strong>Resources</strong><button type="button" onClick={() => setWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => setWelcomeTab("contact")}>Contact</button><button type="button" onClick={() => setWelcomeTab("terms")}>Terms of Use</button><button type="button" onClick={() => setWelcomeTab("medical-disclaimer")}>Medical Disclaimer</button></div>
+        <div><strong>Privacy</strong><button type="button" onClick={() => goToSection("privacy")}>Privacy Overview</button><button type="button" onClick={() => goToSection("privacy")}>Data & Security</button><button type="button" onClick={() => navigateWelcomeTab("privacy-policy")}>Privacy Policy</button></div>
+        <div><strong>Resources</strong><button type="button" onClick={() => navigateWelcomeTab("help")}>Help Center</button><button type="button" onClick={() => navigateWelcomeTab("contact")}>Contact</button><button type="button" onClick={() => navigateWelcomeTab("terms")}>Terms of Use</button><button type="button" onClick={() => navigateWelcomeTab("medical-disclaimer")}>Medical Disclaimer</button></div>
         <div><p>Made with care for your health ♡</p><p>© 2026 4Sara. All rights reserved.</p></div>
       </footer>
     </div>
@@ -3942,7 +4123,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
           <Card className="dashboard-list-card recent-card">
             <div className="dashboard-list-head">
               <h2>Recent entries</h2>
-              <button type="button" onClick={() => setActiveTab("log")}>View all</button>
+              <button type="button" onClick={() => setActiveTabRoute("log")}>View all</button>
             </div>
             <div className="dashboard-entry-list">
               {recentRows.length ? (
@@ -3954,7 +4135,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
                 </div>
               )}
             </div>
-            <Button onClick={() => setActiveTab("log")} className="dashboard-new-checkin"><Plus size={20} /> New check-in</Button>
+            <Button onClick={() => setActiveTabRoute("log")} className="dashboard-new-checkin"><Plus size={20} /> New check-in</Button>
           </Card>
 
           <Card className="dashboard-list-card upcoming-card">
@@ -3975,7 +4156,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             <h2>Your privacy is protected</h2>
             <p>Your data is private and stored securely. Use your account for encrypted sync, export, and deletion controls anytime.</p>
           </div>
-          <button type="button" onClick={() => setActiveTab("privacy")}>Privacy settings</button>
+          <button type="button" onClick={() => setActiveTabRoute("privacy")}>Privacy settings</button>
         </Card>
       </section>
     </main>
@@ -4611,7 +4792,7 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
         <h2><ShieldCheck size={20} /> Privacy</h2>
         <p className="muted">Review privacy controls, data storage, terms, and medical limitations in one place.</p>
         <div className="two-actions">
-          <Button onClick={() => setActiveTab("privacy")} variant="secondary">Open privacy center</Button>
+          <Button onClick={() => setActiveTabRoute("privacy")} variant="secondary">Open privacy center</Button>
         </div>
       </Card>
 

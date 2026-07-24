@@ -2936,7 +2936,25 @@ function App() {
   if (authUser && hasLoadedExistingAccount) {
     // Existing signed-in accounts with cloud data should never be sent back through onboarding on any device or browser.
   } else if (!settings.onboardingComplete) {
-    return <div className="app"><OnboardingScreen onboarding={onboarding} setOnboarding={setOnboarding} completeOnboarding={completeOnboarding} skipOnboarding={skipOnboarding} message={message} /></div>;
+    return (
+      <div className="app">
+        <OnboardingScreen
+          onboarding={onboarding}
+          setOnboarding={setOnboarding}
+          completeOnboarding={completeOnboarding}
+          skipOnboarding={skipOnboarding}
+          message={message}
+          onLogin={() => {
+            updateSettings({ accountPromptSeen: false });
+            setActiveTabRoute("account");
+          }}
+          onBackHome={() => {
+            updateSettings({ welcomeSeen: false, accountPromptSeen: false });
+            navigateToPath("/");
+          }}
+        />
+      </div>
+    );
   }
 
   if (locked && settings.pinEnabled && settings.pin) {
@@ -4028,7 +4046,7 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
   );
 }
 
-function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipOnboarding, message }) {
+function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipOnboarding, message, onLogin, onBackHome }) {
   return (
     <div className="screen-center">
       <Card className="onboarding-card">
@@ -4067,6 +4085,11 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
         <div className="two-actions">
           <Button onClick={completeOnboarding}><Save size={16} /> Create my tracker</Button>
           <Button onClick={skipOnboarding} variant="secondary">Skip setup</Button>
+        </div>
+
+        <div className="onboarding-exit-actions">
+          <Button onClick={onLogin} variant="secondary">Log in or create account</Button>
+          <Button onClick={onBackHome} variant="secondary">Back to home page</Button>
         </div>
       </Card>
     </div>

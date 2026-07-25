@@ -134,7 +134,8 @@ const defaultSettings = {
   reminderDaysBefore: 2,
   cycleLengthOverride: "",
   periodLengthOverride: "",
-  customSymptoms: []
+  customSymptoms: [],
+  customMoods: []
 };
 
 const presetSymptoms = ["Cramps", "Headache", "Bloating", "Fatigue", "Acne", "Back pain", "Cravings", "Mood swings", "Nausea", "Tender breasts"];
@@ -1273,6 +1274,7 @@ function App() {
   const [sharedSupportData, setSharedSupportData] = useState(null);
   const [sharedSupportStatus, setSharedSupportStatus] = useState("");
   const [customSymptomInput, setCustomSymptomInput] = useState("");
+  const [customMoodInput, setCustomMoodInput] = useState("");
   const lastCloudPayloadSignatureRef = useRef("");
   const cloudSaveInFlightRef = useRef(false);
   const [onboarding, setOnboarding] = useState({ profileName: "", profileAge: "", lastPeriodStart: todayKey(), averageCycleLength: "28", averagePeriodLength: "5", firstFlow: "N/A", firstMood: "N/A", consentAccepted: false });
@@ -2393,6 +2395,7 @@ function App() {
   const activeEntriesForLog = viewMode === "support" ? [...supportEntries].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)) : sortedEntries;
   const activeSettingsForLog = viewMode === "support" ? supportSettings : settings;
   const activeSymptomsForLog = useMemo(() => [...new Set([...presetSymptoms, ...(activeSettingsForLog.customSymptoms || [])])], [activeSettingsForLog.customSymptoms]);
+  const activeMoodsForLog = useMemo(() => [...new Set([...moods, ...(activeSettingsForLog.customMoods || [])])], [activeSettingsForLog.customMoods]);
 
   const supportCalendarData = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -2597,6 +2600,32 @@ function App() {
     updateSettings({ customSymptoms: (settings.customSymptoms || []).filter((item) => item !== symptom) });
     setForm((current) => ({ ...current, symptoms: current.symptoms.filter((item) => item !== symptom) }));
     showMessage("Custom symptom removed.");
+  };
+
+  const addCustomMood = () => {
+    const cleaned = customMoodInput.trim();
+    if (!cleaned) return showMessage("Type a mood first.");
+    if (cleaned.toLowerCase() === "n/a") return showMessage("N/A is already included.");
+    const allMoodOptions = [...moods, ...(settings.customMoods || [])];
+    if (allMoodOptions.some((mood) => mood.toLowerCase() === cleaned.toLowerCase())) return showMessage("That mood already exists.");
+
+    updateSettings({ customMoods: [...(settings.customMoods || []), cleaned] });
+    setCustomMoodInput("");
+    showMessage("Custom mood added.");
+  };
+
+  const removeCustomMood = (mood) => {
+    updateSettings({ customMoods: (settings.customMoods || []).filter((item) => item !== mood) });
+    setForm((current) => {
+      const nextMoods = normalizeMoods(current).filter((item) => item !== mood);
+      const finalMoods = nextMoods.length ? nextMoods : ["N/A"];
+      return {
+        ...current,
+        moods: finalMoods,
+        mood: finalMoods.filter((item) => item !== "N/A").join(", ") || "N/A"
+      };
+    });
+    showMessage("Custom mood removed.");
   };
 
   const saveEntry = async () => {
@@ -3044,7 +3073,7 @@ function App() {
                 readOnly={viewMode === "support" && !supportCanEdit}
               />
             )}
-            {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={activeEntriesForLog} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={activeSymptomsForLog} customSymptoms={activeSettingsForLog.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} selectedPhase={selectedPhase} isSupportEditMode={supportCanEdit} allowDelete={viewMode !== "support"} allowCustomSymptoms={viewMode !== "support"} />}
+            {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={activeEntriesForLog} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={activeSymptomsForLog} customSymptoms={activeSettingsForLog.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} allMoods={activeMoodsForLog} customMoods={activeSettingsForLog.customMoods || []} customMoodInput={customMoodInput} setCustomMoodInput={setCustomMoodInput} addCustomMood={addCustomMood} removeCustomMood={removeCustomMood} selectedPhase={selectedPhase} isSupportEditMode={supportCanEdit} allowDelete={viewMode !== "support"} allowCustomSymptoms={viewMode !== "support"} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTabRoute} />}
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
@@ -4499,7 +4528,7 @@ function LogTab(props) {
   return <main className="layout"><section className="side-col"><LogForm {...props} /></section><section className="main-col"><Card className="pad"><h2>All entries</h2><EntryList entries={props.entries} onEdit={props.startEdit} onDelete={props.deleteEntry} allowDelete={props.allowDelete} /></Card></section></main>;
 }
 
-function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdit, allSymptoms, customSymptoms, customSymptomInput, setCustomSymptomInput, addCustomSymptom, removeCustomSymptom, selectedPhase, isSupportEditMode = false, allowCustomSymptoms = true }) {
+function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdit, allSymptoms, customSymptoms, customSymptomInput, setCustomSymptomInput, addCustomSymptom, removeCustomSymptom, allMoods = moods, customMoods = [], customMoodInput = "", setCustomMoodInput = () => {}, addCustomMood = () => {}, removeCustomMood = () => {}, selectedPhase, isSupportEditMode = false, allowCustomSymptoms = true }) {
   return (
     <Card className="pad">
       <h2>{editingId ? "Edit entry" : form.type === "checkin" ? "Add daily check-in" : "Add menstruation entry"}</h2>
@@ -4526,27 +4555,81 @@ function LogForm({ form, setForm, toggleSymptom, saveEntry, editingId, cancelEdi
         <div>
           <span className="label">Mood</span>
           <div className="choice-grid">
-            {moods.map((mood) => (
-              <button
-                key={mood}
-                onClick={() => {
-                  const nextMoods = toggleMoodSelection(form.moods, mood);
-                  setForm({ ...form, moods: nextMoods, mood: nextMoods.filter((item) => item !== "N/A").join(", ") || "N/A" });
-                }}
-                className={`choice ${normalizeMoods(form).includes(mood) ? "active" : ""}`}
-              >
-                {mood}
-              </button>
-            ))}
+            {allMoods.map((mood) => {
+              const isCustomMood = customMoods.includes(mood);
+              return (
+                <button
+                  key={mood}
+                  onClick={() => {
+                    const nextMoods = toggleMoodSelection(form.moods, mood);
+                    setForm({ ...form, moods: nextMoods, mood: nextMoods.filter((item) => item !== "N/A").join(", ") || "N/A" });
+                  }}
+                  className={`choice removable-choice ${normalizeMoods(form).includes(mood) ? "active" : ""}`}
+                >
+                  <span>{mood}</span>
+                  {allowCustomSymptoms && isCustomMood && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Remove ${mood}`}
+                      className="chip-remove"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeCustomMood(mood);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          removeCustomMood(mood);
+                        }
+                      }}
+                    >
+                      ×
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <small className="field-help">Select one or more moods. Choose N/A if you do not want to track mood today.</small>
+          {allowCustomSymptoms && <div className="custom-symptom"><input value={customMoodInput} onChange={(e) => setCustomMoodInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomMood()} placeholder="Add custom mood" /><Button onClick={addCustomMood} variant="secondary">Add</Button></div>}
         </div>
 
         <div>
           <span className="label">Symptoms</span>
-          <div className="symptom-grid">{allSymptoms.map((symptom) => <button key={symptom} onClick={() => toggleSymptom(symptom)} className={`symptom ${form.symptoms.includes(symptom) ? "active" : ""}`}>{symptom}</button>)}</div>
+          <div className="symptom-grid">
+            {allSymptoms.map((symptom) => {
+              const isCustomSymptom = customSymptoms.includes(symptom);
+              return (
+                <button key={symptom} onClick={() => toggleSymptom(symptom)} className={`symptom removable-choice ${form.symptoms.includes(symptom) ? "active" : ""}`}>
+                  <span>{symptom}</span>
+                  {allowCustomSymptoms && isCustomSymptom && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Remove ${symptom}`}
+                      className="chip-remove"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeCustomSymptom(symptom);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          removeCustomSymptom(symptom);
+                        }
+                      }}
+                    >
+                      ×
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
           {allowCustomSymptoms && <div className="custom-symptom"><input value={customSymptomInput} onChange={(e) => setCustomSymptomInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomSymptom()} placeholder="Add custom symptom" /><Button onClick={addCustomSymptom} variant="secondary">Add</Button></div>}
-          {allowCustomSymptoms && customSymptoms.length > 0 && <div className="custom-list"><p>Custom symptoms</p><div className="chips">{customSymptoms.map((symptom) => <button key={symptom} onClick={() => removeCustomSymptom(symptom)} className="chip rose-chip">{symptom} ×</button>)}</div></div>}
         </div>
 
         <label><span>Notes</span><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Current-cycle changes such as stress, travel, illness, medication, sleep, exercise habits, or anything else that may affect your cycle..." /></label>

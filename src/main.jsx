@@ -3164,7 +3164,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
   return (
     <main className="layout">
-      <Card className="pad main-col">
+      <Card className="pad main-col full-width-card">
         <h2><Mail size={20} /> Account</h2>
 
         {authLoading ? (
@@ -3430,29 +3430,6 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <p className="auth-note">This is not a sign out button because no account is currently signed in.</p>
             </div>
           </div>
-        )}
-      </Card>
-
-      <Card className="pad side-col">
-        {authUser ? (
-          <>
-            <h3>Account status</h3>
-            <div className="mini-card"><strong>Logged in</strong><p>Your account is connected as {authUser.email}.</p></div>
-            <div className="mini-card"><strong>Smart cloud loading</strong><p>If this device has no local data, cloud data loads automatically after login.</p></div>
-            <div className="mini-card"><strong>Auto-save available</strong><p>When enabled, changes save to cloud automatically after a short delay.</p></div>
-            <div className="mini-card"><strong>Manual controls remain</strong><p>You can still use Save to cloud or Load from cloud when needed.</p></div>
-            <div className="mini-card"><strong>Local backup still active</strong><p>Your browser still keeps a local copy for faster access.</p></div>
-            <div className="mini-card"><strong>Account deletion</strong><p>Deleting an account removes the Firebase account and cloud document, but local device data is separate.</p></div>
-            <div className="mini-card"><strong>Support sharing tip</strong><p>Only invite trusted people. You can revoke access from the Support viewers section.</p></div>
-          </>
-        ) : (
-          <>
-            <h3>What accounts unlock</h3>
-            <div className="mini-card"><strong>Device sync</strong><p>Use 4Sara on a phone, laptop, or new browser.</p></div>
-            <div className="mini-card"><strong>Safer backup</strong><p>Reduce the risk of losing data if browser storage is cleared.</p></div>
-            <div className="mini-card"><strong>Cloud controls</strong><p>Export, delete cloud data, and manage account privacy.</p></div>
-            <div className="mini-card"><strong>Local-only controls</strong><p>Without an account, use Clear local data to reset this browser/device. There is no sign out because no account is connected.</p></div>
-          </>
         )}
       </Card>
     </main>
@@ -5001,7 +4978,7 @@ function NumberField({ label, value, onChange, placeholder, min, max }) {
 function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, confirmClearLocal, setConfirmClearLocal, exportJson, exportCsv }) {
   return (
     <main className="layout">
-      <Card className="pad main-col">
+      <Card className="pad main-col full-width-card">
         <h2><ShieldCheck size={20} /> Privacy</h2>
         <p className="muted">
           One calm place to manage your data, understand how 4Sara handles privacy, and review the terms and medical safety notes that protect users.
@@ -5118,14 +5095,6 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
             {confirmClearLocal && <Button onClick={() => setConfirmClearLocal(false)} variant="secondary">Cancel</Button>}
           </div>
         </div>
-      </Card>
-
-      <Card className="pad side-col">
-        <h3>Quick guide</h3>
-        <div className="mini-card"><strong>Privacy controls</strong><p>Export, clear local data, and manage cloud data from this page.</p></div>
-        <div className="mini-card"><strong>Legal notes</strong><p>Privacy policy, terms, and medical disclaimer summaries are included here.</p></div>
-        <div className="mini-card"><strong>Export first</strong><p>Download a backup before deleting data.</p></div>
-        <div className="mini-card"><strong>PIN lock</strong><p>Your PIN can lock this device’s app view, but it is not a substitute for your phone or account password.</p></div>
       </Card>
 
       {settings.pinEnabled && (

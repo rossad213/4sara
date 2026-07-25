@@ -2589,7 +2589,9 @@ function App() {
   const addCustomSymptom = () => {
     const cleaned = customSymptomInput.trim();
     if (!cleaned) return showMessage("Type a symptom first.");
-    if (allSymptoms.some((symptom) => symptom.toLowerCase() === cleaned.toLowerCase())) return showMessage("That symptom already exists.");
+
+    const allSymptomOptions = [...presetSymptoms, ...(settings.customSymptoms || [])];
+    if (allSymptomOptions.some((symptom) => symptom.toLowerCase() === cleaned.toLowerCase())) return showMessage("That symptom already exists.");
 
     updateSettings({ customSymptoms: [...(settings.customSymptoms || []), cleaned] });
     setCustomSymptomInput("");

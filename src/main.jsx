@@ -1427,6 +1427,10 @@ function App() {
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [confirmClearLocal, setConfirmClearLocal] = useState(false);
+  const [cloudBackups, setCloudBackups] = useState([]);
+  const [backupStatus, setBackupStatus] = useState("");
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [confirmRestoreBackupId, setConfirmRestoreBackupId] = useState("");
   const [inviteToken, setInviteToken] = useState("");
   const [pendingInvite, setPendingInvite] = useState(null);
   const [inviteStatus, setInviteStatus] = useState("");
@@ -1637,6 +1641,11 @@ function App() {
     window.addEventListener("popstate", syncRouteToState);
     return () => window.removeEventListener("popstate", syncRouteToState);
   }, []);
+
+  useEffect(() => {
+    if (!authUser || activeTab !== "privacy") return;
+    refreshCloudBackups();
+  }, [authUser, activeTab]);
 
   const handleAuthSubmit = async () => {
     setAuthError("");
@@ -2275,6 +2284,165 @@ function App() {
     } catch (error) {
       console.warn("Could not create 4Sara cloud backup.", error);
       return false;
+    }
+  };
+
+  const refreshCloudBackups = async () => {
+    if (!authUser) {
+      setBackupStatus("Log in to view cloud backups.");
+      setCloudBackups([]);
+      return;
+    }
+
+    setBackupBusy(true);
+    setBackupStatus("Loading backups...");
+
+    try {
+      const backupsQuery = query(
+        collection(db, "users", authUser.uid, "backups"),
+        orderBy("createdAt", "desc"),
+        limit(10)
+      );
+      const snapshot = await getDocs(backupsQuery);
+      const backups = snapshot.docs.map((backupDoc) => ({
+        id: backupDoc.id,
+        ...backupDoc.data()
+      }));
+
+      setCloudBackups(backups);
+      setBackupStatus(backups.length ? `Found ${backups.length} recent backup${backups.length === 1 ? "" : "s"}.` : "No cloud backups found yet.");
+    } catch (error) {
+      const friendly = friendlyErrorMessage(error, "Could not load backups. Please try again.");
+      setBackupStatus(friendly);
+      showMessage(friendly);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const createManualCloudBackup = async () => {
+    if (!authUser) {
+      showMessage("Log in first to create a cloud backup.");
+      return;
+    }
+
+    setBackupBusy(true);
+    setBackupStatus("Creating backup...");
+
+    try {
+      await setDoc(doc(db, "users", authUser.uid), {
+        email: authUser.email || "",
+        data: buildCloudPayload(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      const created = await createCloudBackup(authUser, "manual-backup");
+
+      if (created) {
+        setBackupStatus("Backup created.");
+        showMessage("Backup created.");
+        await refreshCloudBackups();
+      } else {
+        setBackupStatus("No cloud data was available to back up yet.");
+        showMessage("No cloud data available to back up yet.");
+      }
+    } catch (error) {
+      const friendly = friendlyErrorMessage(error, "Could not create backup. Please try again.");
+      setBackupStatus(friendly);
+      showMessage(friendly);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const downloadCloudBackup = (backup) => {
+    if (!backup?.data) {
+      showMessage("Backup data was not available.");
+      return;
+    }
+
+    downloadFile(
+      `4sara-backup-${backup.createdAt ? backup.createdAt.slice(0, 10) : "cloud"}.json`,
+      JSON.stringify({
+        exportedAt: new Date().toISOString(),
+        backupId: backup.id,
+        reason: backup.reason || "",
+        createdAt: backup.createdAt || "",
+        data: backup.data
+      }, null, 2),
+      "application/json"
+    );
+    showMessage("Backup downloaded.");
+  };
+
+  const restoreCloudBackup = async (backup) => {
+    if (!authUser) {
+      showMessage("Log in first to restore a backup.");
+      return;
+    }
+
+    if (!backup?.id || !backup?.data) {
+      showMessage("Backup data was not available.");
+      return;
+    }
+
+    if (confirmRestoreBackupId !== backup.id) {
+      setConfirmRestoreBackupId(backup.id);
+      setBackupStatus("Click Restore again to confirm. This will replace current cloud and device data with that backup.");
+      return;
+    }
+
+    setBackupBusy(true);
+    setSyncBusy(true);
+    setBackupStatus("Creating safety backup before restore...");
+
+    try {
+      await createCloudBackup(authUser, "before-restore-backup");
+
+      const restoredEntries = Array.isArray(backup.data.entries) ? backup.data.entries : [];
+      const restoredSettings = backup.data.settings || {};
+      const restoredAt = new Date().toISOString();
+
+      await setDoc(doc(db, "users", authUser.uid), {
+        email: authUser.email || "",
+        data: {
+          entries: restoredEntries,
+          settings: stableCloudSettings(restoredSettings),
+          updatedAt: restoredAt
+        },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      setEntries(restoredEntries);
+      setSettings((current) => ({
+        ...current,
+        ...restoredSettings,
+        welcomeSeen: true,
+        accountPromptSeen: true,
+        onboardingComplete: true,
+        pin: current.pin,
+        pinEnabled: current.pinEnabled
+      }));
+
+      setCloudHasData(true);
+      setCloudUpdatedAt(restoredAt);
+      setCloudSyncAllowed(true);
+      setAutoSyncEnabled(true);
+      setCloudLoadedAccountUid(authUser.uid);
+      setConfirmRestoreBackupId("");
+      lastCloudPayloadSignatureRef.current = makeCloudPayloadSignature(restoredEntries, { ...defaultSettings, ...restoredSettings });
+      await rememberCloudChoiceForAccount(authUser, "load-cloud");
+      setSyncStatus("Backup restored. This device and cloud account now use the restored data.");
+      setBackupStatus("Backup restored.");
+      showMessage("Backup restored.");
+      await refreshCloudBackups();
+    } catch (error) {
+      const friendly = friendlyErrorMessage(error, "Could not restore backup. Nothing was restored.");
+      setBackupStatus(friendly);
+      showMessage(friendly);
+    } finally {
+      setBackupBusy(false);
+      setSyncBusy(false);
     }
   };
 
@@ -3248,7 +3416,7 @@ function App() {
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={activeEntriesForLog} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={activeSymptomsForLog} customSymptoms={activeSettingsForLog.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} allMoods={activeMoodsForLog} customMoods={activeSettingsForLog.customMoods || []} customMoodInput={customMoodInput} setCustomMoodInput={setCustomMoodInput} addCustomMood={addCustomMood} removeCustomMood={removeCustomMood} selectedPhase={selectedPhase} isSupportEditMode={supportCanEdit} allowDelete={viewMode !== "support"} allowCustomSymptoms={viewMode !== "support"} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} isSupportView={viewMode === "support"} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTabRoute} />}
-            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
+            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} cloudBackups={cloudBackups} backupStatus={backupStatus} backupBusy={backupBusy} refreshCloudBackups={refreshCloudBackups} createManualCloudBackup={createManualCloudBackup} restoreCloudBackup={restoreCloudBackup} downloadCloudBackup={downloadCloudBackup} confirmRestoreBackupId={confirmRestoreBackupId} setConfirmRestoreBackupId={setConfirmRestoreBackupId} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} updateSupportViewerPermission={updateSupportViewerPermission} supportActivity={supportActivity} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && viewMode === "support" && (
@@ -5305,7 +5473,7 @@ function NumberField({ label, value, onChange, placeholder, min, max }) {
   return <label className="form single"><span>{label}</span><input type="number" min={min} max={max} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></label>;
 }
 
-function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, confirmClearLocal, setConfirmClearLocal, exportJson, exportCsv }) {
+function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, confirmClearLocal, setConfirmClearLocal, exportJson, exportCsv, cloudBackups = [], backupStatus = "", backupBusy = false, refreshCloudBackups, createManualCloudBackup, restoreCloudBackup, downloadCloudBackup, confirmRestoreBackupId, setConfirmRestoreBackupId }) {
   return (
     <main className="layout">
       <Card className="pad main-col full-width-card privacy-dashboard-card">
@@ -5358,6 +5526,43 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
             {authUser && <span className={cloudHasData ? "status-pill online" : "status-pill local"}>{cloudHasData ? "Cloud data found" : "No cloud data found yet"}</span>}
           </div>
         </div>
+
+        {authUser && (
+          <div className="privacy-section privacy-action-card backup-restore-card">
+            <h3>Cloud backups & restore</h3>
+            <p>4Sara keeps recent recovery backups before important cloud actions. You can also create a backup now or restore a recent one.</p>
+            <div className="actions">
+              <Button onClick={createManualCloudBackup} variant="secondary" disabled={backupBusy || syncBusy}>Create backup now</Button>
+              <Button onClick={refreshCloudBackups} variant="secondary" disabled={backupBusy}>Refresh backups</Button>
+            </div>
+            {backupStatus && <p className="sync-small">{backupStatus}</p>}
+
+            {cloudBackups.length > 0 ? (
+              <div className="backup-list">
+                {cloudBackups.map((backup) => (
+                  <div className="backup-item" key={backup.id}>
+                    <div>
+                      <strong>{backup.createdAt ? new Date(backup.createdAt).toLocaleString() : "Cloud backup"}</strong>
+                      <p>{backup.reason ? backup.reason.replaceAll("-", " ") : "Backup"} · {(backup.data?.entries || []).length} entr{(backup.data?.entries || []).length === 1 ? "y" : "ies"}</p>
+                    </div>
+                    {confirmRestoreBackupId === backup.id && (
+                      <p className="danger-confirm">Confirm restore: this replaces current cloud and device data with this backup.</p>
+                    )}
+                    <div className="backup-actions">
+                      <Button onClick={() => restoreCloudBackup(backup)} variant="secondary" disabled={backupBusy || syncBusy}>
+                        {confirmRestoreBackupId === backup.id ? "Confirm restore" : "Restore"}
+                      </Button>
+                      <Button onClick={() => downloadCloudBackup(backup)} variant="secondary" disabled={backupBusy}>Download</Button>
+                      {confirmRestoreBackupId === backup.id && <Button onClick={() => setConfirmRestoreBackupId("")} variant="secondary">Cancel</Button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">No recent cloud backups are showing yet.</p>
+            )}
+          </div>
+        )}
 
         {authUser && (
           <div className="privacy-section danger-zone">

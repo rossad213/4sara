@@ -6056,3 +6056,42 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Cloud backup restore UI */
+.backup-restore-card {
+  grid-column: 1 / -1;
+}
+
+.backup-list {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.backup-item {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.035);
+}
+
+.backup-item strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.backup-item p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}

@@ -6095,3 +6095,45 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   flex-wrap: wrap;
   gap: 0.55rem;
 }
+
+
+/* Report a problem links */
+.problem-report-card {
+  border-color: rgba(244, 63, 94, 0.28) !important;
+  background: linear-gradient(135deg, rgba(255, 241, 242, 0.96), rgba(255, 255, 255, 0.92)) !important;
+}
+
+.problem-report-button {
+  display: inline-flex !important;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.65rem;
+  text-decoration: none;
+}
+
+.help-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.problem-report-mini-card {
+  border-color: rgba(251, 113, 133, 0.35) !important;
+}
+
+.problem-report-mini-card p {
+  margin-bottom: 0.4rem;
+}
+
+@media (max-width: 760px) {
+  .help-contact-actions,
+  .problem-report-mini-card .actions {
+    width: 100%;
+  }
+
+  .problem-report-button {
+    width: 100%;
+  }
+}

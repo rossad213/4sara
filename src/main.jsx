@@ -216,6 +216,27 @@ function passwordRequirementMessage() {
   return "Password must be at least 8 characters and include at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.";
 }
 
+const REPORT_PROBLEM_EMAIL = "4sara.org@gmail.com";
+
+function reportProblemHref(context = "General") {
+  const subject = encodeURIComponent("4Sara Problem Report");
+  const body = encodeURIComponent(`What happened?
+
+What were you trying to do?
+
+What screen were you on?
+${context ? context : ""}
+
+Did you see an error message?
+
+Device/browser:
+
+Anything else?
+
+Please do not include highly sensitive medical details unless you are comfortable sharing them by email.`);
+  return `mailto:${REPORT_PROBLEM_EMAIL}?subject=${subject}&body=${body}`;
+}
+
 function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
   if (!dateKey || !periods.length) return "Unknown";
   const sorted = [...periods].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
@@ -3694,6 +3715,12 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <Button onClick={() => setShowSignOutPrivacy(true)} variant="secondary">Sign out</Button>
             </div>
 
+            <div className="support-sharing-card account-clean-section problem-report-mini-card">
+              <h3>Having an account or sync problem?</h3>
+              <p>Report login, signup, cloud sync, backup, or Support View issues so they can be fixed faster.</p>
+              <a className="btn problem-report-button" href={reportProblemHref("Account tab / sign-in or cloud sync")}>Report a problem</a>
+            </div>
+
             <div className="danger-zone account-clean-danger">
               <h3>Cloud data controls</h3>
               <p>Delete the cloud copy of your 4Sara data from this account. This does not delete the local data saved on this device.</p>
@@ -3775,6 +3802,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                 {confirmClearLocal && <Button onClick={() => setConfirmClearLocal(false)} variant="secondary">Cancel</Button>}
               </div>
               <p className="auth-note">This is not a sign out button because no account is currently signed in.</p>
+              <a className="btn secondary problem-report-button" href={reportProblemHref("Account tab / login or local data")}>Report a problem</a>
             </div>
           </div>
         )}
@@ -4259,6 +4287,12 @@ function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
           <h3>Is 4Sara medical advice?</h3>
           <p>No. 4Sara is for personal wellness tracking only. Predictions are estimates and should not be used as medical advice, diagnosis, treatment, or birth control.</p>
         </div>
+
+        <div className="help-card problem-report-card">
+          <h3>Report a problem</h3>
+          <p>Something not working? Send a quick problem report so we can understand what happened and fix it.</p>
+          <a className="btn problem-report-button" href={reportProblemHref("Help Center")}>Report a problem</a>
+        </div>
       </div>
 
       <div className="help-contact-strip">
@@ -4266,7 +4300,10 @@ function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
           <strong>Still need help?</strong>
           <p>Email us and we’ll respond as soon as possible.</p>
         </div>
-        <a className="btn help-mail-button" href={contactHref}>Contact 4Sara</a>
+        <div className="help-contact-actions">
+          <a className="btn help-mail-button" href={contactHref}>Contact 4Sara</a>
+          <a className="btn secondary problem-report-button" href={reportProblemHref("Help Center")}>Report a problem</a>
+        </div>
       </div>
     </section>
   );
@@ -4288,6 +4325,7 @@ function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
       <div className="support-note-box">
         <strong>Helpful details to include</strong>
         <p>Tell us what page you were on, what you were trying to do, and what happened. If it is a bug, a screenshot can help.</p>
+        <a className="btn problem-report-button" href={reportProblemHref("Contact page")}>Report a problem</a>
       </div>
     </section>
   );
@@ -5563,6 +5601,12 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
             )}
           </div>
         )}
+
+        <div className="privacy-section privacy-action-card problem-report-mini-card">
+          <h3>Report a privacy, backup, or data problem</h3>
+          <p>If export, backup, restore, cloud sync, delete, or privacy controls do not work the way you expected, send a quick report.</p>
+          <a className="btn problem-report-button" href={reportProblemHref("Privacy tab / data controls")}>Report a problem</a>
+        </div>
 
         {authUser && (
           <div className="privacy-section danger-zone">

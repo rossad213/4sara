@@ -3350,7 +3350,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <p className="sync-paused-note">Auto-sync is paused to protect existing data. Choose Load cloud data or Save this device’s data to cloud to continue syncing.</p>
             )}
 
-            <div className="account-actions">
+            <div className="account-actions account-primary-actions">
               <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
               <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
               <Button onClick={() => setShowSignOutPrivacy(true)} variant="secondary">Sign out</Button>
@@ -4987,11 +4987,17 @@ function NumberField({ label, value, onChange, placeholder, min, max }) {
 function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, confirmClearLocal, setConfirmClearLocal, exportJson, exportCsv }) {
   return (
     <main className="layout">
-      <Card className="pad main-col full-width-card">
-        <h2><ShieldCheck size={20} /> Privacy</h2>
-        <p className="muted">
-          One calm place to manage your data, understand how 4Sara handles privacy, and review the terms and medical safety notes that protect users.
-        </p>
+      <Card className="pad main-col full-width-card privacy-dashboard-card">
+        <div className="privacy-page-hero">
+          <div>
+            <p className="account-eyebrow">Privacy center</p>
+            <h2><ShieldCheck size={20} /> Privacy</h2>
+            <p>
+              One calm place to manage your data, understand how 4Sara handles privacy, and review the terms and medical safety notes that protect users.
+            </p>
+          </div>
+          <span className={authUser ? "status-pill online" : "status-pill local"}>{authUser ? "Account connected" : "Local only"}</span>
+        </div>
 
         <div className="privacy-grid">
           <div className="privacy-info-card">
@@ -5013,7 +5019,8 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
           </div>
         </div>
 
-        <div className="privacy-section">
+        <div className="privacy-action-grid">
+          <div className="privacy-section privacy-action-card">
           <h3>Export your data</h3>
           <p>Download a backup before clearing or deleting anything.</p>
           <div className="actions">
@@ -5022,7 +5029,7 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
           </div>
         </div>
 
-        <div className="privacy-section">
+          <div className="privacy-section privacy-action-card">
           <h3>Cloud storage status</h3>
           <p>{authUser ? syncStatus : "You are not logged in. Your data is currently local to this device."}</p>
           <div className="privacy-status-row">
@@ -5059,7 +5066,9 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
             </div>
           </div>
         )}
+        </div>
 
+        <div className="privacy-legal-grid">
         <div className="privacy-section legal-section">
           <h3>Privacy policy summary</h3>
           <p>
@@ -5094,7 +5103,9 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
           </p>
         </div>
 
-        <div className="privacy-section danger-zone">
+        </div>
+
+        <div className="privacy-section danger-zone privacy-full-row">
           <h3>Clear local data</h3>
           <p>This removes 4Sara data from this browser/device. It does not delete cloud data from your account.</p>
           {authUser && <p className="danger-confirm">Safety: clearing local data turns off cloud sync first, so the empty local tracker is not auto-saved over your cloud copy.</p>}

@@ -5727,3 +5727,84 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-column: 1 / -1 !important;
   }
 }
+
+
+/* Account layout cleanup: stop awkward stretched cards */
+.account-polished-card .account-polished-stack {
+  align-items: start !important;
+}
+
+.account-polished-stack .support-sharing-card,
+.account-polished-stack .cloud-migration-card,
+.account-polished-stack .account-hero-status,
+.account-polished-stack .account-sync-panel,
+.account-polished-stack .account-clean-danger {
+  align-self: start !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.account-polished-stack .support-sharing-card {
+  display: block !important;
+}
+
+.account-polished-stack .support-sharing-card > p,
+.account-polished-stack .support-sharing-card .muted {
+  margin-top: 0.35rem !important;
+  margin-bottom: 0.85rem !important;
+}
+
+.account-polished-stack .support-sharing-card .shared-profile-list {
+  margin-top: 1rem !important;
+}
+
+.account-polished-stack .support-sharing-card .account-actions {
+  margin-top: 0.85rem !important;
+}
+
+.account-polished-stack .support-sharing-card:has(> p.muted) {
+  min-height: 190px !important;
+}
+
+.account-polished-stack .support-sharing-card:has(> p.muted) p.muted {
+  margin-top: 0.5rem !important;
+  max-width: 620px;
+}
+
+.account-polished-stack .account-hero-status,
+.account-polished-stack .cloud-migration-card {
+  min-height: 210px !important;
+}
+
+.account-polished-stack .cloud-migration-card .migration-actions {
+  margin-top: 1rem !important;
+}
+
+.account-polished-stack .support-sharing-card h3,
+.account-polished-stack .cloud-migration-card h3 {
+  margin-bottom: 0.6rem !important;
+}
+
+/* keep the wide layout, but make rows feel intentional */
+@media (min-width: 981px) {
+  .account-polished-card .account-polished-stack {
+    grid-template-columns: minmax(360px, 0.95fr) minmax(560px, 1.45fr) !important;
+  }
+
+  .account-polished-stack .account-hero-status {
+    grid-column: 1 / 2 !important;
+  }
+
+  .account-polished-stack .cloud-migration-card {
+    grid-column: 2 / 3 !important;
+  }
+
+  .account-polished-stack > .support-sharing-card:nth-of-type(3),
+  .account-polished-stack > .support-sharing-card:nth-of-type(4) {
+    grid-column: span 1 !important;
+  }
+
+  .account-polished-stack > .support-sharing-card:nth-of-type(5) {
+    grid-column: 1 / -1 !important;
+  }
+}

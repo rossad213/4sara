@@ -3629,8 +3629,6 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
     || getCurrentProjectedPhase(stats, entries)
     || "Unknown";
   const phaseText = phaseDescription(phase);
-  const topSymptoms = (stats.symptomStats || []).slice(0, 5);
-  const phasePatterns = stats.checkInPhaseInsights || [];
 
   const supportTips = {
     Menstruation: [
@@ -3812,10 +3810,10 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
   const tips = supportTips[phase] || supportTips.Unknown;
 
   return (
-    <main className="layout">
-      <Card className="pad main-col">
+    <main className="layout how-to-help-layout">
+      <Card className="pad main-col how-to-help-main-col">
         <h2><HeartPulse size={20} /> How to Help{sharedSupportData?.displayName ? ` ${sharedSupportData.displayName}` : ""}</h2>
-        <p className="muted">This read-only support guide uses the same phase shown for today on the Calendar tab, plus logged patterns, to suggest simple ways to be helpful.</p>
+        <p className="muted">This read-only support guide uses the same phase shown for today on the Calendar tab to suggest simple, practical ways to be helpful.</p>
 
         <div className="help-current-card">
           <p className="account-eyebrow">Estimated current phase for {formatDate(todayKey())}</p>
@@ -3835,26 +3833,10 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
           ))}
         </div>
 
-        <div className="privacy-section legal-section">
+        <div className="privacy-section legal-section how-to-help-reminder">
           <h3>Support reminder</h3>
           <p>This view is not medical advice. It is meant to help supporters be more thoughtful, patient, and aware. The current phase shown here matches today’s phase on the Calendar tab. Always respect privacy, consent, and boundaries.</p>
         </div>
-      </Card>
-
-      <Card className="pad side-col">
-        <h3>Recent patterns</h3>
-        {topSymptoms.length ? topSymptoms.map(([symptom, count]) => (
-          <div className="mini-card" key={symptom}><strong>{symptom}</strong><p>Logged {count} time{count === 1 ? "" : "s"}.</p></div>
-        )) : <p className="muted">No symptom patterns yet.</p>}
-
-        <h3>Check-ins by phase</h3>
-        {phasePatterns.length ? phasePatterns.slice(0, 5).map((item) => (
-          <div className="mini-card" key={item.phase}>
-            <strong>{item.phase}</strong>
-            <p>{item.count} check-in{item.count === 1 ? "" : "s"} logged.</p>
-            {item.topMood && <p>Common mood: {item.topMood[0]}</p>}
-          </div>
-        )) : <p className="muted">No phase check-in patterns yet.</p>}
       </Card>
     </main>
   );

@@ -6027,3 +6027,32 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* How to Help full-width layout */
+.how-to-help-layout {
+  grid-template-columns: 1fr;
+}
+
+.how-to-help-main-col {
+  width: 100%;
+}
+
+.expanded-help-tip-list {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: stretch;
+}
+
+.expanded-help-card {
+  height: 100%;
+}
+
+.how-to-help-reminder {
+  margin-top: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .expanded-help-tip-list {
+    grid-template-columns: 1fr;
+  }
+}

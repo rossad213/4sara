@@ -5983,3 +5983,208 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Expanded Support View How to Help ideas */
+.expanded-help-tip-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.expanded-help-card {
+  border-radius: 22px !important;
+  padding: 1rem !important;
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid rgba(253, 164, 175, 0.45) !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.035);
+}
+
+.expanded-help-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.expanded-help-card p {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.expanded-help-card ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  color: var(--muted);
+}
+
+.expanded-help-card li {
+  margin: 0.32rem 0;
+  line-height: 1.45;
+}
+
+@media (max-width: 1100px) {
+  .expanded-help-tip-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* How to Help full-width layout */
+.how-to-help-layout {
+  grid-template-columns: 1fr;
+}
+
+.how-to-help-main-col {
+  width: 100%;
+}
+
+.expanded-help-tip-list {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: stretch;
+}
+
+.expanded-help-card {
+  height: 100%;
+}
+
+.how-to-help-reminder {
+  margin-top: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .expanded-help-tip-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Cloud backup restore UI */
+.backup-restore-card {
+  grid-column: 1 / -1;
+}
+
+.backup-list {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.backup-item {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.035);
+}
+
+.backup-item strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.backup-item p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+
+/* Report a problem links */
+.problem-report-card {
+  border-color: rgba(244, 63, 94, 0.28) !important;
+  background: linear-gradient(135deg, rgba(255, 241, 242, 0.96), rgba(255, 255, 255, 0.92)) !important;
+}
+
+.problem-report-button {
+  display: inline-flex !important;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.65rem;
+  text-decoration: none;
+}
+
+.help-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.problem-report-mini-card {
+  border-color: rgba(251, 113, 133, 0.35) !important;
+}
+
+.problem-report-mini-card p {
+  margin-bottom: 0.4rem;
+}
+
+@media (max-width: 760px) {
+  .help-contact-actions,
+  .problem-report-mini-card .actions {
+    width: 100%;
+  }
+
+  .problem-report-button {
+    width: 100%;
+  }
+}
+
+
+/* Prediction education reminders */
+.prediction-education-card,
+.prediction-learning-card {
+  border-radius: 22px;
+  padding: 1rem;
+  border: 1px solid rgba(147, 197, 253, 0.55);
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.035);
+}
+
+.prediction-education-card {
+  margin: 1rem 0;
+}
+
+.prediction-education-card strong,
+.prediction-learning-card h3 {
+  display: block;
+  margin: 0 0 0.4rem;
+  color: var(--text);
+}
+
+.prediction-education-card p,
+.prediction-learning-card p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.prediction-education-note {
+  margin: 0.55rem 0 0 !important;
+  color: #475569;
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.prediction-learning-card {
+  margin: 1rem 0;
+}
+
+
+/* Slightly larger public homepage navigation */
+.landing-nav nav button {
+  font-size: 1.08rem !important;
+  font-weight: 900 !important;
+}
+
+.landing-brand span {
+  font-size: 1.06em;
+}

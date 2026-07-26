@@ -6239,3 +6239,64 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     padding-right: 1.05rem !important;
   }
 }
+
+
+/* Account tab: intentional true 50/50 layout */
+.account-polished-card .account-polished-stack {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 1rem !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.account-polished-card .account-polished-stack > * {
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  grid-column: auto !important;
+}
+
+.account-polished-card .account-hero-status,
+.account-polished-card .cloud-migration-card,
+.account-polished-card .support-sharing-card,
+.account-polished-card .support-viewers-card,
+.account-polished-card .support-activity-card,
+.account-polished-card .account-primary-actions,
+.account-polished-card .problem-report-mini-card,
+.account-polished-card .account-clean-danger,
+.account-polished-card .account-delete-zone {
+  grid-column: auto !important;
+}
+
+/* Pair these as clean rows:
+   left: Cloud sync / right: Auto-save
+   left: Save-load-signout actions / right: Report a problem
+   left: Cloud data controls / right: Delete account */
+.account-polished-card .account-primary-actions {
+  align-self: stretch !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-content: center !important;
+  align-items: center !important;
+}
+
+.account-polished-card .problem-report-mini-card,
+.account-polished-card .account-clean-danger,
+.account-polished-card .account-delete-zone {
+  min-height: 100% !important;
+}
+
+/* Keep the Account header intentionally full-width. */
+.account-polished-card .account-page-hero {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Mobile stays single-column. */
+@media (max-width: 820px) {
+  .account-polished-card .account-polished-stack {
+    grid-template-columns: 1fr !important;
+  }
+}

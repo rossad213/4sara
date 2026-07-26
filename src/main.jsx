@@ -216,27 +216,6 @@ function passwordRequirementMessage() {
   return "Password must be at least 8 characters and include at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.";
 }
 
-const REPORT_PROBLEM_EMAIL = "4sara.org@gmail.com";
-
-function reportProblemHref(context = "General") {
-  const subject = encodeURIComponent("4Sara Problem Report");
-  const body = encodeURIComponent(`What happened?
-
-What were you trying to do?
-
-What screen were you on?
-${context ? context : ""}
-
-Did you see an error message?
-
-Device/browser:
-
-Anything else?
-
-Please do not include highly sensitive medical details unless you are comfortable sharing them by email.`);
-  return `mailto:${REPORT_PROBLEM_EMAIL}?subject=${subject}&body=${body}`;
-}
-
 function inferPhase(dateKey, periods, avgCycle, avgPeriod) {
   if (!dateKey || !periods.length) return "Unknown";
   const sorted = [...periods].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
@@ -1080,61 +1059,6 @@ function friendlyPermissionMessage(message) {
   return text || "Something went wrong. Please try again.";
 }
 
-function friendlyErrorMessage(error, fallback = "Something went wrong. Please try again.") {
-  const raw = String(error?.code || error?.message || error || "").toLowerCase();
-
-  if (raw.includes("auth/email-already-in-use")) {
-    return "An account already exists with this email. Try logging in instead, or use Forgot password.";
-  }
-
-  if (raw.includes("auth/invalid-email")) {
-    return "Enter a valid email address.";
-  }
-
-  if (raw.includes("auth/user-not-found") || raw.includes("auth/wrong-password") || raw.includes("auth/invalid-credential")) {
-    return "The email or password does not look right. Try again, or use Forgot password.";
-  }
-
-  if (raw.includes("auth/weak-password")) {
-    return passwordRequirementMessage();
-  }
-
-  if (raw.includes("auth/too-many-requests")) {
-    return "Too many attempts. Please wait a little while, then try again.";
-  }
-
-  if (raw.includes("auth/network-request-failed") || raw.includes("unavailable") || raw.includes("network")) {
-    return "Could not connect right now. Check your internet connection and try again.";
-  }
-
-  if (raw.includes("auth/requires-recent-login")) {
-    return "For security, please log out, log back in, and try that again.";
-  }
-
-  if (raw.includes("permission") || raw.includes("insufficient") || raw.includes("permission-denied")) {
-    return "You do not have permission to do that right now. Try refreshing, signing in again, or checking access.";
-  }
-
-  if (raw.includes("not-found")) {
-    return "That data could not be found. It may have been deleted or moved.";
-  }
-
-  if (raw.includes("quota") || raw.includes("resource-exhausted")) {
-    return "4Sara is temporarily busy. Please wait a little while and try again.";
-  }
-
-  return fallback;
-}
-
-function friendlyAuthMessage(error, mode = "signin") {
-  return friendlyErrorMessage(
-    error,
-    mode === "signup"
-      ? "Could not create the account. Please check the email and password, then try again."
-      : "Could not log in. Please check the email and password, then try again."
-  );
-}
-
 
 function getCloudChoiceMap() {
   try {
@@ -1448,10 +1372,6 @@ function App() {
   const [confirmDeleteCloud, setConfirmDeleteCloud] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [confirmClearLocal, setConfirmClearLocal] = useState(false);
-  const [cloudBackups, setCloudBackups] = useState([]);
-  const [backupStatus, setBackupStatus] = useState("");
-  const [backupBusy, setBackupBusy] = useState(false);
-  const [confirmRestoreBackupId, setConfirmRestoreBackupId] = useState("");
   const [inviteToken, setInviteToken] = useState("");
   const [pendingInvite, setPendingInvite] = useState(null);
   const [inviteStatus, setInviteStatus] = useState("");
@@ -1617,7 +1537,7 @@ function App() {
     // 10 seconds keeps Firebase usage lower while still saving soon after meaningful changes.
     const timer = setTimeout(() => {
       saveToCloudSilent().catch((error) => {
-        setSyncStatus(friendlyErrorMessage(error, "Auto-sync failed. Your latest changes are still on this device."));
+        setSyncStatus(error.message || "Auto-sync failed.");
       });
     }, 10000);
 
@@ -1663,11 +1583,6 @@ function App() {
     return () => window.removeEventListener("popstate", syncRouteToState);
   }, []);
 
-  useEffect(() => {
-    if (!authUser || activeTab !== "privacy") return;
-    refreshCloudBackups();
-  }, [authUser, activeTab]);
-
   const handleAuthSubmit = async () => {
     setAuthError("");
     setAuthNotice("");
@@ -1702,7 +1617,7 @@ function App() {
 
       setAuthPassword("");
     } catch (error) {
-      setAuthError(friendlyAuthMessage(error, authMode));
+      setAuthError(error.message?.replace("Firebase: ", "") || "Authentication failed.");
     }
   };
 
@@ -1720,7 +1635,7 @@ function App() {
       setAuthNotice("Password reset email sent. Check your inbox.");
       showMessage("Password reset email sent.");
     } catch (error) {
-      setAuthError(friendlyErrorMessage(error, "Could not send the password reset email. Check the email address and try again."));
+      setAuthError(error.message?.replace("Firebase: ", "") || "Could not send password reset email.");
     }
   };
 
@@ -1738,7 +1653,7 @@ function App() {
       setAuthNotice("Verification email sent again. Check your inbox.");
       showMessage("Verification email sent.");
     } catch (error) {
-      setAuthError(friendlyErrorMessage(error, "Could not send the verification email. Please try again."));
+      setAuthError(error.message?.replace("Firebase: ", "") || "Could not send verification email.");
     }
   };
 
@@ -2113,7 +2028,7 @@ function App() {
       const cleanUrl = `${window.location.origin}${window.location.pathname}`;
       window.history.replaceState({}, document.title, cleanUrl);
     } catch (error) {
-      const friendly = friendlyErrorMessage(error, friendlyPermissionMessage(error.message || "Could not accept invite."));
+      const friendly = friendlyPermissionMessage(error.message || "Could not accept invite.");
       setInviteStatus(friendly);
       showMessage(friendly);
     } finally {
@@ -2150,9 +2065,8 @@ function App() {
       setSyncStatus("Cloud data deleted. Auto-sync was turned off so the cloud copy is not recreated automatically. Local data on this device was not deleted.");
       showMessage("Cloud data deleted.");
     } catch (error) {
-      const friendly = friendlyErrorMessage(error, "Cloud delete failed. Nothing was deleted. Please try again.");
-      setSyncStatus(friendly);
-      showMessage(friendly);
+      setSyncStatus("Cloud delete failed.");
+      showMessage(error.message || "Cloud delete failed.");
     } finally {
       setSyncBusy(false);
     }
@@ -2189,14 +2103,14 @@ function App() {
       setSyncStatus("Account deleted. Local data on this device was not deleted.");
       showMessage("Account deleted.");
     } catch (error) {
-      const friendly = friendlyErrorMessage(error, "Account deletion failed. Nothing was deleted. Please try again.");
+      const message = error.message || "Account deletion failed.";
 
-      if (String(error?.code || error?.message || "").includes("requires-recent-login")) {
+      if (message.includes("requires-recent-login")) {
         setSyncStatus("For security, log out, log back in, then delete the account again.");
         showMessage("Log in again before deleting account.");
       } else {
-        setSyncStatus(friendly);
-        showMessage(friendly);
+        setSyncStatus("Account deletion failed.");
+        showMessage(message);
       }
     } finally {
       setSyncBusy(false);
@@ -2263,7 +2177,7 @@ function App() {
         limit(20)
       );
       const snapshot = await getDocs(backupsQuery);
-      const extraBackups = snapshot.docs.slice(3);
+      const extraBackups = snapshot.docs.slice(10);
       await Promise.all(extraBackups.map((backupDoc) => deleteDoc(backupDoc.ref)));
     } catch (error) {
       console.warn("Could not prune old 4Sara backups.", error);
@@ -2305,165 +2219,6 @@ function App() {
     } catch (error) {
       console.warn("Could not create 4Sara cloud backup.", error);
       return false;
-    }
-  };
-
-  const refreshCloudBackups = async () => {
-    if (!authUser) {
-      setBackupStatus("Log in to view cloud backups.");
-      setCloudBackups([]);
-      return;
-    }
-
-    setBackupBusy(true);
-    setBackupStatus("Loading backups...");
-
-    try {
-      const backupsQuery = query(
-        collection(db, "users", authUser.uid, "backups"),
-        orderBy("createdAt", "desc"),
-        limit(3)
-      );
-      const snapshot = await getDocs(backupsQuery);
-      const backups = snapshot.docs.map((backupDoc) => ({
-        id: backupDoc.id,
-        ...backupDoc.data()
-      }));
-
-      setCloudBackups(backups);
-      setBackupStatus(backups.length ? `Found ${backups.length} recent backup${backups.length === 1 ? "" : "s"}.` : "No cloud backups found yet.");
-    } catch (error) {
-      const friendly = friendlyErrorMessage(error, "Could not load backups. Please try again.");
-      setBackupStatus(friendly);
-      showMessage(friendly);
-    } finally {
-      setBackupBusy(false);
-    }
-  };
-
-  const createManualCloudBackup = async () => {
-    if (!authUser) {
-      showMessage("Log in first to create a cloud backup.");
-      return;
-    }
-
-    setBackupBusy(true);
-    setBackupStatus("Creating backup...");
-
-    try {
-      await setDoc(doc(db, "users", authUser.uid), {
-        email: authUser.email || "",
-        data: buildCloudPayload(),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      const created = await createCloudBackup(authUser, "manual-backup");
-
-      if (created) {
-        setBackupStatus("Backup created.");
-        showMessage("Backup created.");
-        await refreshCloudBackups();
-      } else {
-        setBackupStatus("No cloud data was available to back up yet.");
-        showMessage("No cloud data available to back up yet.");
-      }
-    } catch (error) {
-      const friendly = friendlyErrorMessage(error, "Could not create backup. Please try again.");
-      setBackupStatus(friendly);
-      showMessage(friendly);
-    } finally {
-      setBackupBusy(false);
-    }
-  };
-
-  const downloadCloudBackup = (backup) => {
-    if (!backup?.data) {
-      showMessage("Backup data was not available.");
-      return;
-    }
-
-    downloadFile(
-      `4sara-backup-${backup.createdAt ? backup.createdAt.slice(0, 10) : "cloud"}.json`,
-      JSON.stringify({
-        exportedAt: new Date().toISOString(),
-        backupId: backup.id,
-        reason: backup.reason || "",
-        createdAt: backup.createdAt || "",
-        data: backup.data
-      }, null, 2),
-      "application/json"
-    );
-    showMessage("Backup downloaded.");
-  };
-
-  const restoreCloudBackup = async (backup) => {
-    if (!authUser) {
-      showMessage("Log in first to restore a backup.");
-      return;
-    }
-
-    if (!backup?.id || !backup?.data) {
-      showMessage("Backup data was not available.");
-      return;
-    }
-
-    if (confirmRestoreBackupId !== backup.id) {
-      setConfirmRestoreBackupId(backup.id);
-      setBackupStatus("Click Restore again to confirm. This will replace current cloud and device data with that backup.");
-      return;
-    }
-
-    setBackupBusy(true);
-    setSyncBusy(true);
-    setBackupStatus("Creating safety backup before restore...");
-
-    try {
-      await createCloudBackup(authUser, "before-restore-backup");
-
-      const restoredEntries = Array.isArray(backup.data.entries) ? backup.data.entries : [];
-      const restoredSettings = backup.data.settings || {};
-      const restoredAt = new Date().toISOString();
-
-      await setDoc(doc(db, "users", authUser.uid), {
-        email: authUser.email || "",
-        data: {
-          entries: restoredEntries,
-          settings: stableCloudSettings(restoredSettings),
-          updatedAt: restoredAt
-        },
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      setEntries(restoredEntries);
-      setSettings((current) => ({
-        ...current,
-        ...restoredSettings,
-        welcomeSeen: true,
-        accountPromptSeen: true,
-        onboardingComplete: true,
-        pin: current.pin,
-        pinEnabled: current.pinEnabled
-      }));
-
-      setCloudHasData(true);
-      setCloudUpdatedAt(restoredAt);
-      setCloudSyncAllowed(true);
-      setAutoSyncEnabled(true);
-      setCloudLoadedAccountUid(authUser.uid);
-      setConfirmRestoreBackupId("");
-      lastCloudPayloadSignatureRef.current = makeCloudPayloadSignature(restoredEntries, { ...defaultSettings, ...restoredSettings });
-      await rememberCloudChoiceForAccount(authUser, "load-cloud");
-      setSyncStatus("Backup restored. This device and cloud account now use the restored data.");
-      setBackupStatus("Backup restored.");
-      showMessage("Backup restored.");
-      await refreshCloudBackups();
-    } catch (error) {
-      const friendly = friendlyErrorMessage(error, "Could not restore backup. Nothing was restored.");
-      setBackupStatus(friendly);
-      showMessage(friendly);
-    } finally {
-      setBackupBusy(false);
-      setSyncBusy(false);
     }
   };
 
@@ -2666,9 +2421,8 @@ function App() {
       setSyncStatus(`Saved to cloud at ${savedTime}. Future sign-ins will load this account's cloud data first.`);
       showMessage("Saved to cloud.");
     } catch (error) {
-      const friendly = friendlyErrorMessage(error, "Cloud save failed. Your data is still on this device.");
-      setSyncStatus(friendly);
-      showMessage(friendly);
+      setSyncStatus("Cloud save failed.");
+      showMessage(error.message || "Cloud save failed.");
     } finally {
       setSyncBusy(false);
     }
@@ -2716,9 +2470,8 @@ function App() {
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}. This device will keep using cloud data after refresh.`);
       showMessage("Loaded cloud data.");
     } catch (error) {
-      const friendly = friendlyErrorMessage(error, "Cloud load failed. Please check your connection and try again.");
-      setSyncStatus(friendly);
-      showMessage(friendly);
+      setSyncStatus("Cloud load failed.");
+      showMessage(error.message || "Cloud load failed.");
     } finally {
       setSyncBusy(false);
     }
@@ -3437,7 +3190,7 @@ function App() {
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={activeEntriesForLog} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={activeSymptomsForLog} customSymptoms={activeSettingsForLog.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} allMoods={activeMoodsForLog} customMoods={activeSettingsForLog.customMoods || []} customMoodInput={customMoodInput} setCustomMoodInput={setCustomMoodInput} addCustomMood={addCustomMood} removeCustomMood={removeCustomMood} selectedPhase={selectedPhase} isSupportEditMode={supportCanEdit} allowDelete={viewMode !== "support"} allowCustomSymptoms={viewMode !== "support"} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} isSupportView={viewMode === "support"} readOnly={viewMode === "support"} />}
             {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTabRoute} />}
-            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} cloudBackups={cloudBackups} backupStatus={backupStatus} backupBusy={backupBusy} refreshCloudBackups={refreshCloudBackups} createManualCloudBackup={createManualCloudBackup} restoreCloudBackup={restoreCloudBackup} downloadCloudBackup={downloadCloudBackup} confirmRestoreBackupId={confirmRestoreBackupId} setConfirmRestoreBackupId={setConfirmRestoreBackupId} />}
+            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} updateSupportViewerPermission={updateSupportViewerPermission} supportActivity={supportActivity} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && viewMode === "support" && (
@@ -3698,7 +3451,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
               <p className="sync-small">Existing accounts with cloud data load their own cloud copy first. Signed-out local data is not auto-saved into an existing account.</p>
               <p className="sync-small">Scale guard: 4Sara waits about 10 seconds before auto-saving and skips duplicate cloud writes when nothing changed.</p>
-              <p className="sync-small">Backup guard: 4Sara keeps the 3 newest recovery backups before cloud saves and cloud deletes.</p>
+              <p className="sync-small">Backup guard: 4Sara keeps recent recovery backups before cloud saves and cloud deletes.</p>
             </div>
 
             <label className="setting-row autosync-row">
@@ -3713,12 +3466,6 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
               <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
               <Button onClick={() => setShowSignOutPrivacy(true)} variant="secondary">Sign out</Button>
-            </div>
-
-            <div className="support-sharing-card account-clean-section problem-report-mini-card">
-              <h3>Having an account or sync problem?</h3>
-              <p>Report login, signup, cloud sync, backup, or Support View issues so they can be fixed faster.</p>
-              <a className="btn problem-report-button" href={reportProblemHref("Account tab / sign-in or cloud sync")}>Report a problem</a>
             </div>
 
             <div className="danger-zone account-clean-danger">
@@ -3802,7 +3549,6 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                 {confirmClearLocal && <Button onClick={() => setConfirmClearLocal(false)} variant="secondary">Cancel</Button>}
               </div>
               <p className="auth-note">This is not a sign out button because no account is currently signed in.</p>
-              <a className="btn secondary problem-report-button" href={reportProblemHref("Account tab / login or local data")}>Report a problem</a>
             </div>
           </div>
         )}
@@ -3883,191 +3629,49 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
     || getCurrentProjectedPhase(stats, entries)
     || "Unknown";
   const phaseText = phaseDescription(phase);
+  const topSymptoms = (stats.symptomStats || []).slice(0, 5);
+  const phasePatterns = stats.checkInPhaseInsights || [];
 
   const supportTips = {
     Menstruation: [
-      {
-        title: "Make comfort easy",
-        summary: "Offer practical comfort without making them ask for every little thing.",
-        ideas: [
-          "Bring water, tea, a heating pad, pain-relief items they already use, or a blanket.",
-          "Ask whether they want quiet company, space, a movie, food, or help resting.",
-          "Help with small tasks like dishes, laundry, errands, pet care, or picking up food."
-        ]
-      },
-      {
-        title: "Be patient with lower energy",
-        summary: "Menstruation can come with cramps, fatigue, headaches, or lower motivation.",
-        ideas: [
-          "Do not pressure them to be productive if they are uncomfortable.",
-          "Offer flexible plans instead of making them feel guilty for resting.",
-          "Use simple check-ins like, “Do you want help, comfort, or space right now?”"
-        ]
-      },
-      {
-        title: "Take symptoms seriously",
-        summary: "Support means believing them and not minimizing what they feel.",
-        ideas: [
-          "Avoid comments like “it cannot be that bad” or “you are being dramatic.”",
-          "Notice if symptoms seem stronger than usual and encourage care if they are worried.",
-          "If pain, bleeding, dizziness, or symptoms feel severe or unusual, encourage medical help."
-        ]
-      }
+      "Offer comfort, rest, water, a heating pad, or help with small tasks.",
+      "Be patient if energy is lower or cramps are present.",
+      "Avoid minimizing pain or symptoms."
     ],
     Follicular: [
-      {
-        title: "Support gentle momentum",
-        summary: "Energy may start improving after menstruation, but it can still vary.",
-        ideas: [
-          "Encourage light routines, planning, movement, or getting back into tasks if they want that.",
-          "Offer to help organize the week, meals, errands, schoolwork, or responsibilities.",
-          "Keep it encouraging, not pushy; ask what pace feels realistic."
-        ]
-      },
-      {
-        title: "Build positive routines",
-        summary: "This can be a good time to support healthy habits without pressure.",
-        ideas: [
-          "Suggest a walk, simple meal, hydration, sleep routine, or low-stress activity.",
-          "Help remove friction: prep something, remind gently, or make the task easier.",
-          "Celebrate small wins instead of focusing on what was not done."
-        ]
-      },
-      {
-        title: "Stay flexible",
-        summary: "Even if energy improves, symptoms or mood can still shift.",
-        ideas: [
-          "Check in before assuming they feel great.",
-          "Keep plans adjustable.",
-          "If they seem tired, offer a lighter version of the plan."
-        ]
-      }
+      "Encourage gentle planning, movement, or routines if energy is improving.",
+      "This may be a good time for positive motivation and shared plans.",
+      "Keep support flexible because energy can still vary."
     ],
     Fertile: [
-      {
-        title: "Be attentive without being intrusive",
-        summary: "The fertile window is an estimate, and privacy still matters.",
-        ideas: [
-          "Respect boundaries around fertility, intimacy, and body information.",
-          "Do not make jokes or assumptions about pregnancy, sex, or fertility.",
-          "Ask what kind of support feels helpful instead of over-interpreting the phase."
-        ]
-      },
-      {
-        title: "Support changing energy and mood",
-        summary: "Some people feel more energetic here, while others notice sensitivity or symptoms.",
-        ideas: [
-          "Offer encouragement for plans or movement if they seem up for it.",
-          "Be patient if mood or body sensations feel different.",
-          "Keep communication clear and respectful."
-        ]
-      },
-      {
-        title: "Remember this is an estimate",
-        summary: "Cycle predictions are helpful, but not exact.",
-        ideas: [
-          "Do not treat the fertile window like a guaranteed medical fact.",
-          "Avoid using this information to pressure decisions.",
-          "Let them lead how much they want to talk about it."
-        ]
-      }
+      "Be supportive and attentive to mood, energy, and body changes.",
+      "Respect privacy and boundaries around fertility information.",
+      "Remember the fertile window is only an estimate."
     ],
     Ovulation: [
-      {
-        title: "Support body changes",
-        summary: "Ovulation may come with bloating, sensitivity, discharge changes, or one-sided pain.",
-        ideas: [
-          "Offer comfort if they mention discomfort, bloating, or tenderness.",
-          "Suggest rest, water, lighter plans, or a heating pad if that usually helps.",
-          "Encourage medical care if pain is severe, sudden, or unusual."
-        ]
-      },
-      {
-        title: "Respect privacy and boundaries",
-        summary: "Ovulation information can feel personal.",
-        ideas: [
-          "Do not announce or joke about their ovulation status.",
-          "Do not connect it to intimacy unless they bring it up first.",
-          "Keep support calm, normal, and respectful."
-        ]
-      },
-      {
-        title: "Stay aware of mood shifts",
-        summary: "Some people notice emotional or physical changes around ovulation.",
-        ideas: [
-          "Ask how they are feeling instead of assuming.",
-          "Be kind if they seem sensitive, uncomfortable, or distracted.",
-          "Offer help with plans if energy changes quickly."
-        ]
-      }
+      "Support comfort if there is bloating, one-sided pain, or sensitivity.",
+      "Respect privacy and boundaries around ovulation information.",
+      "Remember ovulation timing is estimated and can shift."
     ],
     Luteal: [
-      {
-        title: "Lower stress before it builds",
-        summary: "The luteal phase can bring PMS-type symptoms, fatigue, cravings, irritability, or mood changes.",
-        ideas: [
-          "Offer help with errands, meals, chores, or planning before things feel overwhelming.",
-          "Keep communication calm and avoid picking unnecessary fights.",
-          "Suggest quiet time, rest, a snack, water, or a lighter plan if they seem drained."
-        ]
-      },
-      {
-        title: "Be emotionally steady",
-        summary: "Patience and reassurance can help more than trying to fix everything.",
-        ideas: [
-          "Listen first before giving advice.",
-          "Use reassuring language like, “I am here,” “That makes sense,” or “How can I help?”",
-          "Do not dismiss feelings as “just hormones.”"
-        ]
-      },
-      {
-        title: "Prepare for the next period",
-        summary: "This phase is often right before menstruation.",
-        ideas: [
-          "Ask if they want supplies, comfort items, groceries, or help with tasks before their period starts.",
-          "Support sleep and lower-pressure routines.",
-          "If symptoms are intense, recurring, or concerning, encourage professional care."
-        ]
-      }
+      "Be extra patient with mood changes, cravings, fatigue, or irritability.",
+      "Offer help before stress builds up, such as errands, meals, or quiet time.",
+      "Avoid unnecessary conflict and do not dismiss symptoms."
     ],
     Unknown: [
-      {
-        title: "Ask first",
-        summary: "When the phase is unclear, the best support is curiosity without assumptions.",
-        ideas: [
-          "Ask, “What would feel helpful today?”",
-          "Offer choices: comfort, food, help with tasks, quiet time, or space.",
-          "Avoid guessing what they need based only on the app."
-        ]
-      },
-      {
-        title: "Listen and adjust",
-        summary: "Support should match what they actually say they need.",
-        ideas: [
-          "Reflect back what you hear before giving advice.",
-          "If they say they need space, respect that.",
-          "If they want help, make the next step specific and easy."
-        ]
-      },
-      {
-        title: "Watch for concerning symptoms",
-        summary: "The app is not medical advice.",
-        ideas: [
-          "Encourage medical care for severe pain, very heavy bleeding, fainting, pregnancy concerns, or unusual symptoms.",
-          "Do not rely on the app during urgent situations.",
-          "When in doubt, support them in contacting a qualified healthcare professional."
-        ]
-      }
+      "Ask what kind of support would be helpful today.",
+      "Be patient, listen first, and avoid assumptions.",
+      "Encourage rest or medical care if symptoms feel concerning."
     ]
   };
 
   const tips = supportTips[phase] || supportTips.Unknown;
 
   return (
-    <main className="layout how-to-help-layout">
-      <Card className="pad main-col how-to-help-main-col">
+    <main className="layout">
+      <Card className="pad main-col">
         <h2><HeartPulse size={20} /> How to Help{sharedSupportData?.displayName ? ` ${sharedSupportData.displayName}` : ""}</h2>
-        <p className="muted">This read-only support guide uses the same phase shown for today on the Calendar tab to suggest simple, practical ways to be helpful.</p>
+        <p className="muted">This read-only support guide uses the same phase shown for today on the Calendar tab, plus logged patterns, to suggest simple ways to be helpful.</p>
 
         <div className="help-current-card">
           <p className="account-eyebrow">Estimated current phase for {formatDate(todayKey())}</p>
@@ -4075,22 +3679,35 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
           <p>{phaseText}</p>
         </div>
 
-        <div className="help-tip-list expanded-help-tip-list">
+        <div className="help-tip-list">
           {tips.map((tip) => (
-            <div className="mini-card expanded-help-card" key={tip.title}>
-              <strong>{tip.title}</strong>
-              <p>{tip.summary}</p>
-              <ul>
-                {tip.ideas.map((idea) => <li key={idea}>{idea}</li>)}
-              </ul>
+            <div className="mini-card" key={tip}>
+              <strong>Support idea</strong>
+              <p>{tip}</p>
             </div>
           ))}
         </div>
 
-        <div className="privacy-section legal-section how-to-help-reminder">
+        <div className="privacy-section legal-section">
           <h3>Support reminder</h3>
           <p>This view is not medical advice. It is meant to help supporters be more thoughtful, patient, and aware. The current phase shown here matches today’s phase on the Calendar tab. Always respect privacy, consent, and boundaries.</p>
         </div>
+      </Card>
+
+      <Card className="pad side-col">
+        <h3>Recent patterns</h3>
+        {topSymptoms.length ? topSymptoms.map(([symptom, count]) => (
+          <div className="mini-card" key={symptom}><strong>{symptom}</strong><p>Logged {count} time{count === 1 ? "" : "s"}.</p></div>
+        )) : <p className="muted">No symptom patterns yet.</p>}
+
+        <h3>Check-ins by phase</h3>
+        {phasePatterns.length ? phasePatterns.slice(0, 5).map((item) => (
+          <div className="mini-card" key={item.phase}>
+            <strong>{item.phase}</strong>
+            <p>{item.count} check-in{item.count === 1 ? "" : "s"} logged.</p>
+            {item.topMood && <p>Common mood: {item.topMood[0]}</p>}
+          </div>
+        )) : <p className="muted">No phase check-in patterns yet.</p>}
       </Card>
     </main>
   );
@@ -4287,12 +3904,6 @@ function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
           <h3>Is 4Sara medical advice?</h3>
           <p>No. 4Sara is for personal wellness tracking only. Predictions are estimates and should not be used as medical advice, diagnosis, treatment, or birth control.</p>
         </div>
-
-        <div className="help-card problem-report-card">
-          <h3>Report a problem</h3>
-          <p>Something not working? Send a quick problem report so we can understand what happened and fix it.</p>
-          <a className="btn problem-report-button" href={reportProblemHref("Help Center")}>Report a problem</a>
-        </div>
       </div>
 
       <div className="help-contact-strip">
@@ -4300,10 +3911,7 @@ function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
           <strong>Still need help?</strong>
           <p>Email us and we’ll respond as soon as possible.</p>
         </div>
-        <div className="help-contact-actions">
-          <a className="btn help-mail-button" href={contactHref}>Contact 4Sara</a>
-          <a className="btn secondary problem-report-button" href={reportProblemHref("Help Center")}>Report a problem</a>
-        </div>
+        <a className="btn help-mail-button" href={contactHref}>Contact 4Sara</a>
       </div>
     </section>
   );
@@ -4325,7 +3933,6 @@ function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
       <div className="support-note-box">
         <strong>Helpful details to include</strong>
         <p>Tell us what page you were on, what you were trying to do, and what happened. If it is a bug, a screenshot can help.</p>
-        <a className="btn problem-report-button" href={reportProblemHref("Contact page")}>Report a problem</a>
       </div>
     </section>
   );
@@ -4621,13 +4228,6 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
           <label><span>Flow level</span><select value={onboarding.firstFlow} onChange={(e) => setOnboarding({ ...onboarding, firstFlow: e.target.value })}><option>N/A</option><option>N/A</option><option>Light</option><option>Medium</option><option>Heavy</option><option>Spotting</option></select></label>
           <label><span>Mood</span><select value={onboarding.firstMood} onChange={(e) => setOnboarding({ ...onboarding, firstMood: e.target.value })}>{moods.map((mood) => <option key={mood}>{mood}</option>)}</select></label>
         </div>
-
-        <div className="prediction-education-card">
-          <strong>Predictions improve over time</strong>
-          <p>Your first prediction is only a starting estimate. 4Sara becomes more personalized as you log more periods, symptoms, moods, notes, and daily check-ins.</p>
-          <p>One cycle can help 4Sara begin. Three or more cycles usually give a better pattern.</p>
-        </div>
-
         <div className="consent-card">
           <label className="consent-row">
             <input
@@ -4682,7 +4282,6 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
               <span>{daysLabel}</span>
             </div>
             <p className="dashboard-hero-note">{hasLoggedData ? `Your period is predicted from your typical cycle length of ${stats.averageCycle || 28} days. ${stats.currentCycleAdjustmentDays ? "Current-cycle factors may shift this prediction window." : "Unusual cycles are discounted so one late cycle does not rewrite your average."}` : "No cycle data has been logged yet. Add your first menstruation entry or daily check-in whenever you are ready."}</p>
-            <p className="prediction-education-note">Predictions improve as you log more cycles. Early estimates may change.</p>
             <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
           <div className="dashboard-calendar-art" aria-hidden="true">
@@ -4927,7 +4526,7 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
           <PhaseCard kind="blue" title="Check-in" text="Saved mood, symptom, or note." />
         </div>
 
-        <p className="calendar-note">Future phases are estimates. They become more reliable as you log more period history and daily check-ins. Cycle phases and fertile timing are estimated up to 6 months ahead and should not be used as birth control or medical advice.</p>
+        <p className="calendar-note">Cycle phases and fertile timing are estimated up to 6 months ahead and should not be used as birth control or medical advice.</p>
 
         <div className="weekdays">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div key={day}>{day}</div>)}</div>
 
@@ -5251,14 +4850,6 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
           </div>
         </div>
 
-        <div className="prediction-learning-card">
-          <div>
-            <h3>Why predictions may change</h3>
-            <p>4Sara starts with an estimate, then improves as more cycle history is logged. One cycle is a starting point. Three or more cycles can show a better pattern.</p>
-            <p>Daily check-ins and notes can also help explain changes from stress, sleep, travel, illness, medication, or routine changes.</p>
-          </div>
-        </div>
-
         <div className="insights-summary-grid">
           <div className="insight-summary-card featured">
             <span>Current estimate</span>
@@ -5275,13 +4866,6 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
             <strong>{stats.ovulationDay ? formatDate(stats.ovulationDay) : "Not enough data"}</strong>
             <p>{stats.fertileStart && stats.fertileEnd ? `Fertile estimate: ${formatDate(stats.fertileStart)} - ${formatDate(stats.fertileEnd)}` : "Add more cycle history for timing estimates."}</p>
           </div>
-        </div>
-
-        <div className="insights-stat-row">
-          <InsightMiniStat title="Average cycle" value={`${stats.averageCycle} days`} note={stats.minCycle ? `Range: ${stats.minCycle} - ${stats.maxCycle}` : "Range builds after 2+ cycles"} />
-          <InsightMiniStat title="Average menstruation" value={`${stats.averagePeriod} days`} note={`${stats.completedPeriodEpisodes || 0} completed ${stats.completedPeriodEpisodes === 1 ? "episode" : "episodes"}`} />
-          <InsightMiniStat title="Logged cycles" value={`${stats.totalEntries}`} note={`${stats.totalPeriodLogs || 0} total menstruation logs`} />
-          <InsightMiniStat title="Prediction window" value={stats.predictionWindowStart ? `${formatDate(stats.predictionWindowStart)} - ${formatDate(stats.predictionWindowEnd)}` : "Not ready"} note="A soft estimate, not a guarantee" />
         </div>
 
         <div className="insights-section-card pattern-notes-card">
@@ -5303,6 +4887,13 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="insights-stat-row">
+          <InsightMiniStat title="Average cycle" value={`${stats.averageCycle} days`} note={stats.minCycle ? `Range: ${stats.minCycle} - ${stats.maxCycle}` : "Range builds after 2+ cycles"} />
+          <InsightMiniStat title="Average menstruation" value={`${stats.averagePeriod} days`} note={`${stats.completedPeriodEpisodes || 0} completed ${stats.completedPeriodEpisodes === 1 ? "episode" : "episodes"}`} />
+          <InsightMiniStat title="Logged cycles" value={`${stats.totalEntries}`} note={`${stats.totalPeriodLogs || 0} total menstruation logs`} />
+          <InsightMiniStat title="Prediction window" value={stats.predictionWindowStart ? `${formatDate(stats.predictionWindowStart)} - ${formatDate(stats.predictionWindowEnd)}` : "Not ready"} note="A soft estimate, not a guarantee" />
         </div>
 
         <div className="insights-section-card">
@@ -5527,7 +5118,7 @@ function NumberField({ label, value, onChange, placeholder, min, max }) {
   return <label className="form single"><span>{label}</span><input type="number" min={min} max={max} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></label>;
 }
 
-function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, confirmClearLocal, setConfirmClearLocal, exportJson, exportCsv, cloudBackups = [], backupStatus = "", backupBusy = false, refreshCloudBackups, createManualCloudBackup, restoreCloudBackup, downloadCloudBackup, confirmRestoreBackupId, setConfirmRestoreBackupId }) {
+function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, setLocked, clearData, confirmClearLocal, setConfirmClearLocal, exportJson, exportCsv }) {
   return (
     <main className="layout">
       <Card className="pad main-col full-width-card privacy-dashboard-card">
@@ -5579,49 +5170,6 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
             <span className={authUser ? "status-pill online" : "status-pill local"}>{authUser ? "Account connected" : "Local only"}</span>
             {authUser && <span className={cloudHasData ? "status-pill online" : "status-pill local"}>{cloudHasData ? "Cloud data found" : "No cloud data found yet"}</span>}
           </div>
-        </div>
-
-        {authUser && (
-          <div className="privacy-section privacy-action-card backup-restore-card">
-            <h3>Cloud backups & restore</h3>
-            <p>4Sara keeps the 3 newest recovery backups before important cloud actions. You can also create a backup now or restore a recent one.</p>
-            <div className="actions">
-              <Button onClick={createManualCloudBackup} variant="secondary" disabled={backupBusy || syncBusy}>Create backup now</Button>
-              <Button onClick={refreshCloudBackups} variant="secondary" disabled={backupBusy}>Refresh backups</Button>
-            </div>
-            {backupStatus && <p className="sync-small">{backupStatus}</p>}
-
-            {cloudBackups.length > 0 ? (
-              <div className="backup-list">
-                {cloudBackups.map((backup) => (
-                  <div className="backup-item" key={backup.id}>
-                    <div>
-                      <strong>{backup.createdAt ? new Date(backup.createdAt).toLocaleString() : "Cloud backup"}</strong>
-                      <p>{backup.reason ? backup.reason.replaceAll("-", " ") : "Backup"} · {(backup.data?.entries || []).length} entr{(backup.data?.entries || []).length === 1 ? "y" : "ies"}</p>
-                    </div>
-                    {confirmRestoreBackupId === backup.id && (
-                      <p className="danger-confirm">Confirm restore: this replaces current cloud and device data with this backup.</p>
-                    )}
-                    <div className="backup-actions">
-                      <Button onClick={() => restoreCloudBackup(backup)} variant="secondary" disabled={backupBusy || syncBusy}>
-                        {confirmRestoreBackupId === backup.id ? "Confirm restore" : "Restore"}
-                      </Button>
-                      <Button onClick={() => downloadCloudBackup(backup)} variant="secondary" disabled={backupBusy}>Download</Button>
-                      {confirmRestoreBackupId === backup.id && <Button onClick={() => setConfirmRestoreBackupId("")} variant="secondary">Cancel</Button>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">No recent cloud backups are showing yet.</p>
-            )}
-          </div>
-        )}
-
-        <div className="privacy-section privacy-action-card problem-report-mini-card">
-          <h3>Report a privacy, backup, or data problem</h3>
-          <p>If export, backup, restore, cloud sync, delete, or privacy controls do not work the way you expected, send a quick report.</p>
-          <a className="btn problem-report-button" href={reportProblemHref("Privacy tab / data controls")}>Report a problem</a>
         </div>
 
         {authUser && (

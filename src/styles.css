@@ -5808,3 +5808,99 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-column: 1 / -1 !important;
   }
 }
+
+/* Account tab full-width stretch fix */
+.account-only-view,
+.account-signed-in.account-only-view,
+.account-polished-card .account-polished-stack {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.account-polished-card .account-polished-stack {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  align-items: start !important;
+}
+
+.account-polished-stack > * {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  justify-self: stretch !important;
+}
+
+.account-polished-stack .account-hero-status {
+  grid-column: 1 / 2 !important;
+}
+
+.account-polished-stack .cloud-migration-card {
+  grid-column: 2 / 3 !important;
+}
+
+.account-polished-stack > .support-sharing-card:nth-of-type(3) {
+  grid-column: 1 / 2 !important;
+}
+
+.account-polished-stack > .support-sharing-card:nth-of-type(4) {
+  grid-column: 2 / 3 !important;
+}
+
+.account-polished-stack > .support-sharing-card:nth-of-type(5),
+.account-polished-stack .account-primary-actions {
+  grid-column: 1 / -1 !important;
+}
+
+.account-polished-stack .account-sync-panel {
+  grid-column: 1 / 2 !important;
+}
+
+.account-polished-stack .autosync-row {
+  grid-column: 2 / 3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.account-polished-stack .account-clean-danger {
+  grid-column: span 1 !important;
+}
+
+.account-polished-stack .support-sharing-card,
+.account-polished-stack .cloud-migration-card,
+.account-polished-stack .account-sync-panel,
+.account-polished-stack .account-clean-danger,
+.account-polished-stack .autosync-row,
+.account-polished-stack .account-hero-status {
+  height: 100% !important;
+}
+
+@media (min-width: 1200px) {
+  .account-polished-card .account-polished-stack {
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 1.58fr) !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .account-only-view,
+  .account-signed-in.account-only-view,
+  .account-polished-card .account-polished-stack {
+    max-width: 100% !important;
+  }
+
+  .account-polished-card .account-polished-stack {
+    grid-template-columns: 1fr !important;
+  }
+
+  .account-polished-stack .account-hero-status,
+  .account-polished-stack .cloud-migration-card,
+  .account-polished-stack > .support-sharing-card:nth-of-type(3),
+  .account-polished-stack > .support-sharing-card:nth-of-type(4),
+  .account-polished-stack > .support-sharing-card:nth-of-type(5),
+  .account-polished-stack .account-sync-panel,
+  .account-polished-stack .autosync-row,
+  .account-polished-stack .account-clean-danger,
+  .account-polished-stack .account-primary-actions,
+  .account-polished-stack .sync-paused-note {
+    grid-column: 1 / -1 !important;
+  }
+}

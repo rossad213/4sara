@@ -587,65 +587,442 @@ function isFutureDate(dateKey) {
   return daysBetween(todayKey(), dateKey) > 0;
 }
 
+function makeSuggestion({ title, why, tryNow = [], food = [], movement = [], comfort = [], support = [], watch = [] }) {
+  return {
+    title,
+    why,
+    sections: [
+      { label: "Try now", items: tryNow },
+      { label: "Food & drink", items: food },
+      { label: "Movement", items: movement },
+      { label: "Comfort", items: comfort },
+      { label: "Support", items: support },
+      { label: "Pay attention if", items: watch }
+    ].filter((section) => section.items?.length),
+    food: food.join(" "),
+    movement: movement.join(" "),
+    comfort: [...tryNow, ...comfort, ...support, ...watch].join(" ")
+  };
+}
+
 function suggestionFor(symptom, phase = "your cycle") {
   const s = symptom.toLowerCase();
   const p = phase === "Unknown" || phase === "your cycle" ? "your cycle" : `the ${phase.toLowerCase()} phase`;
+  const phaseNote = `Track whether this repeats during ${p} so 4Sara can make the pattern more useful over time.`;
 
-  if (s.includes("cramp")) return {
-    title: `Cramps during ${p}`,
-    food: "Consider warm drinks, balanced meals, and staying hydrated.",
-    movement: "Gentle stretching, light walking, or yoga may help ease discomfort.",
-    comfort: "Heat on the lower abdomen or back may help. If cramps are severe or unusual, consider talking with a healthcare professional."
-  };
+  if (s.includes("cramp")) return makeSuggestion({
+    title: `Cramp relief during ${p}`,
+    why: "Cramps can show up around menstruation or before it starts. The goal is to lower tension, support rest, and notice what helps.",
+    tryNow: [
+      "Use a heating pad or warm compress on the lower belly or lower back.",
+      "Try a warm bath or shower if that usually feels soothing.",
+      "Sip something warm, like ginger tea, peppermint tea, chamomile tea, or warm water."
+    ],
+    food: [
+      "Try a balanced snack or meal with protein so your stomach is not empty.",
+      "Drink water or an electrolyte drink if you have not had much fluid.",
+      "Notice whether caffeine, very salty foods, or skipped meals make cramps feel worse."
+    ],
+    movement: [
+      "Try slow stretching, child’s pose, knees-to-chest, or a short gentle walk.",
+      "Keep workouts lighter if cramps are active."
+    ],
+    comfort: [
+      "Wear loose clothing or rest with a pillow under your knees.",
+      "Try slow breathing while heat is on your stomach or back.",
+      phaseNote
+    ],
+    support: [
+      "Ask someone to handle small tasks like food, dishes, errands, or laundry.",
+      "Ask for quiet company, space, or comfort depending on what feels best."
+    ],
+    watch: [
+      "Get medical advice if pain is severe, suddenly different, one-sided, or comes with fever, dizziness, fainting, or very heavy bleeding."
+    ]
+  });
 
-  if (s.includes("bloat")) return {
-    title: `Bloating during ${p}`,
-    food: "Try drinking water, eating smaller meals, and limiting very salty foods.",
-    movement: "Light walking or gentle movement may help digestion and bloating.",
-    comfort: "Track whether bloating repeats in this phase so 4Sara can spot the pattern better."
-  };
+  if (s.includes("bloat")) return makeSuggestion({
+    title: `Bloating support during ${p}`,
+    why: "Bloating may line up with digestion, salt, hydration, stress, or normal cycle shifts.",
+    tryNow: [
+      "Sip peppermint tea, ginger tea, or warm water.",
+      "Try a heating pad on the belly if it feels tight.",
+      "Wear loose clothes or loosen the waistband if pressure makes it worse."
+    ],
+    food: [
+      "Try smaller, slower meals instead of one large meal.",
+      "Drink water steadily throughout the day.",
+      "Notice whether carbonated drinks, salty foods, or certain foods make bloating repeat."
+    ],
+    movement: [
+      "Take a short walk after eating.",
+      "Try gentle twists, hip circles, or light stretching."
+    ],
+    comfort: [
+      "Log bloating with notes about meals, sleep, stress, and cycle day.",
+      phaseNote
+    ],
+    support: [
+      "Ask for lighter plans if you feel uncomfortable.",
+      "Ask someone to help with dinner or errands if bloating is draining."
+    ],
+    watch: [
+      "Consider medical advice if bloating is severe, painful, persistent, or very different from normal."
+    ]
+  });
 
-  if (s.includes("fatigue") || s.includes("tired")) return {
-    title: `Fatigue during ${p}`,
-    food: "Consider iron-rich foods, protein, and steady meals. Ask a professional before starting iron supplements.",
-    movement: "Keep movement gentle. A short walk or stretching may be better than intense workouts.",
-    comfort: "Prioritize sleep and rest, especially if fatigue repeats around the same phase."
-  };
+  if (s.includes("fatigue") || s.includes("tired")) return makeSuggestion({
+    title: `Low-energy day support during ${p}`,
+    why: "Fatigue can connect with sleep, stress, appetite, heavier bleeding, illness, or cycle timing.",
+    tryNow: [
+      "Pick one small priority instead of trying to do everything.",
+      "Take a short rest, low-stimulation break, or earlier night.",
+      "Drink water and eat something simple if you have not eaten much."
+    ],
+    food: [
+      "Try protein plus a carb, like eggs and toast, yogurt and fruit, chicken and rice, or peanut butter toast.",
+      "Consider iron-rich foods like beans, spinach, red meat, lentils, or fortified cereal.",
+      "Ask a healthcare professional before starting iron supplements."
+    ],
+    movement: [
+      "Choose gentle movement: a short walk, stretching, or mobility.",
+      "Skip intense workouts if your body feels depleted."
+    ],
+    comfort: [
+      "Prepare an easier evening routine and protect sleep.",
+      "Use a shower, clean clothes, or a small reset if you feel stuck.",
+      phaseNote
+    ],
+    support: [
+      "Ask for help with meals, laundry, errands, or driving.",
+      "Ask someone to reduce decision-making by offering simple choices."
+    ],
+    watch: [
+      "Get medical advice if fatigue is extreme, new, worsening, or paired with heavy bleeding, dizziness, fainting, chest pain, or shortness of breath."
+    ]
+  });
 
-  if (s.includes("headache")) return {
-    title: `Headaches during ${p}`,
-    food: "Hydration and regular meals may help. Track caffeine, salty foods, and skipped meals.",
-    movement: "Keep activity light if a headache is active.",
-    comfort: "Rest, dim lighting, and tracking timing may help identify recurring triggers."
-  };
+  if (s.includes("headache")) return makeSuggestion({
+    title: `Headache care during ${p}`,
+    why: "Headaches may line up with hydration, caffeine changes, skipped meals, sleep, stress, light sensitivity, or cycle timing.",
+    tryNow: [
+      "Rest in a dim, quiet room if light or noise makes it worse.",
+      "Try a cool cloth or ice pack wrapped in a towel on the forehead or neck for short intervals.",
+      "Drink water and consider electrolytes if you may be dehydrated."
+    ],
+    food: [
+      "Eat a simple meal or snack if you skipped food.",
+      "Track caffeine changes, salty foods, and dehydration.",
+      "Try ginger tea or peppermint tea if nausea comes with the headache."
+    ],
+    movement: [
+      "Keep movement light while the headache is active.",
+      "Try gentle neck and shoulder stretches if tension seems involved."
+    ],
+    comfort: [
+      "Lower screen brightness and take a screen break.",
+      "Log sleep, stress, caffeine, and cycle day.",
+      phaseNote
+    ],
+    support: [
+      "Ask for a quieter environment or help with screens/driving if needed."
+    ],
+    watch: [
+      "Seek urgent care for sudden severe headache, weakness, vision changes, confusion, fainting, fever/stiff neck, or a headache after injury."
+    ]
+  });
 
-  if (s.includes("mood") || s.includes("anxious") || s.includes("sad") || s.includes("irritable")) return {
-    title: `Mood changes during ${p}`,
-    food: "Balanced meals and steady hydration may support energy and mood.",
-    movement: "Walking, stretching, or breathing exercises may help with stress and tension.",
-    comfort: "Journaling or daily check-ins can help confirm whether mood changes repeat in this phase."
-  };
+  if (s.includes("back pain")) return makeSuggestion({
+    title: `Back pain support during ${p}`,
+    why: "Back pain may show up with cramps, posture changes, bloating, tension, or lower-energy days.",
+    tryNow: [
+      "Try heat on the lower back, or a cool pack if it feels more like soreness.",
+      "Use a pillow under your knees while lying down.",
+      "Change positions instead of staying curled up too long."
+    ],
+    food: [
+      "Stay hydrated and eat steady meals to support energy.",
+      "Notice if bloating or constipation seems to make back pressure worse."
+    ],
+    movement: [
+      "Try cat-cow, child’s pose, hip circles, or a slow walk.",
+      "Avoid heavy lifting if pain is active."
+    ],
+    comfort: [
+      "Try a supportive chair, softer clothes, or a warm shower.",
+      phaseNote
+    ],
+    support: [
+      "Ask for help carrying items, doing chores, or running errands."
+    ],
+    watch: [
+      "Get medical advice if pain is severe, shoots down the leg, follows an injury, or comes with fever, numbness, weakness, or bladder/bowel changes."
+    ]
+  });
 
-  if (s.includes("craving")) return {
-    title: `Cravings during ${p}`,
-    food: "Try balanced snacks with protein, fiber, and healthy fats to stay fuller longer.",
-    movement: "A short walk may help reset cravings and stress eating.",
-    comfort: "Track cravings by phase to see if they happen before menstruation."
-  };
+  if (s.includes("tender") || s.includes("breast")) return makeSuggestion({
+    title: `Breast tenderness support during ${p}`,
+    why: "Tender breasts can happen with hormone shifts, especially before menstruation.",
+    tryNow: [
+      "Wear a supportive, comfortable bra or softer top.",
+      "Try a cool compress or warm compress and see which feels better.",
+      "Avoid pressure from tight clothing if soreness is noticeable."
+    ],
+    food: [
+      "Stay hydrated and notice whether caffeine or salty foods seem to affect tenderness.",
+      "Choose balanced meals and snacks to keep energy steady."
+    ],
+    movement: [
+      "Choose lower-impact movement if bouncing or pressure makes tenderness worse.",
+      "Try gentle stretching for chest, shoulders, and upper back."
+    ],
+    comfort: [
+      "Log whether tenderness appears before menstruation or around ovulation.",
+      phaseNote
+    ],
+    support: [
+      "Ask for gentler hugs, less pressure, or more personal space if soreness is bothering you."
+    ],
+    watch: [
+      "Consider medical advice for a new lump, skin changes, nipple discharge, one-sided severe pain, or symptoms that do not improve."
+    ]
+  });
 
-  if (s.includes("nausea")) return {
-    title: `Nausea during ${p}`,
-    food: "Small bland meals, crackers, or ginger tea may help some people.",
-    movement: "Keep movement light until nausea improves.",
-    comfort: "If nausea is severe, new, or recurring often, consider checking with a healthcare professional."
-  };
+  if (s.includes("mood") || s.includes("anxious") || s.includes("sad") || s.includes("irritable")) return makeSuggestion({
+    title: `Mood support during ${p}`,
+    why: "Mood changes can connect with cycle phase, stress, sleep, appetite, relationship stress, and feeling overwhelmed.",
+    tryNow: [
+      "Name what kind of support you need: space, reassurance, help, food, or quiet.",
+      "Try a 5-minute reset: breathe slowly, shower, step outside, or lower stimulation.",
+      "Write a short note about what triggered the feeling."
+    ],
+    food: [
+      "Eat a steady meal or snack if you have not eaten.",
+      "Try protein, complex carbs, and water to support energy.",
+      "Tea like chamomile, peppermint, or ginger may feel calming for some people."
+    ],
+    movement: [
+      "Try a walk, light stretching, or gentle movement to release tension.",
+      "Avoid using intense exercise as punishment; keep it supportive."
+    ],
+    comfort: [
+      "Delay big conflict conversations if you feel flooded.",
+      "Use a journal, voice note, or check-in to get thoughts out.",
+      phaseNote
+    ],
+    support: [
+      "Ask someone trusted for patience, reassurance, or practical help.",
+      "Use a phrase like: “I’m sensitive today; I need gentleness, not fixing.”"
+    ],
+    watch: [
+      "Seek support quickly if sadness, anxiety, panic, anger, or hopelessness feels intense, unsafe, or hard to control."
+    ]
+  });
 
-  return {
-    title: `${symptom} during ${p}`,
-    food: "Track meals, hydration, and timing to see if a pattern develops.",
-    movement: "Gentle movement may help, depending on how you feel.",
-    comfort: "Use daily check-ins to see whether this symptom repeats in the same phase."
-  };
+  if (s.includes("craving")) return makeSuggestion({
+    title: `Craving support during ${p}`,
+    why: "Cravings can line up with appetite changes, stress, sleep, blood sugar dips, or the days before menstruation.",
+    tryNow: [
+      "Have a satisfying snack instead of trying to ignore hunger.",
+      "Try yogurt and fruit, chocolate with nuts, peanut butter toast, or cheese and crackers.",
+      "Drink water or tea and wait a few minutes before deciding what else you want."
+    ],
+    food: [
+      "Aim for protein, fiber, and healthy fats so the snack lasts.",
+      "Keep easy options ready: nuts, fruit, cheese, yogurt, eggs, tuna, hummus, or trail mix.",
+      "Log cravings by phase so 4Sara can spot whether they repeat."
+    ],
+    movement: [
+      "Try a short walk if cravings feel connected to stress or boredom.",
+      "Choose rest if cravings come with fatigue."
+    ],
+    comfort: [
+      "Avoid guilt language. The goal is noticing patterns, not judging food.",
+      phaseNote
+    ],
+    support: [
+      "Ask someone to help make or pick up a satisfying snack instead of skipping food."
+    ],
+    watch: [
+      "Consider professional support if cravings feel distressing, extreme, or tied to restrictive eating or bingeing."
+    ]
+  });
+
+  if (s.includes("nausea")) return makeSuggestion({
+    title: `Nausea support during ${p}`,
+    why: "Nausea can connect with cramps, headaches, appetite changes, illness, medication, stress, or cycle shifts.",
+    tryNow: [
+      "Sip water slowly instead of drinking a lot at once.",
+      "Try ginger tea, peppermint tea, crackers, toast, rice, bananas, or another bland food.",
+      "Get fresh air or sit upright if lying down makes it worse."
+    ],
+    food: [
+      "Try small, frequent bites instead of a full meal.",
+      "Avoid greasy, very spicy, or heavy foods until your stomach settles.",
+      "Track medication, caffeine, skipped meals, and timing."
+    ],
+    movement: [
+      "Keep movement very light while nausea is active.",
+      "Avoid intense workouts until you feel steady."
+    ],
+    comfort: [
+      "Rest somewhere cool and calm.",
+      "Try a cool cloth on the neck or forehead if you feel overheated.",
+      phaseNote
+    ],
+    support: [
+      "Ask someone to bring water, crackers, tea, or a trash can nearby if needed."
+    ],
+    watch: [
+      "Seek care if nausea is severe, persistent, includes repeated vomiting, dehydration, severe pain, fever, or possible pregnancy concerns."
+    ]
+  });
+
+  if (s.includes("acne")) return makeSuggestion({
+    title: `Breakout support during ${p}`,
+    why: "Breakouts can repeat around certain cycle phases, stress, sleep changes, sweating, skincare changes, or diet shifts.",
+    tryNow: [
+      "Keep skincare simple and avoid picking.",
+      "Wash sweat off gently after workouts.",
+      "Change pillowcases or towels if breakouts keep repeating."
+    ],
+    food: [
+      "Track whether high-sugar foods, dairy, stress, or sleep changes line up with breakouts.",
+      "Stay hydrated and eat steady meals."
+    ],
+    movement: [
+      "Movement is fine, but cleanse gently after heavy sweating.",
+      "Avoid irritating skin with tight hats, straps, or sweaty clothing."
+    ],
+    comfort: [
+      "Log where breakouts happen and which cycle day they appear.",
+      phaseNote
+    ],
+    watch: [
+      "Consider a dermatologist if acne is painful, cystic, scarring, or not improving."
+    ]
+  });
+
+  return makeSuggestion({
+    title: `${symptom} support during ${p}`,
+    why: "4Sara noticed this symptom in your logs. More detail can help turn it into a clearer pattern.",
+    tryNow: [
+      "Write a quick note about intensity, timing, and what helped.",
+      "Try water, rest, a simple meal, or a gentle reset if you are unsure where to start."
+    ],
+    food: [
+      "Track meals, hydration, caffeine, and timing to see if a pattern develops."
+    ],
+    movement: [
+      "Choose gentle movement or rest depending on how your body feels."
+    ],
+    comfort: [
+      "Use daily check-ins to see whether this symptom repeats in the same phase.",
+      phaseNote
+    ],
+    support: [
+      "Ask for the specific kind of help you need: comfort, space, food, errands, or reassurance."
+    ],
+    watch: [
+      "Ask a healthcare professional if symptoms are severe, unusual, persistent, or worrying."
+    ]
+  });
+}
+
+function generalSupportSuggestions(stats) {
+  const suggestions = [];
+
+  suggestions.push(makeSuggestion({
+    title: "Hydration reset",
+    why: "Hydration is a simple first step when energy, cramps, bloating, headaches, or nausea show up.",
+    tryNow: [
+      "Drink a glass of water now.",
+      "Try an electrolyte drink if you have been sweating, sick, or not drinking much.",
+      "Keep a water bottle nearby for the next few hours."
+    ],
+    food: [
+      "Pair water with a snack if you have not eaten.",
+      "Try warm tea if cold water does not sound good."
+    ],
+    comfort: [
+      "Log whether hydration helped today."
+    ]
+  }));
+
+  suggestions.push(makeSuggestion({
+    title: "Warmth or cold check",
+    why: "Different symptoms respond better to different comfort tools, so 4Sara can suggest both options.",
+    tryNow: [
+      "Use heat for cramps, tight belly, or lower-back tension.",
+      "Use a cool pack or cold cloth for headache, overheating, or soreness.",
+      "Wrap ice/cold packs in a towel and use short intervals."
+    ],
+    comfort: [
+      "Notice which option actually helps and write it in notes.",
+      "Keep your go-to comfort item ready before the next predicted period."
+    ]
+  }));
+
+  suggestions.push(makeSuggestion({
+    title: "Tea and calm routine",
+    why: "A small calming ritual can make symptoms feel more manageable, especially when stress or discomfort is involved.",
+    tryNow: [
+      "Try ginger tea for nausea or stomach discomfort.",
+      "Try peppermint tea for bloating or stomach tightness.",
+      "Try chamomile tea for a calm bedtime routine."
+    ],
+    comfort: [
+      "Dim lights, lower screen brightness, and give yourself 20 minutes without multitasking.",
+      "Pair tea with heat, a blanket, or quiet music."
+    ]
+  }));
+
+  suggestions.push(makeSuggestion({
+    title: "Period prep checklist",
+    why: "If your next period is coming soon, preparing early can reduce stress when symptoms start.",
+    tryNow: [
+      "Restock pads, tampons, liners, cups, or pain-relief items you already use.",
+      "Put a heating pad, comfortable clothes, and easy snacks somewhere accessible.",
+      "Plan one easier meal or low-effort dinner option."
+    ],
+    support: [
+      "Ask a trusted person to pick up supplies or help with errands.",
+      "Share what support usually helps before symptoms peak."
+    ]
+  }));
+
+  if (stats.currentCycleFactors?.length || stats.currentCycleAdjustmentDays) {
+    suggestions.push(makeSuggestion({
+      title: "Shifted-cycle support",
+      why: "Recent context may be nudging this cycle’s timing estimate, so it may help to support the body gently instead of forcing a normal routine.",
+      tryNow: [
+        "Protect sleep for the next few nights.",
+        "Make workouts lighter if stress, illness, or travel has been high.",
+        "Use notes to track what changed: stress, travel, medication, illness, sleep, or exercise."
+      ],
+      comfort: [
+        "Keep plans flexible until your body feels more steady.",
+        "Use the calendar as an estimate, not a deadline."
+      ]
+    }));
+  }
+
+  if (stats.dataConfidence === "Limited" || stats.totalEntries < 3) {
+    suggestions.push(makeSuggestion({
+      title: "Build better suggestions",
+      why: "4Sara gets more helpful when it can compare patterns across more than one cycle.",
+      tryNow: [
+        "Log the first day of menstruation each cycle.",
+        "Add daily check-ins when symptoms, mood changes, cravings, or fatigue show up.",
+        "Use notes for context like stress, sleep, travel, illness, medication, or exercise changes."
+      ],
+      comfort: [
+        "One cycle starts the estimate. Three or more cycles usually show a better pattern."
+      ]
+    }));
+  }
+
+  return suggestions;
 }
 
 function readableList(items) {
@@ -760,45 +1137,72 @@ function buildSuggestions(stats) {
   const output = [];
 
   if (stats.totalEntries < 3) {
-    output.push({
+    output.push(makeSuggestion({
       title: "Build stronger predictions",
-      food: "No food pattern is clear yet because there is limited cycle history.",
-      movement: "Add daily check-ins across different phases to improve pattern detection.",
-      comfort: "Track at least 3 cycles for stronger insights and more personalized suggestions."
-    });
-  }
-
-  if (!stats.symptomStats.length) {
-    output.push({
-      title: "Start tracking symptoms",
-      food: "Food suggestions will become more useful once symptoms are logged.",
-      movement: "Daily check-ins can show whether symptoms happen before, during, or after menstruation.",
-      comfort: "Add symptoms like cramps, bloating, fatigue, headaches, or mood changes when they happen."
-    });
-    return output;
+      why: "There is limited cycle history so 4Sara is still learning the pattern.",
+      tryNow: [
+        "Log the first day of each period.",
+        "Add check-ins when symptoms, moods, cravings, or fatigue show up.",
+        "Add notes for stress, travel, illness, medication, sleep, or exercise changes."
+      ],
+      comfort: [
+        "One cycle helps 4Sara begin. Three or more cycles usually give a better pattern."
+      ]
+    }));
   }
 
   const phaseMap = new Map();
-  stats.phaseInsights.forEach((item) => {
-    item.topSymptoms.forEach(([symptom]) => {
+  (stats.phaseInsights || []).forEach((item) => {
+    (item.topSymptoms || []).forEach(([symptom]) => {
       if (!phaseMap.has(symptom)) phaseMap.set(symptom, item.phase);
     });
   });
 
-  stats.symptomStats.slice(0, 4).forEach(([symptom]) => {
+  (stats.symptomStats || []).slice(0, 8).forEach(([symptom]) => {
     output.push(suggestionFor(symptom, phaseMap.get(symptom) || "your cycle"));
   });
 
+  generalSupportSuggestions(stats).forEach((suggestion) => output.push(suggestion));
+
   if (stats.minCycle && stats.maxCycle && stats.maxCycle - stats.minCycle >= 8) {
-    output.push({
+    output.push(makeSuggestion({
       title: "Cycle timing varies",
-      food: "Keep logging meals, hydration, stress, and sleep notes if your cycle timing changes often.",
-      movement: "Daily check-ins can help show if stress, travel, illness, or workouts line up with changes.",
-      comfort: "Predictions may be less reliable when cycle length varies a lot."
-    });
+      why: "Your logged cycle lengths have a wider range, so predictions may need more flexibility.",
+      tryNow: [
+        "Keep logging start dates even if the period arrives earlier or later than expected.",
+        "Use daily notes to track stress, travel, illness, medication, sleep, or routine changes."
+      ],
+      comfort: [
+        "Treat the prediction window as a planning tool, not a guarantee.",
+        "Prepare supplies a little earlier when timing is variable."
+      ],
+      watch: [
+        "Ask a healthcare professional if cycle changes are sudden, concerning, or paired with unusual symptoms."
+      ]
+    }));
   }
 
-  return output.slice(0, 5);
+  if (!output.length) {
+    output.push(makeSuggestion({
+      title: "Start with simple support",
+      why: "Once symptoms and check-ins are logged, suggestions become more personalized.",
+      tryNow: [
+        "Drink water, eat something simple, and rest if your body feels off.",
+        "Use a quick check-in to record what you feel today.",
+        "Write one note about anything that changed: stress, sleep, travel, illness, medication, or exercise."
+      ],
+      comfort: [
+        "4Sara will use future logs to make this section more useful."
+      ]
+    }));
+  }
+
+  const seen = new Set();
+  return output.filter((suggestion) => {
+    if (seen.has(suggestion.title)) return false;
+    seen.add(suggestion.title);
+    return true;
+  }).slice(0, 10);
 }
 
 function downloadFile(filename, content, type) {
@@ -5438,17 +5842,34 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
         <div className="insights-section-card soft-green">
           <div className="insights-section-head">
             <h3>Helpful suggestions</h3>
-            <p className="muted">Simple wellness ideas based on logged symptoms and phase patterns.</p>
+            <p className="muted">Practical, solution-focused ideas based on logged symptoms, notes, cycle timing, and phase patterns.</p>
           </div>
 
           {stats.dynamicSuggestions?.length ? (
-            <div className="insight-suggestion-grid">
-              {stats.dynamicSuggestions.slice(0, 3).map((suggestion, index) => (
-                <div key={`${suggestion.title}-${index}`} className="insight-suggestion-card">
+            <div className="insight-suggestion-grid expanded-suggestion-grid">
+              {stats.dynamicSuggestions.slice(0, 10).map((suggestion, index) => (
+                <div key={`${suggestion.title}-${index}`} className="insight-suggestion-card expanded-suggestion-card">
                   <strong>{suggestion.title}</strong>
-                  <p><b>Food:</b> {suggestion.food}</p>
-                  <p><b>Movement:</b> {suggestion.movement}</p>
-                  <p><b>Comfort:</b> {suggestion.comfort}</p>
+                  {suggestion.why && <p className="suggestion-why">{suggestion.why}</p>}
+
+                  {suggestion.sections?.length ? (
+                    <div className="suggestion-section-list">
+                      {suggestion.sections.map((section) => (
+                        <div className="suggestion-section" key={section.label}>
+                          <span>{section.label}</span>
+                          <ul>
+                            {section.items.map((item) => <li key={item}>{item}</li>)}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <p><b>Food:</b> {suggestion.food}</p>
+                      <p><b>Movement:</b> {suggestion.movement}</p>
+                      <p><b>Comfort:</b> {suggestion.comfort}</p>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

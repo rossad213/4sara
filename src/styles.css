@@ -6472,3 +6472,55 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .account-polished-card .autosave-support-divider {
   margin: 1.1rem 0 !important;
 }
+
+
+/* Expanded solution-focused suggestions */
+.expanded-suggestion-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+}
+
+.expanded-suggestion-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.expanded-suggestion-card > strong {
+  font-size: 1.02rem;
+}
+
+.suggestion-why {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.48;
+}
+
+.suggestion-section-list {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.suggestion-section {
+  border-radius: 16px;
+  padding: 0.72rem 0.8rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.suggestion-section span {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.suggestion-section ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  color: var(--muted);
+}
+
+.suggestion-section li {
+  margin: 0.28rem 0;
+  line-height: 1.45;
+}

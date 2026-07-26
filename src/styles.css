@@ -5904,3 +5904,26 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-column: 1 / -1 !important;
   }
 }
+
+
+/* Account tab: make side-by-side cards a true 50/50 split */
+.account-polished-card .account-polished-stack {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+}
+
+@media (min-width: 1200px) {
+  .account-polished-card .account-polished-stack {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+}
+
+.account-polished-stack .account-hero-status,
+.account-polished-stack .cloud-migration-card,
+.account-polished-stack > .support-sharing-card:nth-of-type(3),
+.account-polished-stack > .support-sharing-card:nth-of-type(4),
+.account-polished-stack .account-sync-panel,
+.account-polished-stack .autosync-row,
+.account-polished-stack .account-clean-danger {
+  width: 100% !important;
+  max-width: none !important;
+}

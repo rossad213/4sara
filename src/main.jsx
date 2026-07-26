@@ -605,6 +605,32 @@ function makeSuggestion({ title, why, tryNow = [], food = [], movement = [], com
   };
 }
 
+function compactSuggestionItems(suggestion) {
+  const sections = Array.isArray(suggestion?.sections) ? suggestion.sections : [];
+  const priorityLabels = ["Try now", "Food & drink", "Comfort", "Movement", "Support"];
+  const items = [];
+
+  priorityLabels.forEach((label) => {
+    const section = sections.find((item) => item.label === label);
+    (section?.items || []).forEach((item) => {
+      if (items.length < 3 && !items.includes(item)) items.push(item);
+    });
+  });
+
+  if (!items.length) {
+    [suggestion?.comfort, suggestion?.food, suggestion?.movement].filter(Boolean).forEach((item) => {
+      if (items.length < 3) items.push(item);
+    });
+  }
+
+  return items.slice(0, 3);
+}
+
+function compactSuggestionWatch(suggestion) {
+  const section = (suggestion?.sections || []).find((item) => item.label === "Pay attention if");
+  return section?.items?.[0] || "";
+}
+
 function suggestionFor(symptom, phase = "your cycle") {
   const s = symptom.toLowerCase();
   const p = phase === "Unknown" || phase === "your cycle" ? "your cycle" : `the ${phase.toLowerCase()} phase`;
@@ -1202,7 +1228,7 @@ function buildSuggestions(stats) {
     if (seen.has(suggestion.title)) return false;
     seen.add(suggestion.title);
     return true;
-  }).slice(0, 10);
+  }).slice(0, 6);
 }
 
 function downloadFile(filename, content, type) {
@@ -5842,36 +5868,33 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
         <div className="insights-section-card soft-green">
           <div className="insights-section-head">
             <h3>Helpful suggestions</h3>
-            <p className="muted">Practical, solution-focused ideas based on logged symptoms, notes, cycle timing, and phase patterns.</p>
+            <p className="muted">Helpful, practical ideas based on logged symptoms and patterns — simple enough to actually use.</p>
           </div>
 
           {stats.dynamicSuggestions?.length ? (
-            <div className="insight-suggestion-grid expanded-suggestion-grid">
-              {stats.dynamicSuggestions.slice(0, 10).map((suggestion, index) => (
-                <div key={`${suggestion.title}-${index}`} className="insight-suggestion-card expanded-suggestion-card">
-                  <strong>{suggestion.title}</strong>
-                  {suggestion.why && <p className="suggestion-why">{suggestion.why}</p>}
+            <div className="insight-suggestion-grid balanced-suggestion-grid">
+              {stats.dynamicSuggestions.slice(0, 5).map((suggestion, index) => {
+                const quickItems = compactSuggestionItems(suggestion);
+                const watchItem = compactSuggestionWatch(suggestion);
 
-                  {suggestion.sections?.length ? (
-                    <div className="suggestion-section-list">
-                      {suggestion.sections.map((section) => (
-                        <div className="suggestion-section" key={section.label}>
-                          <span>{section.label}</span>
-                          <ul>
-                            {section.items.map((item) => <li key={item}>{item}</li>)}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      <p><b>Food:</b> {suggestion.food}</p>
-                      <p><b>Movement:</b> {suggestion.movement}</p>
-                      <p><b>Comfort:</b> {suggestion.comfort}</p>
-                    </>
-                  )}
-                </div>
-              ))}
+                return (
+                  <div key={`${suggestion.title}-${index}`} className="insight-suggestion-card balanced-suggestion-card">
+                    <strong>{suggestion.title}</strong>
+                    {suggestion.why && <p className="suggestion-why">{suggestion.why}</p>}
+
+                    {quickItems.length > 0 && (
+                      <div className="suggestion-quick-block">
+                        <span>Helpful ideas</span>
+                        <ul>
+                          {quickItems.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    {watchItem && <p className="suggestion-watch"><b>Pay attention if:</b> {watchItem}</p>}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="muted">Add more symptoms and check-ins to unlock personalized suggestions.</p>

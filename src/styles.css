@@ -6524,3 +6524,51 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   margin: 0.28rem 0;
   line-height: 1.45;
 }
+
+
+/* Balanced helpful suggestions */
+.balanced-suggestion-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+}
+
+.balanced-suggestion-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.balanced-suggestion-card > strong {
+  font-size: 1.02rem;
+}
+
+.suggestion-quick-block {
+  border-radius: 16px;
+  padding: 0.75rem 0.85rem;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.suggestion-quick-block span {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.suggestion-quick-block ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  color: var(--muted);
+}
+
+.suggestion-quick-block li {
+  margin: 0.3rem 0;
+  line-height: 1.45;
+}
+
+.suggestion-watch {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}

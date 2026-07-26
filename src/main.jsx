@@ -4652,6 +4652,7 @@ function WelcomeScreen({ onStart, onLogin, initialTab = "home" }) {
           <div><span>3</span><BarChart3 size={26} /><h3>Understand your cycle</h3><p>Get personalized insights and spot patterns across your cycles.</p></div>
           <div><span>4</span><FileText size={26} /><h3>Use your data</h3><p>View trends, export reports, and take control of your health information.</p></div>
         </div>
+        <p className="landing-how-note">The more you log, the more personal your estimates become. Early predictions are only a starting point and may change as 4Sara learns your cycle.</p>
       </section>
     </>
   );

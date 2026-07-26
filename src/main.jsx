@@ -3164,21 +3164,30 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
 
   return (
     <main className="layout">
-      <Card className="pad main-col full-width-card">
-        <h2><Mail size={20} /> Account</h2>
+      <Card className="pad main-col full-width-card account-polished-card">
+        <div className="account-page-hero">
+          <div>
+            <p className="account-eyebrow">Account center</p>
+            <h2><Mail size={20} /> Account</h2>
+            <p>Manage sign-in, cloud sync, support sharing, and account safety in one place.</p>
+          </div>
+          {authUser && (
+            <span className={authUser.emailVerified ? "verify-badge verified" : "verify-badge unverified"}>
+              {authUser.emailVerified ? "Email verified" : "Email not verified"}
+            </span>
+          )}
+        </div>
 
         {authLoading ? (
           <p className="muted">Checking account status...</p>
         ) : authUser ? (
-          <div className="account-signed-in account-only-view">
-            <div className="account-status-card">
+          <div className="account-signed-in account-only-view account-polished-stack">
+            <div className="account-status-card account-hero-status">
               <div>
                 <p className="account-eyebrow">Signed in</p>
                 <h3>{authUser.email}</h3>
                 <p>Your account is active. Cloud sync is available for this account.</p>
-                <span className={authUser.emailVerified ? "verify-badge verified" : "verify-badge unverified"}>
-                  {authUser.emailVerified ? "Email verified" : "Email not verified"}
-                </span>
+
               </div>
             </div>
 
@@ -3192,7 +3201,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               </div>
             )}
 
-            <div className="cloud-migration-card">
+            <div className="cloud-migration-card account-clean-section">
               <h3>Cloud data check</h3>
               {!cloudCheckedForAccount ? (
                 <p>Checking for existing cloud data...</p>
@@ -3214,7 +3223,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               )}
             </div>
 
-            <div className="support-sharing-card">
+            <div className="support-sharing-card account-clean-section">
               <h3>Support sharing</h3>
               <p>Create a support invite. New supporters start as view only. You can give edit permission later from Support viewers.</p>
 
@@ -3277,7 +3286,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <p className="auth-note">Use My Support View to preview what supporters can see. Shared Support View names come from the owner’s profile name, and you can remove shared views from your account anytime.</p>
             </div>
 
-            <div className="support-sharing-card">
+            <div className="support-sharing-card account-clean-section">
               <h3>Support viewers</h3>
               <p>These people can view your shared Support View. You can keep them view only or give edit permission. Support people cannot delete entries.</p>
 
@@ -3307,7 +3316,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               )}
             </div>
 
-            <div className="support-sharing-card">
+            <div className="support-sharing-card account-clean-section">
               <h3>Support activity</h3>
               <p>When a support person adds or edits an entry, 4Sara records who did it and when.</p>
               {Array.isArray(supportActivity) && supportActivity.length > 0 ? (
@@ -3324,7 +3333,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               )}
             </div>
 
-            <div className="info-box amber-box">
+            <div className="info-box amber-box account-sync-panel">
               <h3>Cloud sync</h3>
               <p>{syncStatus}</p>
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
@@ -3347,7 +3356,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <Button onClick={() => setShowSignOutPrivacy(true)} variant="secondary">Sign out</Button>
             </div>
 
-            <div className="danger-zone">
+            <div className="danger-zone account-clean-danger">
               <h3>Cloud data controls</h3>
               <p>Delete the cloud copy of your 4Sara data from this account. This does not delete the local data saved on this device.</p>
               {confirmDeleteCloud && (
@@ -3361,7 +3370,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               </div>
             </div>
 
-            <div className="danger-zone account-delete-zone">
+            <div className="danger-zone account-delete-zone account-clean-danger">
               <h3>Delete account</h3>
               <p>This deletes your Firebase account and the cloud copy of your 4Sara data. Local data on this device is not deleted unless you clear it separately in Privacy.</p>
               {confirmDeleteAccount && (
@@ -3376,9 +3385,9 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
             </div>
           </div>
         ) : (
-          <div className="auth-panel">
+          <div className="auth-panel account-auth-polished">
             {inviteToken && (
-              <div className="support-sharing-card">
+              <div className="support-sharing-card account-clean-section">
                 <h3>Support invite found</h3>
                 <p>{inviteStatus || "Log in or create an account to accept this Support View invite."}</p>
                 {pendingInvite && <p>Invite from: <strong>{pendingInvite.ownerDisplayName || "4Sara user"}</strong></p>}

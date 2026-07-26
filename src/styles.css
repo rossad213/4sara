@@ -6422,3 +6422,53 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     align-items: flex-start !important;
   }
 }
+
+
+/* Account tab: uniform card spacing */
+.account-polished-card .account-polished-stack {
+  gap: 1.25rem !important;
+  row-gap: 1.25rem !important;
+  column-gap: 1.25rem !important;
+  align-items: stretch !important;
+}
+
+.account-polished-card .account-polished-stack > * {
+  margin: 0 !important;
+}
+
+.account-polished-card .account-sync-panel,
+.account-polished-card .account-autosave-support-card,
+.account-polished-card .support-sharing-card,
+.account-polished-card .support-viewers-card,
+.account-polished-card .support-activity-card,
+.account-polished-card .account-clean-danger,
+.account-polished-card .account-delete-zone {
+  margin: 0 !important;
+  align-self: stretch !important;
+}
+
+/* Keep the lower danger row from visually touching the row above it. */
+.account-polished-card .account-clean-danger,
+.account-polished-card .account-delete-zone {
+  margin-top: 0 !important;
+}
+
+/* Make paired rows feel even at the top and bottom. */
+.account-polished-card .account-sync-panel,
+.account-polished-card .account-autosave-support-card {
+  min-height: 100% !important;
+}
+
+.account-polished-card .account-clean-danger,
+.account-polished-card .account-delete-zone {
+  min-height: 100% !important;
+}
+
+/* Remove extra internal push that made the merged autosave/report card feel uneven. */
+.account-polished-card .account-autosave-support-card {
+  justify-content: flex-start !important;
+}
+
+.account-polished-card .autosave-support-divider {
+  margin: 1.1rem 0 !important;
+}

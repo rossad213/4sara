@@ -5904,3 +5904,82 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-column: 1 / -1 !important;
   }
 }
+
+
+/* Cycle Pattern Notes */
+.pattern-notes-card {
+  background: linear-gradient(135deg, rgba(255, 241, 242, 0.82), rgba(255, 255, 255, 0.92)) !important;
+}
+
+.pattern-note-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.pattern-note-card {
+  border-radius: 22px;
+  padding: 1rem;
+  border: 1px solid rgba(253, 164, 175, 0.55);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.035);
+}
+
+.pattern-note-card strong {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--text);
+}
+
+.pattern-note-card p {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.pattern-note-card ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  color: var(--muted);
+}
+
+.pattern-note-card li {
+  margin: 0.28rem 0;
+}
+
+.pattern-note-card.amber {
+  border-color: rgba(251, 191, 36, 0.65);
+  background: rgba(255, 251, 235, 0.75);
+}
+
+.pattern-note-card.purple {
+  border-color: rgba(216, 180, 254, 0.7);
+  background: rgba(250, 245, 255, 0.78);
+}
+
+.pattern-note-card.sky {
+  border-color: rgba(147, 197, 253, 0.7);
+  background: rgba(239, 246, 255, 0.78);
+}
+
+.pattern-note-card.green {
+  border-color: rgba(134, 239, 172, 0.7);
+  background: rgba(240, 253, 244, 0.78);
+}
+
+/* Preserve Account tab true 50/50 split */
+.account-polished-card .account-polished-stack {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+}
+
+@media (min-width: 1200px) {
+  .account-polished-card .account-polished-stack {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 780px) {
+  .pattern-note-grid {
+    grid-template-columns: 1fr;
+  }
+}

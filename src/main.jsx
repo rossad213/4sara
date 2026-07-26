@@ -3699,20 +3699,23 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <p className="sync-small">Existing accounts with cloud data load their own cloud copy first. Signed-out local data is not auto-saved into an existing account.</p>
               <p className="sync-small">Scale guard: 4Sara waits about 10 seconds before auto-saving and skips duplicate cloud writes when nothing changed.</p>
               <p className="sync-small">Backup guard: 4Sara keeps the 3 newest recovery backups before cloud saves and cloud deletes.</p>
+
+              <div className="account-actions account-primary-actions">
+                <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
+                <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
+                <Button onClick={() => setShowSignOutPrivacy(true)} variant="secondary">Sign out</Button>
+              </div>
             </div>
 
-            <label className="setting-row autosync-row">
-              <span>Auto-save changes to cloud</span>
+            <div className="setting-row autosync-row account-autosave-card">
+              <div>
+                <span>Auto-save changes to cloud</span>
+                <p>When this is on, 4Sara saves changes to this account after a short delay.</p>
+                {authUser && cloudCheckedForAccount && !cloudSyncAllowed && (
+                  <p className="sync-paused-note">Auto-sync is paused to protect existing data. Choose Load cloud data or Save this device’s data to cloud to continue syncing.</p>
+                )}
+              </div>
               <input type="checkbox" checked={autoSyncEnabled} onChange={(event) => setAutoSyncEnabled(event.target.checked)} />
-            </label>
-            {authUser && cloudCheckedForAccount && !cloudSyncAllowed && (
-              <p className="sync-paused-note">Auto-sync is paused to protect existing data. Choose Load cloud data or Save this device’s data to cloud to continue syncing.</p>
-            )}
-
-            <div className="account-actions account-primary-actions">
-              <Button onClick={saveToCloud} disabled={syncBusy}>Save to cloud</Button>
-              <Button onClick={loadFromCloud} variant="secondary" disabled={syncBusy}>Load from cloud</Button>
-              <Button onClick={() => setShowSignOutPrivacy(true)} variant="secondary">Sign out</Button>
             </div>
 
             <div className="support-sharing-card account-clean-section problem-report-mini-card">

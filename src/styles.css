@@ -6300,3 +6300,78 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* Account tab: even spacing and balanced cloud-sync rows */
+.account-polished-card .account-polished-stack {
+  grid-auto-flow: row !important;
+  align-items: stretch !important;
+  gap: 1rem !important;
+}
+
+.account-polished-card .account-polished-stack > * {
+  min-height: 0 !important;
+}
+
+.account-polished-card .account-sync-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  gap: 0.7rem !important;
+}
+
+.account-polished-card .account-sync-panel .account-primary-actions {
+  margin-top: 0.85rem !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  min-height: 0 !important;
+}
+
+.account-polished-card .account-autosave-card {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 1.25rem !important;
+  padding: 1.25rem !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(203, 213, 225, 0.9) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.035) !important;
+}
+
+.account-polished-card .account-autosave-card div {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.account-polished-card .account-autosave-card span {
+  font-weight: 900;
+  color: var(--text);
+}
+
+.account-polished-card .account-autosave-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.account-polished-card .account-autosave-card input {
+  flex: 0 0 auto;
+}
+
+.account-polished-card .support-activity-card,
+.account-polished-card .account-sync-panel,
+.account-polished-card .account-autosave-card,
+.account-polished-card .problem-report-mini-card,
+.account-polished-card .account-clean-danger,
+.account-polished-card .account-delete-zone {
+  min-height: 100% !important;
+}
+
+@media (max-width: 820px) {
+  .account-polished-card .account-autosave-card {
+    align-items: flex-start !important;
+  }
+}

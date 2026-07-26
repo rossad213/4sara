@@ -3707,21 +3707,25 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               </div>
             </div>
 
-            <div className="setting-row autosync-row account-autosave-card">
-              <div>
-                <span>Auto-save changes to cloud</span>
-                <p>When this is on, 4Sara saves changes to this account after a short delay.</p>
-                {authUser && cloudCheckedForAccount && !cloudSyncAllowed && (
-                  <p className="sync-paused-note">Auto-sync is paused to protect existing data. Choose Load cloud data or Save this device’s data to cloud to continue syncing.</p>
-                )}
+            <div className="setting-row autosync-row account-autosave-card account-autosave-support-card">
+              <div className="autosave-support-main">
+                <div>
+                  <span>Auto-save changes to cloud</span>
+                  <p>When this is on, 4Sara saves changes to this account after a short delay.</p>
+                  {authUser && cloudCheckedForAccount && !cloudSyncAllowed && (
+                    <p className="sync-paused-note">Auto-sync is paused to protect existing data. Choose Load cloud data or Save this device’s data to cloud to continue syncing.</p>
+                  )}
+                </div>
+                <input type="checkbox" checked={autoSyncEnabled} onChange={(event) => setAutoSyncEnabled(event.target.checked)} />
               </div>
-              <input type="checkbox" checked={autoSyncEnabled} onChange={(event) => setAutoSyncEnabled(event.target.checked)} />
-            </div>
 
-            <div className="support-sharing-card account-clean-section problem-report-mini-card">
-              <h3>Having an account or sync problem?</h3>
-              <p>Report login, signup, cloud sync, backup, or Support View issues so they can be fixed faster.</p>
-              <a className="btn problem-report-button" href={reportProblemHref("Account tab / sign-in or cloud sync")}>Report a problem</a>
+              <div className="autosave-support-divider" />
+
+              <div className="autosave-problem-section">
+                <h3>Having an account or sync problem?</h3>
+                <p>Report login, signup, cloud sync, backup, or Support View issues so they can be fixed faster.</p>
+                <a className="btn problem-report-button" href={reportProblemHref("Account tab / sign-in or cloud sync")}>Report a problem</a>
+              </div>
             </div>
 
             <div className="danger-zone account-clean-danger">

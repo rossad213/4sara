@@ -3634,34 +3634,178 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
 
   const supportTips = {
     Menstruation: [
-      "Offer comfort, rest, water, a heating pad, or help with small tasks.",
-      "Be patient if energy is lower or cramps are present.",
-      "Avoid minimizing pain or symptoms."
+      {
+        title: "Make comfort easy",
+        summary: "Offer practical comfort without making them ask for every little thing.",
+        ideas: [
+          "Bring water, tea, a heating pad, pain-relief items they already use, or a blanket.",
+          "Ask whether they want quiet company, space, a movie, food, or help resting.",
+          "Help with small tasks like dishes, laundry, errands, pet care, or picking up food."
+        ]
+      },
+      {
+        title: "Be patient with lower energy",
+        summary: "Menstruation can come with cramps, fatigue, headaches, or lower motivation.",
+        ideas: [
+          "Do not pressure them to be productive if they are uncomfortable.",
+          "Offer flexible plans instead of making them feel guilty for resting.",
+          "Use simple check-ins like, “Do you want help, comfort, or space right now?”"
+        ]
+      },
+      {
+        title: "Take symptoms seriously",
+        summary: "Support means believing them and not minimizing what they feel.",
+        ideas: [
+          "Avoid comments like “it cannot be that bad” or “you are being dramatic.”",
+          "Notice if symptoms seem stronger than usual and encourage care if they are worried.",
+          "If pain, bleeding, dizziness, or symptoms feel severe or unusual, encourage medical help."
+        ]
+      }
     ],
     Follicular: [
-      "Encourage gentle planning, movement, or routines if energy is improving.",
-      "This may be a good time for positive motivation and shared plans.",
-      "Keep support flexible because energy can still vary."
+      {
+        title: "Support gentle momentum",
+        summary: "Energy may start improving after menstruation, but it can still vary.",
+        ideas: [
+          "Encourage light routines, planning, movement, or getting back into tasks if they want that.",
+          "Offer to help organize the week, meals, errands, schoolwork, or responsibilities.",
+          "Keep it encouraging, not pushy; ask what pace feels realistic."
+        ]
+      },
+      {
+        title: "Build positive routines",
+        summary: "This can be a good time to support healthy habits without pressure.",
+        ideas: [
+          "Suggest a walk, simple meal, hydration, sleep routine, or low-stress activity.",
+          "Help remove friction: prep something, remind gently, or make the task easier.",
+          "Celebrate small wins instead of focusing on what was not done."
+        ]
+      },
+      {
+        title: "Stay flexible",
+        summary: "Even if energy improves, symptoms or mood can still shift.",
+        ideas: [
+          "Check in before assuming they feel great.",
+          "Keep plans adjustable.",
+          "If they seem tired, offer a lighter version of the plan."
+        ]
+      }
     ],
     Fertile: [
-      "Be supportive and attentive to mood, energy, and body changes.",
-      "Respect privacy and boundaries around fertility information.",
-      "Remember the fertile window is only an estimate."
+      {
+        title: "Be attentive without being intrusive",
+        summary: "The fertile window is an estimate, and privacy still matters.",
+        ideas: [
+          "Respect boundaries around fertility, intimacy, and body information.",
+          "Do not make jokes or assumptions about pregnancy, sex, or fertility.",
+          "Ask what kind of support feels helpful instead of over-interpreting the phase."
+        ]
+      },
+      {
+        title: "Support changing energy and mood",
+        summary: "Some people feel more energetic here, while others notice sensitivity or symptoms.",
+        ideas: [
+          "Offer encouragement for plans or movement if they seem up for it.",
+          "Be patient if mood or body sensations feel different.",
+          "Keep communication clear and respectful."
+        ]
+      },
+      {
+        title: "Remember this is an estimate",
+        summary: "Cycle predictions are helpful, but not exact.",
+        ideas: [
+          "Do not treat the fertile window like a guaranteed medical fact.",
+          "Avoid using this information to pressure decisions.",
+          "Let them lead how much they want to talk about it."
+        ]
+      }
     ],
     Ovulation: [
-      "Support comfort if there is bloating, one-sided pain, or sensitivity.",
-      "Respect privacy and boundaries around ovulation information.",
-      "Remember ovulation timing is estimated and can shift."
+      {
+        title: "Support body changes",
+        summary: "Ovulation may come with bloating, sensitivity, discharge changes, or one-sided pain.",
+        ideas: [
+          "Offer comfort if they mention discomfort, bloating, or tenderness.",
+          "Suggest rest, water, lighter plans, or a heating pad if that usually helps.",
+          "Encourage medical care if pain is severe, sudden, or unusual."
+        ]
+      },
+      {
+        title: "Respect privacy and boundaries",
+        summary: "Ovulation information can feel personal.",
+        ideas: [
+          "Do not announce or joke about their ovulation status.",
+          "Do not connect it to intimacy unless they bring it up first.",
+          "Keep support calm, normal, and respectful."
+        ]
+      },
+      {
+        title: "Stay aware of mood shifts",
+        summary: "Some people notice emotional or physical changes around ovulation.",
+        ideas: [
+          "Ask how they are feeling instead of assuming.",
+          "Be kind if they seem sensitive, uncomfortable, or distracted.",
+          "Offer help with plans if energy changes quickly."
+        ]
+      }
     ],
     Luteal: [
-      "Be extra patient with mood changes, cravings, fatigue, or irritability.",
-      "Offer help before stress builds up, such as errands, meals, or quiet time.",
-      "Avoid unnecessary conflict and do not dismiss symptoms."
+      {
+        title: "Lower stress before it builds",
+        summary: "The luteal phase can bring PMS-type symptoms, fatigue, cravings, irritability, or mood changes.",
+        ideas: [
+          "Offer help with errands, meals, chores, or planning before things feel overwhelming.",
+          "Keep communication calm and avoid picking unnecessary fights.",
+          "Suggest quiet time, rest, a snack, water, or a lighter plan if they seem drained."
+        ]
+      },
+      {
+        title: "Be emotionally steady",
+        summary: "Patience and reassurance can help more than trying to fix everything.",
+        ideas: [
+          "Listen first before giving advice.",
+          "Use reassuring language like, “I am here,” “That makes sense,” or “How can I help?”",
+          "Do not dismiss feelings as “just hormones.”"
+        ]
+      },
+      {
+        title: "Prepare for the next period",
+        summary: "This phase is often right before menstruation.",
+        ideas: [
+          "Ask if they want supplies, comfort items, groceries, or help with tasks before their period starts.",
+          "Support sleep and lower-pressure routines.",
+          "If symptoms are intense, recurring, or concerning, encourage professional care."
+        ]
+      }
     ],
     Unknown: [
-      "Ask what kind of support would be helpful today.",
-      "Be patient, listen first, and avoid assumptions.",
-      "Encourage rest or medical care if symptoms feel concerning."
+      {
+        title: "Ask first",
+        summary: "When the phase is unclear, the best support is curiosity without assumptions.",
+        ideas: [
+          "Ask, “What would feel helpful today?”",
+          "Offer choices: comfort, food, help with tasks, quiet time, or space.",
+          "Avoid guessing what they need based only on the app."
+        ]
+      },
+      {
+        title: "Listen and adjust",
+        summary: "Support should match what they actually say they need.",
+        ideas: [
+          "Reflect back what you hear before giving advice.",
+          "If they say they need space, respect that.",
+          "If they want help, make the next step specific and easy."
+        ]
+      },
+      {
+        title: "Watch for concerning symptoms",
+        summary: "The app is not medical advice.",
+        ideas: [
+          "Encourage medical care for severe pain, very heavy bleeding, fainting, pregnancy concerns, or unusual symptoms.",
+          "Do not rely on the app during urgent situations.",
+          "When in doubt, support them in contacting a qualified healthcare professional."
+        ]
+      }
     ]
   };
 
@@ -3679,11 +3823,14 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
           <p>{phaseText}</p>
         </div>
 
-        <div className="help-tip-list">
+        <div className="help-tip-list expanded-help-tip-list">
           {tips.map((tip) => (
-            <div className="mini-card" key={tip}>
-              <strong>Support idea</strong>
-              <p>{tip}</p>
+            <div className="mini-card expanded-help-card" key={tip.title}>
+              <strong>{tip.title}</strong>
+              <p>{tip.summary}</p>
+              <ul>
+                {tip.ideas.map((idea) => <li key={idea}>{idea}</li>)}
+              </ul>
             </div>
           ))}
         </div>

@@ -4621,6 +4621,13 @@ function OnboardingScreen({ onboarding, setOnboarding, completeOnboarding, skipO
           <label><span>Flow level</span><select value={onboarding.firstFlow} onChange={(e) => setOnboarding({ ...onboarding, firstFlow: e.target.value })}><option>N/A</option><option>N/A</option><option>Light</option><option>Medium</option><option>Heavy</option><option>Spotting</option></select></label>
           <label><span>Mood</span><select value={onboarding.firstMood} onChange={(e) => setOnboarding({ ...onboarding, firstMood: e.target.value })}>{moods.map((mood) => <option key={mood}>{mood}</option>)}</select></label>
         </div>
+
+        <div className="prediction-education-card">
+          <strong>Predictions improve over time</strong>
+          <p>Your first prediction is only a starting estimate. 4Sara becomes more personalized as you log more periods, symptoms, moods, notes, and daily check-ins.</p>
+          <p>One cycle can help 4Sara begin. Three or more cycles usually give a better pattern.</p>
+        </div>
+
         <div className="consent-card">
           <label className="consent-row">
             <input
@@ -4675,6 +4682,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
               <span>{daysLabel}</span>
             </div>
             <p className="dashboard-hero-note">{hasLoggedData ? `Your period is predicted from your typical cycle length of ${stats.averageCycle || 28} days. ${stats.currentCycleAdjustmentDays ? "Current-cycle factors may shift this prediction window." : "Unusual cycles are discounted so one late cycle does not rewrite your average."}` : "No cycle data has been logged yet. Add your first menstruation entry or daily check-in whenever you are ready."}</p>
+            <p className="prediction-education-note">Predictions improve as you log more cycles. Early estimates may change.</p>
             <Button onClick={jumpToNextPeriod} className="dashboard-hero-button"><CalendarDays size={18} /> View Calendar</Button>
           </div>
           <div className="dashboard-calendar-art" aria-hidden="true">
@@ -4919,7 +4927,7 @@ function CalendarPanel({ calendarDate, calendarData, moveMonth, onDayClick, sele
           <PhaseCard kind="blue" title="Check-in" text="Saved mood, symptom, or note." />
         </div>
 
-        <p className="calendar-note">Cycle phases and fertile timing are estimated up to 6 months ahead and should not be used as birth control or medical advice.</p>
+        <p className="calendar-note">Future phases are estimates. They become more reliable as you log more period history and daily check-ins. Cycle phases and fertile timing are estimated up to 6 months ahead and should not be used as birth control or medical advice.</p>
 
         <div className="weekdays">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div key={day}>{day}</div>)}</div>
 
@@ -5240,6 +5248,14 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
           <div className="insights-confidence-badge">
             <span>Confidence</span>
             <strong>{stats.dataConfidence}</strong>
+          </div>
+        </div>
+
+        <div className="prediction-learning-card">
+          <div>
+            <h3>Why predictions may change</h3>
+            <p>4Sara starts with an estimate, then improves as more cycle history is logged. One cycle is a starting point. Three or more cycles can show a better pattern.</p>
+            <p>Daily check-ins and notes can also help explain changes from stress, sleep, travel, illness, medication, or routine changes.</p>
           </div>
         </div>
 

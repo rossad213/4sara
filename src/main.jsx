@@ -2242,7 +2242,7 @@ function App() {
         limit(20)
       );
       const snapshot = await getDocs(backupsQuery);
-      const extraBackups = snapshot.docs.slice(10);
+      const extraBackups = snapshot.docs.slice(3);
       await Promise.all(extraBackups.map((backupDoc) => deleteDoc(backupDoc.ref)));
     } catch (error) {
       console.warn("Could not prune old 4Sara backups.", error);
@@ -2301,7 +2301,7 @@ function App() {
       const backupsQuery = query(
         collection(db, "users", authUser.uid, "backups"),
         orderBy("createdAt", "desc"),
-        limit(10)
+        limit(3)
       );
       const snapshot = await getDocs(backupsQuery);
       const backups = snapshot.docs.map((backupDoc) => ({
@@ -3677,7 +3677,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               {lastCloudSave && <p className="sync-small">Last cloud save: {lastCloudSave}</p>}
               <p className="sync-small">Existing accounts with cloud data load their own cloud copy first. Signed-out local data is not auto-saved into an existing account.</p>
               <p className="sync-small">Scale guard: 4Sara waits about 10 seconds before auto-saving and skips duplicate cloud writes when nothing changed.</p>
-              <p className="sync-small">Backup guard: 4Sara keeps recent recovery backups before cloud saves and cloud deletes.</p>
+              <p className="sync-small">Backup guard: 4Sara keeps the 3 newest recovery backups before cloud saves and cloud deletes.</p>
             </div>
 
             <label className="setting-row autosync-row">
@@ -5530,7 +5530,7 @@ function PrivacyPage({ settings, authUser, syncStatus, cloudHasData, syncBusy, d
         {authUser && (
           <div className="privacy-section privacy-action-card backup-restore-card">
             <h3>Cloud backups & restore</h3>
-            <p>4Sara keeps recent recovery backups before important cloud actions. You can also create a backup now or restore a recent one.</p>
+            <p>4Sara keeps the 3 newest recovery backups before important cloud actions. You can also create a backup now or restore a recent one.</p>
             <div className="actions">
               <Button onClick={createManualCloudBackup} variant="secondary" disabled={backupBusy || syncBusy}>Create backup now</Button>
               <Button onClick={refreshCloudBackups} variant="secondary" disabled={backupBusy}>Refresh backups</Button>

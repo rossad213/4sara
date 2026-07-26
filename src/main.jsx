@@ -1059,6 +1059,61 @@ function friendlyPermissionMessage(message) {
   return text || "Something went wrong. Please try again.";
 }
 
+function friendlyErrorMessage(error, fallback = "Something went wrong. Please try again.") {
+  const raw = String(error?.code || error?.message || error || "").toLowerCase();
+
+  if (raw.includes("auth/email-already-in-use")) {
+    return "An account already exists with this email. Try logging in instead, or use Forgot password.";
+  }
+
+  if (raw.includes("auth/invalid-email")) {
+    return "Enter a valid email address.";
+  }
+
+  if (raw.includes("auth/user-not-found") || raw.includes("auth/wrong-password") || raw.includes("auth/invalid-credential")) {
+    return "The email or password does not look right. Try again, or use Forgot password.";
+  }
+
+  if (raw.includes("auth/weak-password")) {
+    return passwordRequirementMessage();
+  }
+
+  if (raw.includes("auth/too-many-requests")) {
+    return "Too many attempts. Please wait a little while, then try again.";
+  }
+
+  if (raw.includes("auth/network-request-failed") || raw.includes("unavailable") || raw.includes("network")) {
+    return "Could not connect right now. Check your internet connection and try again.";
+  }
+
+  if (raw.includes("auth/requires-recent-login")) {
+    return "For security, please log out, log back in, and try that again.";
+  }
+
+  if (raw.includes("permission") || raw.includes("insufficient") || raw.includes("permission-denied")) {
+    return "You do not have permission to do that right now. Try refreshing, signing in again, or checking access.";
+  }
+
+  if (raw.includes("not-found")) {
+    return "That data could not be found. It may have been deleted or moved.";
+  }
+
+  if (raw.includes("quota") || raw.includes("resource-exhausted")) {
+    return "4Sara is temporarily busy. Please wait a little while and try again.";
+  }
+
+  return fallback;
+}
+
+function friendlyAuthMessage(error, mode = "signin") {
+  return friendlyErrorMessage(
+    error,
+    mode === "signup"
+      ? "Could not create the account. Please check the email and password, then try again."
+      : "Could not log in. Please check the email and password, then try again."
+  );
+}
+
 
 function getCloudChoiceMap() {
   try {
@@ -1537,7 +1592,7 @@ function App() {
     // 10 seconds keeps Firebase usage lower while still saving soon after meaningful changes.
     const timer = setTimeout(() => {
       saveToCloudSilent().catch((error) => {
-        setSyncStatus(error.message || "Auto-sync failed.");
+        setSyncStatus(friendlyErrorMessage(error, "Auto-sync failed. Your latest changes are still on this device."));
       });
     }, 10000);
 
@@ -1617,7 +1672,7 @@ function App() {
 
       setAuthPassword("");
     } catch (error) {
-      setAuthError(error.message?.replace("Firebase: ", "") || "Authentication failed.");
+      setAuthError(friendlyAuthMessage(error, authMode));
     }
   };
 
@@ -1635,7 +1690,7 @@ function App() {
       setAuthNotice("Password reset email sent. Check your inbox.");
       showMessage("Password reset email sent.");
     } catch (error) {
-      setAuthError(error.message?.replace("Firebase: ", "") || "Could not send password reset email.");
+      setAuthError(friendlyErrorMessage(error, "Could not send the password reset email. Check the email address and try again."));
     }
   };
 
@@ -1653,7 +1708,7 @@ function App() {
       setAuthNotice("Verification email sent again. Check your inbox.");
       showMessage("Verification email sent.");
     } catch (error) {
-      setAuthError(error.message?.replace("Firebase: ", "") || "Could not send verification email.");
+      setAuthError(friendlyErrorMessage(error, "Could not send the verification email. Please try again."));
     }
   };
 
@@ -2028,7 +2083,7 @@ function App() {
       const cleanUrl = `${window.location.origin}${window.location.pathname}`;
       window.history.replaceState({}, document.title, cleanUrl);
     } catch (error) {
-      const friendly = friendlyPermissionMessage(error.message || "Could not accept invite.");
+      const friendly = friendlyErrorMessage(error, friendlyPermissionMessage(error.message || "Could not accept invite."));
       setInviteStatus(friendly);
       showMessage(friendly);
     } finally {
@@ -2065,8 +2120,9 @@ function App() {
       setSyncStatus("Cloud data deleted. Auto-sync was turned off so the cloud copy is not recreated automatically. Local data on this device was not deleted.");
       showMessage("Cloud data deleted.");
     } catch (error) {
-      setSyncStatus("Cloud delete failed.");
-      showMessage(error.message || "Cloud delete failed.");
+      const friendly = friendlyErrorMessage(error, "Cloud delete failed. Nothing was deleted. Please try again.");
+      setSyncStatus(friendly);
+      showMessage(friendly);
     } finally {
       setSyncBusy(false);
     }
@@ -2103,14 +2159,14 @@ function App() {
       setSyncStatus("Account deleted. Local data on this device was not deleted.");
       showMessage("Account deleted.");
     } catch (error) {
-      const message = error.message || "Account deletion failed.";
+      const friendly = friendlyErrorMessage(error, "Account deletion failed. Nothing was deleted. Please try again.");
 
-      if (message.includes("requires-recent-login")) {
+      if (String(error?.code || error?.message || "").includes("requires-recent-login")) {
         setSyncStatus("For security, log out, log back in, then delete the account again.");
         showMessage("Log in again before deleting account.");
       } else {
-        setSyncStatus("Account deletion failed.");
-        showMessage(message);
+        setSyncStatus(friendly);
+        showMessage(friendly);
       }
     } finally {
       setSyncBusy(false);
@@ -2421,8 +2477,9 @@ function App() {
       setSyncStatus(`Saved to cloud at ${savedTime}. Future sign-ins will load this account's cloud data first.`);
       showMessage("Saved to cloud.");
     } catch (error) {
-      setSyncStatus("Cloud save failed.");
-      showMessage(error.message || "Cloud save failed.");
+      const friendly = friendlyErrorMessage(error, "Cloud save failed. Your data is still on this device.");
+      setSyncStatus(friendly);
+      showMessage(friendly);
     } finally {
       setSyncBusy(false);
     }
@@ -2470,8 +2527,9 @@ function App() {
       setSyncStatus(`Loaded cloud data at ${new Date().toLocaleTimeString()}. This device will keep using cloud data after refresh.`);
       showMessage("Loaded cloud data.");
     } catch (error) {
-      setSyncStatus("Cloud load failed.");
-      showMessage(error.message || "Cloud load failed.");
+      const friendly = friendlyErrorMessage(error, "Cloud load failed. Please check your connection and try again.");
+      setSyncStatus(friendly);
+      showMessage(friendly);
     } finally {
       setSyncBusy(false);
     }

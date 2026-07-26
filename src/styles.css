@@ -6188,3 +6188,9 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .landing-brand span {
   font-size: 1.06em;
 }
+
+
+/* Dashboard hero button breathing room */
+.dashboard-hero-button {
+  margin-top: 1.35rem !important;
+}

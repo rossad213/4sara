@@ -6583,3 +6583,29 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   font-size: 0.96rem;
   line-height: 1.5;
 }
+
+
+/* Home page: note directly under How it works title */
+.landing-how h2 + .landing-how-note {
+  margin: 0.45rem auto 1.35rem !important;
+}
+
+.landing-how .landing-steps {
+  margin-top: 0 !important;
+}
+
+
+/* Home page: note below How it works cards with comfortable spacing */
+.landing-how .landing-steps + .landing-how-note {
+  max-width: 1120px !important;
+  margin: 1.15rem auto 0 !important;
+  text-align: center !important;
+  white-space: nowrap;
+}
+
+@media (max-width: 1120px) {
+  .landing-how .landing-steps + .landing-how-note {
+    max-width: 760px !important;
+    white-space: normal;
+  }
+}

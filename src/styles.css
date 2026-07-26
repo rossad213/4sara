@@ -6194,3 +6194,48 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .dashboard-hero-button {
   margin-top: 1.35rem !important;
 }
+
+
+/* Account tab: stretch cards closer to the edges */
+.account-polished-card {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+.account-polished-card .account-page-hero,
+.account-polished-card .account-polished-stack,
+.account-polished-card .support-activity-card,
+.account-polished-card .account-primary-actions,
+.account-polished-card .problem-report-mini-card,
+.account-polished-card .account-clean-danger {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.account-polished-card .account-polished-stack {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  gap: 1rem !important;
+}
+
+.account-polished-card .account-status-card,
+.account-polished-card .cloud-migration-card,
+.account-polished-card .support-sharing-card,
+.account-polished-card .support-viewers-card,
+.account-polished-card .support-activity-card,
+.account-polished-card .danger-zone,
+.account-polished-card .account-primary-actions {
+  box-sizing: border-box !important;
+}
+
+.account-polished-card .account-primary-actions {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+@media (min-width: 900px) {
+  .account-polished-card {
+    padding-left: 1.05rem !important;
+    padding-right: 1.05rem !important;
+  }
+}

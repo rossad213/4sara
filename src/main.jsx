@@ -3465,11 +3465,8 @@ function App() {
 
       try {
         await updateDoc(doc(db, "users", selectedSharedOwnerId), {
-          data: {
-            entries: nextEntries,
-            settings: sharedSupportData.settings,
-            updatedAt
-          },
+          "data.entries": nextEntries,
+          "data.updatedAt": updatedAt,
           supportActivity: arrayUnion(activity),
           updatedAt: serverTimestamp()
         });

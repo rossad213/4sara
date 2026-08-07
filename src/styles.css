@@ -6609,3 +6609,140 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     white-space: normal;
   }
 }
+
+
+/* Support-only app mode */
+.settings-mode-card {
+  grid-column: 1 / -1;
+}
+
+.mode-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.mode-option {
+  text-align: left;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 20px;
+  padding: 1rem;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.035);
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text);
+}
+
+.mode-option strong {
+  font-size: 1rem;
+}
+
+.mode-option span {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.mode-option.active {
+  border-color: rgba(244, 63, 94, 0.7);
+  background: linear-gradient(135deg, rgba(255, 241, 245, 0.98), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 16px 34px rgba(244, 63, 94, 0.12);
+}
+
+.support-only-home {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.support-only-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  background: linear-gradient(135deg, rgba(255, 241, 245, 0.98), rgba(255, 255, 255, 0.95));
+}
+
+.support-only-hero h2 {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.support-only-hero p {
+  max-width: 760px;
+}
+
+.support-only-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.support-only-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.support-only-card {
+  min-height: 100%;
+}
+
+.support-only-shared-list,
+.support-basics-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.support-basics-list div {
+  border-radius: 16px;
+  padding: 0.78rem 0.85rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.support-basics-list p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.support-phase-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.support-phase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.9rem;
+}
+
+.support-phase-mini {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.support-phase-mini p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+@media (max-width: 820px) {
+  .mode-toggle-grid,
+  .support-only-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .support-only-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .support-only-actions {
+    justify-content: flex-start;
+  }
+}

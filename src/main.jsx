@@ -58,6 +58,7 @@ const db = getFirestore(firebaseApp);
 
 const APP_ROUTES = {
   dashboard: "/dashboard",
+  supporthome: "/support-home",
   calendar: "/calendar",
   log: "/log",
   insights: "/insights",
@@ -138,6 +139,7 @@ const defaultSettings = {
   reminderDaysBefore: 2,
   cycleLengthOverride: "",
   periodLengthOverride: "",
+  appMode: "cycle",
   customSymptoms: [],
   customMoods: []
 };
@@ -3744,6 +3746,14 @@ function App() {
     { id: "mobile", label: "Mobile", icon: Home }
   ];
 
+  const supportOnlyNavItems = [
+    { id: "supporthome", label: "Support Home", icon: HeartPulse },
+    { id: "howtohelp", label: "How to Help", icon: Sparkles },
+    { id: "account", label: "Shared Views", icon: Mail },
+    { id: "settings", label: "Settings", icon: Settings },
+    { id: "privacy", label: "Privacy", icon: ShieldCheck }
+  ];
+
   const supportNavItems = [
     { id: "calendar", label: "Calendar", icon: CalendarDays },
     ...(supportCanEdit ? [{ id: "log", label: "Log", icon: Plus }] : []),
@@ -3751,14 +3761,15 @@ function App() {
     { id: "howtohelp", label: "How to Help", icon: HeartPulse }
   ];
 
-  const navItems = viewMode === "support" ? supportNavItems : ownerNavItems;
+  const isSupportOnlyMode = settings.appMode === "support";
+  const navItems = viewMode === "support" ? supportNavItems : (isSupportOnlyMode ? supportOnlyNavItems : ownerNavItems);
 
   useEffect(() => {
     const allowedTabs = navItems.map((item) => item.id);
     if (!allowedTabs.includes(activeTab)) {
-      setActiveTab(viewMode === "support" ? "calendar" : "dashboard");
+      setActiveTabRoute(viewMode === "support" ? "calendar" : (isSupportOnlyMode ? "supporthome" : "dashboard"), { replace: true });
     }
-  }, [viewMode, activeTab]);
+  }, [viewMode, activeTab, isSupportOnlyMode]);
 
   const hasLoadedExistingAccount = Boolean(existingAccountLoaded || (authUser && cloudHasData && cloudCheckedForAccount));
   const currentPublicTab = publicTabFromPath();
@@ -3785,7 +3796,7 @@ function App() {
           initialTab={currentPublicTab || "home"}
           onStart={() => {
             updateSettings({ welcomeSeen: true });
-            setActiveTabRoute("dashboard");
+            setActiveTabRoute(settings.appMode === "support" ? "supporthome" : "dashboard");
           }}
           onLogin={() => {
             updateSettings({ welcomeSeen: true });
@@ -3814,7 +3825,7 @@ function App() {
           handlePasswordReset={handlePasswordReset}
           onContinue={() => {
             updateSettings({ accountPromptSeen: true });
-            setActiveTabRoute("dashboard");
+            setActiveTabRoute(settings.appMode === "support" ? "supporthome" : "dashboard");
           }}
           onBackHome={() => {
             updateSettings({ welcomeSeen: false });
@@ -3928,7 +3939,8 @@ function App() {
 
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 16, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -10, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            {activeTab === "dashboard" && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} setActiveTab={setActiveTabRoute} setLocked={setLocked} />}
+            {activeTab === "dashboard" && !isSupportOnlyMode && <Dashboard stats={stats} settings={settings} sortedEntries={sortedEntries} startEdit={startEdit} deleteEntry={deleteEntry} jumpToNextPeriod={jumpToNextPeriod} setActiveTab={setActiveTabRoute} setLocked={setLocked} />}
+            {activeTab === "supporthome" && isSupportOnlyMode && <SupportOnlyHome sharedProfiles={sharedProfiles} chooseSharedSupportView={chooseSharedSupportView} setActiveTab={setActiveTabRoute} setLocked={setLocked} />}
             {activeTab === "calendar" && (
               <CalendarPanel
                 calendarDate={calendarDate}
@@ -3954,13 +3966,13 @@ function App() {
             {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} cloudBackups={cloudBackups} backupStatus={backupStatus} backupBusy={backupBusy} refreshCloudBackups={refreshCloudBackups} createManualCloudBackup={createManualCloudBackup} restoreCloudBackup={restoreCloudBackup} downloadCloudBackup={downloadCloudBackup} confirmRestoreBackupId={confirmRestoreBackupId} setConfirmRestoreBackupId={setConfirmRestoreBackupId} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} updateSupportViewerPermission={updateSupportViewerPermission} supportActivity={supportActivity} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
-            {activeTab === "howtohelp" && viewMode === "support" && (
+            {activeTab === "howtohelp" && (viewMode === "support" || isSupportOnlyMode) && (
               <HowToHelpPage
-                stats={supportStats}
-                settings={supportSettings}
-                entries={supportEntries}
-                calendarData={supportCalendarData}
-                sharedSupportData={sharedSupportData}
+                stats={viewMode === "support" ? supportStats : stats}
+                settings={viewMode === "support" ? supportSettings : settings}
+                entries={viewMode === "support" ? supportEntries : entries}
+                calendarData={viewMode === "support" ? supportCalendarData : calendarData}
+                sharedSupportData={viewMode === "support" ? sharedSupportData : null}
               />
             )}
           </motion.div>
@@ -5235,6 +5247,105 @@ function dashboardPredictionTextGroup(stats, hasLoggedData) {
   ];
 }
 
+
+function SupportOnlyHome({ sharedProfiles, chooseSharedSupportView, setActiveTab, setLocked }) {
+  const sharedList = Object.values(sharedProfiles || {});
+  const phaseCards = [
+    {
+      phase: "Menstruation",
+      body: "Bleeding may come with cramps, fatigue, headaches, back pain, mood changes, or a need for extra rest.",
+      help: "Offer heat, water or tea, food, errands, patience, and quiet support."
+    },
+    {
+      phase: "Follicular",
+      body: "Energy may slowly rebuild after menstruation, but everyone is different.",
+      help: "Support normal routines while still checking in instead of assuming they feel great."
+    },
+    {
+      phase: "Fertile window",
+      body: "The app may estimate fertile timing, but this should never be treated as birth control or medical certainty.",
+      help: "Be respectful and private. Do not joke about fertility or make assumptions."
+    },
+    {
+      phase: "Ovulation",
+      body: "Some people notice cramps, tenderness, mood shifts, discharge changes, or no obvious symptoms at all.",
+      help: "Ask what feels helpful and keep support calm, normal, and respectful."
+    },
+    {
+      phase: "Luteal",
+      body: "PMS-type symptoms, cravings, irritability, sadness, bloating, or fatigue may show up before menstruation.",
+      help: "Lower stress, offer practical help, avoid picking fights, and be emotionally steady."
+    }
+  ];
+
+  return (
+    <main className="support-only-home">
+      <Card className="support-only-hero pad">
+        <div>
+          <p className="account-eyebrow">Support mode</p>
+          <h2>Help someone feel more understood.</h2>
+          <p>Support mode is for people who use 4Sara mainly to support someone else. Instead of focusing on your own period logs, this view gives you shared Support Views, cycle education, and practical ways to help.</p>
+        </div>
+        <div className="support-only-actions">
+          <Button onClick={() => setActiveTab("account")}>Open shared views</Button>
+          <Button onClick={() => setActiveTab("howtohelp")} variant="secondary">How to Help guide</Button>
+        </div>
+      </Card>
+
+      <div className="support-only-grid">
+        <Card className="pad support-only-card">
+          <h3>Shared Support Views</h3>
+          {sharedList.length ? (
+            <div className="support-only-shared-list">
+              {sharedList.map((profile) => (
+                <div className="mini-card" key={profile.ownerUserId}>
+                  <strong>{profile.displayName || "Shared 4Sara"}</strong>
+                  <p>Access: {profile.permissions?.canEdit ? "Can edit" : "View only"}</p>
+                  <Button onClick={() => chooseSharedSupportView(profile.ownerUserId)} variant="secondary">Open Support View</Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <p className="muted">No shared Support Views are connected yet. When someone sends you an invite, you can accept it from Account.</p>
+              <Button onClick={() => setActiveTab("account")} variant="secondary">Go to Account</Button>
+            </>
+          )}
+        </Card>
+
+        <Card className="pad support-only-card">
+          <h3>Support basics</h3>
+          <div className="support-basics-list">
+            <div><strong>Ask first</strong><p>Try “What would feel helpful today?” instead of guessing.</p></div>
+            <div><strong>Offer practical help</strong><p>Food, water, tea, errands, chores, rest, or quiet can matter more than advice.</p></div>
+            <div><strong>Respect privacy</strong><p>Cycle information is personal. Do not share, joke about, or pressure someone with it.</p></div>
+            <div><strong>Know when it is serious</strong><p>Encourage care for severe pain, very heavy bleeding, fainting, fever, pregnancy concerns, or unusual symptoms.</p></div>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="pad support-phase-card">
+        <div className="section-heading-row">
+          <div>
+            <h3>Cycle phases at a glance</h3>
+            <p className="muted">General education only. Everyone’s cycle and symptoms can be different.</p>
+          </div>
+          <Button onClick={() => setLocked(true)} variant="secondary">Lock app</Button>
+        </div>
+        <div className="support-phase-grid">
+          {phaseCards.map((item) => (
+            <div className="mini-card support-phase-mini" key={item.phase}>
+              <strong>{item.phase}</strong>
+              <p>{item.body}</p>
+              <p><b>How to help:</b> {item.help}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </main>
+  );
+}
+
 function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jumpToNextPeriod, setActiveTab, setLocked }) {
   const recent = sortedEntries.slice(0, 3);
   const nextPeriodLabel = stats.nextPeriod ? `${formatDate(stats.nextPeriod)}${stats.predictedEnd ? ` - ${formatDate(stats.predictedEnd)}` : ""}` : "Add a cycle";
@@ -6021,8 +6132,36 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
 }
 
 function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearData, confirmClearLocal, setConfirmClearLocal, resetDemo, importText, setImportText, importJson, sortedEntries, stats, setActiveTab }) {
+  const currentAppMode = settings.appMode === "support" ? "support" : "cycle";
+
+  const changeAppMode = (mode) => {
+    updateSettings({ appMode: mode });
+    if (mode === "support") {
+      setActiveTab("supporthome");
+      showMessage("Support mode turned on.");
+    } else {
+      setActiveTab("dashboard");
+      showMessage("Cycle tracking mode turned on.");
+    }
+  };
+
   return (
     <main className="settings-grid">
+      <Card className="pad settings-mode-card">
+        <h2><HeartPulse size={20} /> App mode</h2>
+        <p className="muted">Choose whether 4Sara should focus on your own cycle tracking or on helping you support someone else.</p>
+        <div className="mode-toggle-grid">
+          <button type="button" className={currentAppMode === "cycle" ? "mode-option active" : "mode-option"} onClick={() => changeAppMode("cycle")}>
+            <strong>Track my cycle</strong>
+            <span>Show period logging, calendar predictions, insights, and reports.</span>
+          </button>
+          <button type="button" className={currentAppMode === "support" ? "mode-option active" : "mode-option"} onClick={() => changeAppMode("support")}>
+            <strong>Support someone</strong>
+            <span>Show shared Support Views, cycle education, and practical support guides.</span>
+          </button>
+        </div>
+      </Card>
+
       <Card className="pad">
         <h2><Bell size={20} /> Profile & settings</h2>
         <div className="two-fields">

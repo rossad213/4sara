@@ -2041,6 +2041,80 @@ function App() {
 
 
   useEffect(() => {
+    if (!authUser || !sharedProfiles || !Object.keys(sharedProfiles).length) return;
+
+    let cancelled = false;
+
+    const refreshSharedProfilePermissions = async () => {
+      const updates = {};
+
+      await Promise.all(Object.values(sharedProfiles).map(async (profile) => {
+        if (!profile?.ownerUserId) return;
+
+        try {
+          const ownerSnapshot = await getDoc(doc(db, "users", profile.ownerUserId));
+          if (!ownerSnapshot.exists()) return;
+
+          const ownerDoc = ownerSnapshot.data() || {};
+          const viewerRecord = ownerDoc.supportViewers?.[authUser.uid];
+          if (!viewerRecord) return;
+
+          const nextPermissions = viewerRecord.permissions || {};
+          const currentCanEdit = Boolean(profile.permissions?.canEdit);
+          const nextCanEdit = Boolean(nextPermissions.canEdit);
+
+          if (currentCanEdit !== nextCanEdit) {
+            updates[profile.ownerUserId] = {
+              ...profile,
+              permissions: {
+                ...(profile.permissions || {}),
+                ...nextPermissions,
+                canEdit: nextCanEdit
+              }
+            };
+          }
+        } catch {
+          // If a shared profile cannot be refreshed, keep the current saved label.
+        }
+      }));
+
+      if (cancelled || !Object.keys(updates).length) return;
+
+      setSharedProfiles((current) => {
+        const next = { ...(current || {}) };
+        Object.entries(updates).forEach(([ownerUserId, profile]) => {
+          next[ownerUserId] = {
+            ...(next[ownerUserId] || {}),
+            ...profile
+          };
+        });
+        return next;
+      });
+
+      if (authUser) {
+        const permissionPatch = {};
+        Object.entries(updates).forEach(([ownerUserId, profile]) => {
+          permissionPatch[`sharedProfiles.${ownerUserId}.permissions`] = profile.permissions || {};
+        });
+
+        try {
+          await updateDoc(doc(db, "users", authUser.uid), permissionPatch);
+        } catch {
+          // The visible label can still update locally even if caching the refreshed permission fails.
+        }
+      }
+    };
+
+    refreshSharedProfilePermissions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser, sharedProfiles]);
+
+
+
+  useEffect(() => {
     if (!authUser || !autoSyncEnabled || !cloudReady || !cloudCheckedForAccount || !cloudSyncAllowed) return;
     if (cloudLoadedAccountUid !== authUser.uid) return;
 

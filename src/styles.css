@@ -6780,3 +6780,22 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .general-help-tip-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
 }
+
+
+/* Settings tab: merged Privacy center at bottom */
+.settings-privacy-center-wrap {
+  grid-column: 1 / -1;
+}
+
+.settings-privacy-center-wrap > .layout {
+  display: block;
+}
+
+.settings-privacy-center-wrap .privacy-dashboard-card {
+  width: 100%;
+  max-width: none;
+}
+
+.settings-privacy-center-wrap .privacy-page-hero {
+  margin-bottom: 1rem;
+}

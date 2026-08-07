@@ -94,6 +94,7 @@ function routeForAppTab(tab) {
 }
 
 function appTabFromPath(path = currentPath()) {
+  if (path === "/privacy") return "settings";
   return ROUTE_TO_APP_TAB[path] || "";
 }
 
@@ -2184,7 +2185,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!authUser || activeTab !== "privacy") return;
+    if (!authUser || activeTab !== "settings") return;
     refreshCloudBackups();
   }, [authUser, activeTab]);
 
@@ -3741,7 +3742,6 @@ function App() {
     { id: "log", label: "Log", icon: Plus },
     { id: "insights", label: "Insights", icon: Sparkles },
     { id: "settings", label: "Settings", icon: Settings },
-    { id: "privacy", label: "Privacy", icon: ShieldCheck },
     { id: "account", label: "Account", icon: Mail },
     { id: "mobile", label: "Mobile", icon: Home }
   ];
@@ -3750,8 +3750,7 @@ function App() {
     { id: "supporthome", label: "Support Home", icon: HeartPulse },
     { id: "howtohelp", label: "How to Help", icon: Sparkles },
     { id: "account", label: "Shared Views", icon: Mail },
-    { id: "settings", label: "Settings", icon: Settings },
-    { id: "privacy", label: "Privacy", icon: ShieldCheck }
+    { id: "settings", label: "Settings", icon: Settings }
   ];
 
   const supportNavItems = [
@@ -3962,8 +3961,7 @@ function App() {
             )}
             {activeTab === "log" && <LogTab form={form} setForm={setForm} toggleSymptom={toggleSymptom} saveEntry={saveEntry} editingId={editingId} cancelEdit={() => { setEditingId(null); setForm(blankForm()); }} entries={activeEntriesForLog} startEdit={startEdit} deleteEntry={deleteEntry} allSymptoms={activeSymptomsForLog} customSymptoms={activeSettingsForLog.customSymptoms || []} customSymptomInput={customSymptomInput} setCustomSymptomInput={setCustomSymptomInput} addCustomSymptom={addCustomSymptom} removeCustomSymptom={removeCustomSymptom} allMoods={activeMoodsForLog} customMoods={activeSettingsForLog.customMoods || []} customMoodInput={customMoodInput} setCustomMoodInput={setCustomMoodInput} addCustomMood={addCustomMood} removeCustomMood={removeCustomMood} selectedPhase={selectedPhase} isSupportEditMode={supportCanEdit} allowDelete={viewMode !== "support"} allowCustomSymptoms={viewMode !== "support"} />}
             {activeTab === "insights" && <Insights stats={viewMode === "support" ? supportStats : stats} settings={viewMode === "support" ? supportSettings : settings} setLocked={setLocked} isSupportView={viewMode === "support"} readOnly={viewMode === "support"} />}
-            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTabRoute} />}
-            {activeTab === "privacy" && <PrivacyPage settings={settings} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} setLocked={setLocked} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} cloudBackups={cloudBackups} backupStatus={backupStatus} backupBusy={backupBusy} refreshCloudBackups={refreshCloudBackups} createManualCloudBackup={createManualCloudBackup} restoreCloudBackup={restoreCloudBackup} downloadCloudBackup={downloadCloudBackup} confirmRestoreBackupId={confirmRestoreBackupId} setConfirmRestoreBackupId={setConfirmRestoreBackupId} />}
+            {activeTab === "settings" && <SettingsTab settings={settings} updateSettings={updateSettings} setLocked={setLocked} showMessage={showMessage} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} resetDemo={() => { setEntries(demoEntries); updateSettings({ onboardingComplete: true }); showMessage("Demo data restored."); }} importText={importText} setImportText={setImportText} importJson={importJson} sortedEntries={sortedEntries} stats={stats} setActiveTab={setActiveTabRoute} authUser={authUser} syncStatus={syncStatus} cloudHasData={cloudHasData} syncBusy={syncBusy} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} exportJson={() => { downloadJson(entries, settings); showMessage("Backup downloaded."); }} exportCsv={() => { downloadCsv(sortedEntries); showMessage("Spreadsheet export downloaded."); }} cloudBackups={cloudBackups} backupStatus={backupStatus} backupBusy={backupBusy} refreshCloudBackups={refreshCloudBackups} createManualCloudBackup={createManualCloudBackup} restoreCloudBackup={restoreCloudBackup} downloadCloudBackup={downloadCloudBackup} confirmRestoreBackupId={confirmRestoreBackupId} setConfirmRestoreBackupId={setConfirmRestoreBackupId} />}
             {activeTab === "account" && <AccountPage authUser={authUser} authLoading={authLoading} authMode={authMode} setAuthMode={setAuthMode} authEmail={authEmail} setAuthEmail={setAuthEmail} authPassword={authPassword} setAuthPassword={setAuthPassword} authError={authError} authNotice={authNotice} handleAuthSubmit={handleAuthSubmit} handlePasswordReset={handlePasswordReset} handleResendVerification={handleResendVerification} handleSignOut={handleSignOut} syncStatus={syncStatus} syncBusy={syncBusy} saveToCloud={saveToCloud} loadFromCloud={loadFromCloud} autoSyncEnabled={autoSyncEnabled} setAutoSyncEnabled={setAutoSyncEnabled} lastCloudSave={lastCloudSave} cloudCheckedForAccount={cloudCheckedForAccount} cloudSyncAllowed={cloudSyncAllowed} cloudHasData={cloudHasData} cloudUpdatedAt={cloudUpdatedAt} deleteCloudData={deleteCloudData} confirmDeleteCloud={confirmDeleteCloud} setConfirmDeleteCloud={setConfirmDeleteCloud} deleteAccount={deleteAccount} confirmDeleteAccount={confirmDeleteAccount} setConfirmDeleteAccount={setConfirmDeleteAccount} clearData={clearLocalDeviceData} confirmClearLocal={confirmClearLocal} setConfirmClearLocal={setConfirmClearLocal} createSupportInvite={createSupportInvite} copyInviteLink={copyInviteLink} lastInviteLink={lastInviteLink} inviteToken={inviteToken} pendingInvite={pendingInvite} inviteStatus={inviteStatus} inviteBusy={inviteBusy} acceptSupportInvite={acceptSupportInvite} checkSupportInvite={checkSupportInvite} sharedProfiles={sharedProfiles} supportViewers={supportViewers} confirmRevokeViewerId={confirmRevokeViewerId} setConfirmRevokeViewerId={setConfirmRevokeViewerId} confirmRemoveSharedOwnerId={confirmRemoveSharedOwnerId} setConfirmRemoveSharedOwnerId={setConfirmRemoveSharedOwnerId} revokeSupportViewer={revokeSupportViewer} updateSupportViewerPermission={updateSupportViewerPermission} supportActivity={supportActivity} chooseSharedSupportView={chooseSharedSupportView} removeSharedSupportView={removeSharedSupportView} />}
             {activeTab === "mobile" && viewMode === "owner" && <MobileSetupPage />}
             {activeTab === "howtohelp" && (viewMode === "support" || isSupportOnlyMode) && (
@@ -6196,7 +6194,7 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
   );
 }
 
-function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearData, confirmClearLocal, setConfirmClearLocal, resetDemo, importText, setImportText, importJson, sortedEntries, stats, setActiveTab }) {
+function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearData, confirmClearLocal, setConfirmClearLocal, resetDemo, importText, setImportText, importJson, sortedEntries, stats, setActiveTab, authUser, syncStatus, cloudHasData, syncBusy, deleteCloudData, confirmDeleteCloud, setConfirmDeleteCloud, deleteAccount, confirmDeleteAccount, setConfirmDeleteAccount, exportJson, exportCsv, cloudBackups = [], backupStatus = "", backupBusy = false, refreshCloudBackups, createManualCloudBackup, restoreCloudBackup, downloadCloudBackup, confirmRestoreBackupId, setConfirmRestoreBackupId }) {
   const currentAppMode = settings.appMode === "support" ? "support" : "cycle";
 
   const changeAppMode = (mode) => {
@@ -6258,14 +6256,6 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
         {confirmClearLocal && <p className="danger-confirm">This clears this browser/device only. Cloud sync will be turned off first so an empty tracker is not auto-saved to cloud.</p>}
       </Card>
 
-      <Card className="pad">
-        <h2><ShieldCheck size={20} /> Privacy</h2>
-        <p className="muted">Review privacy controls, data storage, terms, and medical limitations in one place.</p>
-        <div className="two-actions">
-          <Button onClick={() => setActiveTabRoute("privacy")} variant="secondary">Open privacy center</Button>
-        </div>
-      </Card>
-
       <Card className="pad wide">
         <h2><Download size={20} /> Data tools</h2>
         <p className="muted">Backup, restore, export to spreadsheet, or open a printable doctor summary report.</p>
@@ -6277,6 +6267,37 @@ function SettingsTab({ settings, updateSettings, setLocked, showMessage, clearDa
           <Button onClick={() => showMessage(printReport(sortedEntries, stats) ? "Report opened. Use Print or Save as PDF." : "Pop-up blocked. Allow pop-ups to print the report.")} variant="secondary">Doctor report</Button>
         </div>
       </Card>
+
+      <div className="settings-privacy-center-wrap">
+        <PrivacyPage
+          settings={settings}
+          authUser={authUser}
+          syncStatus={syncStatus}
+          cloudHasData={cloudHasData}
+          syncBusy={syncBusy}
+          deleteCloudData={deleteCloudData}
+          confirmDeleteCloud={confirmDeleteCloud}
+          setConfirmDeleteCloud={setConfirmDeleteCloud}
+          deleteAccount={deleteAccount}
+          confirmDeleteAccount={confirmDeleteAccount}
+          setConfirmDeleteAccount={setConfirmDeleteAccount}
+          setLocked={setLocked}
+          clearData={clearData}
+          confirmClearLocal={confirmClearLocal}
+          setConfirmClearLocal={setConfirmClearLocal}
+          exportJson={exportJson}
+          exportCsv={exportCsv}
+          cloudBackups={cloudBackups}
+          backupStatus={backupStatus}
+          backupBusy={backupBusy}
+          refreshCloudBackups={refreshCloudBackups}
+          createManualCloudBackup={createManualCloudBackup}
+          restoreCloudBackup={restoreCloudBackup}
+          downloadCloudBackup={downloadCloudBackup}
+          confirmRestoreBackupId={confirmRestoreBackupId}
+          setConfirmRestoreBackupId={setConfirmRestoreBackupId}
+        />
+      </div>
     </main>
   );
 }

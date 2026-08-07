@@ -3973,6 +3973,7 @@ function App() {
                 entries={viewMode === "support" ? supportEntries : entries}
                 calendarData={viewMode === "support" ? supportCalendarData : calendarData}
                 sharedSupportData={viewMode === "support" ? sharedSupportData : null}
+                generalGuide={isSupportOnlyMode && viewMode !== "support"}
               />
             )}
           </motion.div>
@@ -4410,7 +4411,7 @@ function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles,
   );
 }
 
-function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
+function HowToHelpPage({ stats, entries, calendarData, sharedSupportData, generalGuide = false }) {
   const todayCalendarDay = (calendarData || []).find((day) => !day.empty && (day.dateKey || day.key) === todayKey());
   const phase = todayCalendarDay?.phaseLabel
     || getCurrentProjectedPhase(stats, entries)
@@ -4595,34 +4596,78 @@ function HowToHelpPage({ stats, entries, calendarData, sharedSupportData }) {
   };
 
   const tips = supportTips[phase] || supportTips.Unknown;
+  const generalPhaseOrder = ["Menstruation", "Follicular", "Fertile", "Ovulation", "Luteal"];
+  const generalPhaseSummaries = {
+    Menstruation: "Bleeding days. They may want comfort, rest, warmth, patience, and practical help.",
+    Follicular: "After menstruation. Energy may rebuild, but support should still be based on how they actually feel.",
+    Fertile: "Estimated fertile window. Treat this information as private and never use it to pressure or joke.",
+    Ovulation: "Estimated ovulation timing. Some people notice symptoms and some do not.",
+    Luteal: "Before the next period. PMS-type symptoms, cravings, fatigue, or mood changes may appear."
+  };
 
   return (
     <main className="layout how-to-help-layout">
       <Card className="pad main-col how-to-help-main-col">
         <h2><HeartPulse size={20} /> How to Help{sharedSupportData?.displayName ? ` ${sharedSupportData.displayName}` : ""}</h2>
-        <p className="muted">This read-only support guide uses the same phase shown for today on the Calendar tab to suggest simple, practical ways to be helpful.</p>
+        {generalGuide ? (
+          <p className="muted">General support guide for people using 4Sara to support someone else. This is not tied to your own calendar or cycle predictions.</p>
+        ) : (
+          <p className="muted">This read-only support guide uses the same phase shown for today on the Calendar tab to suggest simple, practical ways to be helpful.</p>
+        )}
 
-        <div className="help-current-card">
-          <p className="account-eyebrow">Estimated current phase for {formatDate(todayKey())}</p>
-          <h3>{phase}</h3>
-          <p>{phaseText}</p>
-        </div>
+        {generalGuide ? (
+          <div className="general-help-phase-list">
+            {generalPhaseOrder.map((phaseName) => (
+              <div className="general-help-phase-card" key={phaseName}>
+                <div className="general-help-phase-heading">
+                  <p className="account-eyebrow">General phase guide</p>
+                  <h3>{phaseName}</h3>
+                  <p>{generalPhaseSummaries[phaseName]}</p>
+                </div>
 
-        <div className="help-tip-list expanded-help-tip-list">
-          {tips.map((tip) => (
-            <div className="mini-card expanded-help-card" key={tip.title}>
-              <strong>{tip.title}</strong>
-              <p>{tip.summary}</p>
-              <ul>
-                {tip.ideas.map((idea) => <li key={idea}>{idea}</li>)}
-              </ul>
+                <div className="help-tip-list expanded-help-tip-list general-help-tip-grid">
+                  {(supportTips[phaseName] || []).map((tip) => (
+                    <div className="mini-card expanded-help-card" key={`${phaseName}-${tip.title}`}>
+                      <strong>{tip.title}</strong>
+                      <p>{tip.summary}</p>
+                      <ul>
+                        {tip.ideas.slice(0, 2).map((idea) => <li key={idea}>{idea}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="help-current-card">
+              <p className="account-eyebrow">Estimated current phase for {formatDate(todayKey())}</p>
+              <h3>{phase}</h3>
+              <p>{phaseText}</p>
             </div>
-          ))}
-        </div>
+
+            <div className="help-tip-list expanded-help-tip-list">
+              {tips.map((tip) => (
+                <div className="mini-card expanded-help-card" key={tip.title}>
+                  <strong>{tip.title}</strong>
+                  <p>{tip.summary}</p>
+                  <ul>
+                    {tip.ideas.map((idea) => <li key={idea}>{idea}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="privacy-section legal-section how-to-help-reminder">
           <h3>Support reminder</h3>
-          <p>This view is not medical advice. It is meant to help supporters be more thoughtful, patient, and aware. The current phase shown here matches today’s phase on the Calendar tab. Always respect privacy, consent, and boundaries.</p>
+          {generalGuide ? (
+            <p>This guide is general education, not medical advice. It is meant to help supporters be more thoughtful, patient, and aware across different cycle phases. When you open someone’s shared Support View, 4Sara can show guidance based on their estimated current phase.</p>
+          ) : (
+            <p>This view is not medical advice. It is meant to help supporters be more thoughtful, patient, and aware. The current phase shown here matches today’s phase on the Calendar tab. Always respect privacy, consent, and boundaries.</p>
+          )}
         </div>
       </Card>
     </main>

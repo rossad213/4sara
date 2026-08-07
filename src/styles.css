@@ -6746,3 +6746,37 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
     justify-content: flex-start;
   }
 }
+
+
+/* Support-only mode: general How to Help guide */
+.general-help-phase-list {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.general-help-phase-card {
+  border: 1px solid rgba(255, 180, 195, 0.82);
+  background: rgba(255, 247, 250, 0.72);
+  border-radius: 24px;
+  padding: 1rem;
+}
+
+.general-help-phase-heading {
+  margin-bottom: 0.85rem;
+}
+
+.general-help-phase-heading h3 {
+  margin: 0.2rem 0 0.35rem;
+  color: var(--rose-700);
+}
+
+.general-help-phase-heading p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.general-help-tip-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+}

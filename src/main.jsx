@@ -5953,11 +5953,31 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
     ? `${formatDate(stats.nextPeriod)}${stats.predictedEnd ? ` - ${formatDate(stats.predictedEnd)}` : ""}`
     : "Log a cycle first";
 
-  const currentPhase = stats.currentCycleDay
-    ? inferPhase(todayKey(), stats.groupedPeriodEpisodes || [], stats.averageCycle, stats.averagePeriod)
+  const today = todayKey();
+  const inferredCurrentPhase = stats.currentCycleDay
+    ? inferPhase(today, stats.groupedPeriodEpisodes || [], stats.averageCycle, stats.averagePeriod)
+    : "";
+
+  const isTodayInPredictedMenstruation = Boolean(
+    stats.nextPeriod
+    && stats.predictedEnd
+    && inRange(today, stats.nextPeriod, stats.predictedEnd)
+  );
+
+  const projectedCurrentPhase = getCurrentProjectedPhase(stats, stats.groupedPeriodEpisodes || []);
+  const currentPhase = isTodayInPredictedMenstruation
+    ? "Estimated menstruation"
+    : inferredCurrentPhase && inferredCurrentPhase !== "Unknown"
+    ? inferredCurrentPhase
+    : projectedCurrentPhase && projectedCurrentPhase !== "Unknown"
+    ? `Estimated ${projectedCurrentPhase.toLowerCase()}`
+    : stats.currentCycleDay
+    ? "Unknown"
     : "Not enough data";
 
-  const currentStatusText = stats.currentCycleDay
+  const currentStatusText = isTodayInPredictedMenstruation
+    ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)} predicted window`
+    : stats.currentCycleDay
     ? `Cycle day ${stats.currentCycleDay}`
     : "Add a menstruation entry to start building insights.";
 
@@ -6009,7 +6029,7 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
           <div className="insight-summary-card">
             <span>Next predicted menstruation</span>
             <strong>{nextPeriodText}</strong>
-            <p>{stats.daysUntil !== null ? `${stats.daysUntil} day${stats.daysUntil === 1 ? "" : "s"} away` : "Predictions begin after your first cycle log."}</p>
+            <p>{isTodayInPredictedMenstruation ? "Current predicted window" : stats.daysUntil !== null ? (stats.daysUntil >= 0 ? `${stats.daysUntil} day${stats.daysUntil === 1 ? "" : "s"} away` : `${Math.abs(stats.daysUntil)} day${Math.abs(stats.daysUntil) === 1 ? "" : "s"} past predicted start`) : "Predictions begin after your first cycle log."}</p>
           </div>
           <div className="insight-summary-card">
             <span>Estimated ovulation</span>

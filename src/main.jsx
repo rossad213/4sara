@@ -1449,6 +1449,14 @@ function getSharedDisplayName(ownerSettings, ownerDoc, fallbackProfile) {
     || "Shared 4Sara";
 }
 
+function sharedProfileDisplayName(profile) {
+  return profile?.resolvedDisplayName
+    || profile?.displayName
+    || profile?.ownerName
+    || profile?.ownerEmail
+    || "Shared 4Sara";
+}
+
 function getSupportActor(authUser) {
   return {
     uid: authUser?.uid || "",
@@ -2048,7 +2056,7 @@ function App() {
 
     let cancelled = false;
 
-    const refreshSharedProfilePermissions = async () => {
+    const refreshSharedProfileDetails = async () => {
       const updates = {};
 
       await Promise.all(Object.values(sharedProfiles).map(async (profile) => {
@@ -2059,16 +2067,23 @@ function App() {
           if (!ownerSnapshot.exists()) return;
 
           const ownerDoc = ownerSnapshot.data() || {};
+          const ownerData = ownerDoc.data || {};
+          const ownerSettings = ownerData.settings || {};
           const viewerRecord = ownerDoc.supportViewers?.[authUser.uid];
           if (!viewerRecord) return;
 
           const nextPermissions = viewerRecord.permissions || {};
           const currentCanEdit = Boolean(profile.permissions?.canEdit);
           const nextCanEdit = Boolean(nextPermissions.canEdit);
+          const resolvedDisplayName = getSharedDisplayName(ownerSettings, ownerDoc, profile);
+          const currentDisplayName = sharedProfileDisplayName(profile);
 
-          if (currentCanEdit !== nextCanEdit) {
+          if (currentCanEdit !== nextCanEdit || currentDisplayName !== resolvedDisplayName || profile.resolvedDisplayName !== resolvedDisplayName) {
             updates[profile.ownerUserId] = {
               ...profile,
+              ownerUserId: profile.ownerUserId,
+              displayName: resolvedDisplayName,
+              resolvedDisplayName,
               permissions: {
                 ...(profile.permissions || {}),
                 ...nextPermissions,
@@ -2095,20 +2110,22 @@ function App() {
       });
 
       if (authUser) {
-        const permissionPatch = {};
+        const sharedProfilePatch = {};
         Object.entries(updates).forEach(([ownerUserId, profile]) => {
-          permissionPatch[`sharedProfiles.${ownerUserId}.permissions`] = profile.permissions || {};
+          sharedProfilePatch[`sharedProfiles.${ownerUserId}.displayName`] = profile.displayName || "";
+          sharedProfilePatch[`sharedProfiles.${ownerUserId}.resolvedDisplayName`] = profile.resolvedDisplayName || "";
+          sharedProfilePatch[`sharedProfiles.${ownerUserId}.permissions`] = profile.permissions || {};
         });
 
         try {
-          await updateDoc(doc(db, "users", authUser.uid), permissionPatch);
+          await updateDoc(doc(db, "users", authUser.uid), sharedProfilePatch);
         } catch {
-          // The visible label can still update locally even if caching the refreshed permission fails.
+          // The visible label can still update locally even if caching the refreshed profile fails.
         }
       }
     };
 
-    refreshSharedProfilePermissions();
+    refreshSharedProfileDetails();
 
     return () => {
       cancelled = true;
@@ -2306,13 +2323,22 @@ function App() {
 
       setSharedProfiles((current) => {
         const existing = current?.[ownerUserId] || {};
-        if (existing.displayName === resolvedDisplayName) return current;
+        if (
+          existing.displayName === resolvedDisplayName
+          && existing.resolvedDisplayName === resolvedDisplayName
+          && Boolean(existing.permissions?.canEdit) === Boolean(resolvedPermissions?.canEdit)
+        ) return current;
         return {
           ...(current || {}),
           [ownerUserId]: {
             ...existing,
             ownerUserId,
-            displayName: resolvedDisplayName
+            displayName: resolvedDisplayName,
+            resolvedDisplayName: resolvedDisplayName,
+            permissions: {
+              ...(existing.permissions || {}),
+              ...(resolvedPermissions || {})
+            }
           }
         };
       });
@@ -2370,8 +2396,10 @@ function App() {
   };
 
   const chooseSharedSupportView = (ownerUserId) => {
+    const profile = sharedProfiles?.[ownerUserId];
     setSelectedSharedOwnerId(ownerUserId);
     setViewMode("support");
+    setSharedSupportStatus(profile ? `Loading shared Support View for ${sharedProfileDisplayName(profile)}...` : "Loading shared Support View...");
     setActiveTabRoute("calendar");
   };
 
@@ -4148,7 +4176,7 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                   <h4>Shared Support Views on this account</h4>
                   {Object.values(sharedProfiles).map((profile) => (
                     <div className="mini-card" key={profile.ownerUserId}>
-                      <strong>{profile.displayName || "Shared 4Sara"}</strong>
+                      <strong>{sharedProfileDisplayName(profile)}</strong>
                       <p>Access: {profile.permissions?.canEdit ? "Can edit" : "View only"}</p>
                       {confirmRemoveSharedOwnerId === profile.ownerUserId && (
                         <p className="danger-confirm">Click Remove from my account again to confirm, or cancel below.</p>
@@ -4370,7 +4398,10 @@ function CloudStatusBadge({ authUser, autoSyncEnabled, cloudCheckedForAccount, c
 
 
 function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles, selectedSharedOwnerId, setSelectedSharedOwnerId, chooseSharedSupportView }) {
-  const profiles = Object.values(sharedProfiles || {});
+  const profiles = Object.values(sharedProfiles || {}).map((profile) => ({
+    ...profile,
+    label: sharedProfileDisplayName(profile)
+  }));
 
   const switchToOwner = () => {
     setViewMode("owner");
@@ -4400,7 +4431,7 @@ function ViewModeSwitcher({ viewMode, setViewMode, setActiveTab, sharedProfiles,
           <option value="">Shared Support Views</option>
           {profiles.map((profile) => (
             <option key={profile.ownerUserId} value={profile.ownerUserId}>
-              {profile.displayName || "Shared 4Sara"}
+              {profile.label}
             </option>
           ))}
         </select>
@@ -5342,7 +5373,7 @@ function SupportOnlyHome({ sharedProfiles, chooseSharedSupportView, setActiveTab
             <div className="support-only-shared-list">
               {sharedList.map((profile) => (
                 <div className="mini-card" key={profile.ownerUserId}>
-                  <strong>{profile.displayName || "Shared 4Sara"}</strong>
+                  <strong>{sharedProfileDisplayName(profile)}</strong>
                   <p>Access: {profile.permissions?.canEdit ? "Can edit" : "View only"}</p>
                   <Button onClick={() => chooseSharedSupportView(profile.ownerUserId)} variant="secondary">Open Support View</Button>
                 </div>

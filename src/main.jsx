@@ -5476,11 +5476,11 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
           <Card className="dashboard-list-card recent-card">
             <div className="dashboard-list-head">
               <h2>Recent entries</h2>
-              <button type="button" onClick={() => setActiveTabRoute("log")}>View all</button>
+              <button type="button" onClick={() => setActiveTab("log")}>View all</button>
             </div>
             <div className="dashboard-entry-list">
               {recentRows.length ? (
-                recentRows.map((entry, index) => <RecentDashboardRow key={entry.id || index} entry={entry} fallbackIndex={index} />)
+                recentRows.map((entry, index) => <RecentDashboardRow key={entry.id || index} entry={entry} stats={stats} />)
               ) : (
                 <div className="dashboard-empty-state">
                   <strong>No entries yet</strong>
@@ -5488,7 +5488,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
                 </div>
               )}
             </div>
-            <Button onClick={() => setActiveTabRoute("log")} className="dashboard-new-checkin"><Plus size={20} /> New check-in</Button>
+            <Button onClick={() => setActiveTab("log")} className="dashboard-new-checkin"><Plus size={20} /> New check-in</Button>
           </Card>
 
           <Card className="dashboard-list-card upcoming-card">
@@ -5509,7 +5509,7 @@ function Dashboard({ stats, settings, sortedEntries, startEdit, deleteEntry, jum
             <h2>Your privacy is protected</h2>
             <p>Your data is private and stored securely. Use your account for encrypted sync, export, and deletion controls anytime.</p>
           </div>
-          <button type="button" onClick={() => setActiveTabRoute("privacy")}>Privacy settings</button>
+          <button type="button" onClick={() => setActiveTab("settings")}>Privacy settings</button>
         </Card>
       </section>
     </main>
@@ -5599,13 +5599,20 @@ function SoftStat({ icon: Icon, label, sublabel, value, suffix, tone = "period" 
   );
 }
 
-function RecentDashboardRow({ entry, fallbackIndex }) {
+function RecentDashboardRow({ entry, stats }) {
   const mood = moodLabel(entry);
   const symptoms = Array.isArray(entry.symptoms) ? entry.symptoms : [];
-  const title = entry.type === "period" ? "Menstruation" : fallbackIndex === 1 ? "Flow" : fallbackIndex === 2 ? "Symptoms" : "Mood";
-  const value = entry.flow && entry.flow !== "N/A" ? entry.flow : symptoms[0] || (mood !== "N/A" ? mood : "Logged");
-  const tone = value.toLowerCase().includes("bloat") ? "predicted" : value.toLowerCase().includes("light") ? "follicular" : entry.type === "period" ? "period" : "luteal";
-  const Icon = entry.type === "period" || title === "Flow" ? Droplet : title === "Symptoms" ? Heart : Smile;
+  const isCheckIn = (entry.type || "period") === "checkin";
+  const phase = isCheckIn
+    ? inferPhase(entry.startDate, stats?.groupedPeriodEpisodes || [], stats?.averageCycle || 28, stats?.averagePeriod || 5)
+    : "Menstruation";
+  const title = isCheckIn && phase && phase !== "Unknown" ? phase : isCheckIn ? "Daily check-in" : "Menstruation";
+  const value = !isCheckIn && entry.flow && entry.flow !== "N/A"
+    ? entry.flow
+    : symptoms[0] || (mood !== "N/A" ? mood : "Logged");
+  const phaseTone = title === "Follicular" ? "follicular" : title === "Fertile" || title === "Ovulation" ? "fertile" : title === "Luteal" ? "luteal" : title === "Menstruation" ? "period" : "predicted";
+  const tone = value.toLowerCase().includes("bloat") ? "predicted" : value.toLowerCase().includes("light") ? "follicular" : phaseTone;
+  const Icon = title === "Menstruation" ? Droplet : title === "Fertile" || title === "Ovulation" ? Heart : title === "Luteal" ? Moon : Smile;
 
   return (
     <div className={`dashboard-entry-row ${tone}`}>

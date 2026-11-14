@@ -4338,12 +4338,12 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
             <div className="form">
               <label>
                 <span>Email</span>
-                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
+                <input type="email" name="email" autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} onInput={(event) => setAuthEmail(event.currentTarget.value)} placeholder="you@example.com" />
               </label>
 
               <label>
                 <span>Password</span>
-                <PasswordInput value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" ariaLabel="Password" />
+                <PasswordInput value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" ariaLabel="Password" autoComplete={authMode === "signup" ? "new-password" : "current-password"} />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}
@@ -5113,7 +5113,7 @@ function PasswordRequirements({ password }) {
   );
 }
 
-function PasswordInput({ value, onChange, placeholder, className = "", onKeyDown, ariaLabel = "Password", inputMode, maxLength }) {
+function PasswordInput({ value, onChange, placeholder, className = "", onKeyDown, ariaLabel = "Password", inputMode, maxLength, autoComplete }) {
   const [visible, setVisible] = useState(false);
   const ToggleIcon = visible ? EyeOff : Eye;
 
@@ -5121,8 +5121,11 @@ function PasswordInput({ value, onChange, placeholder, className = "", onKeyDown
     <div className={`password-input-wrap ${className}`}>
       <input
         type={visible ? "text" : "password"}
+        name={autoComplete === "current-password" ? "current-password" : autoComplete === "new-password" ? "new-password" : undefined}
+        autoComplete={autoComplete}
         value={value}
         onChange={onChange}
+        onInput={onChange}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         aria-label={ariaLabel}
@@ -5182,12 +5185,12 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
             <div className="form">
               <label>
                 <span>Email</span>
-                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
+                <input type="email" name="email" autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} onInput={(event) => setAuthEmail(event.currentTarget.value)} placeholder="you@example.com" />
               </label>
 
               <label>
                 <span>Password</span>
-                <PasswordInput value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" ariaLabel="Password" />
+                <PasswordInput value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} placeholder="8+ chars, uppercase, lowercase, number, special character" ariaLabel="Password" autoComplete={authMode === "signup" ? "new-password" : "current-password"} />
               </label>
 
               {authMode === "signup" && <PasswordRequirements password={authPassword} />}

@@ -1695,7 +1695,16 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const currentCycleAdjustmentDays = Number(safeSettings.cycleLengthOverride) ? 0 : predictionModel.currentCycleAdjustmentDays;
   const predictionCycleLength = averageCycle + currentCycleAdjustmentDays;
 
-  const nextPeriod = last ? addDays(last.startDate, predictionCycleLength) : "";
+  // Advance past unconfirmed predictions without creating synthetic period logs.
+  // Only recorded menstruation episodes contribute to cycle-length statistics.
+  const initialPredictedPeriod = last ? addDays(last.startDate, predictionCycleLength) : "";
+  const daysAfterInitialPrediction = initialPredictedPeriod ? daysBetween(initialPredictedPeriod, todayKey()) : 0;
+  const unrecordedCycleCount = daysAfterInitialPrediction > 0
+    ? Math.ceil(daysAfterInitialPrediction / Math.max(1, averageCycle))
+    : 0;
+  const nextPeriod = initialPredictedPeriod
+    ? addDays(initialPredictedPeriod, unrecordedCycleCount * Math.max(1, averageCycle))
+    : "";
   const predictedEnd = nextPeriod ? addDays(nextPeriod, averagePeriod - 1) : "";
   const predictionWindowStart = nextPeriod ? addDays(nextPeriod, -predictionModel.predictionWindowBefore) : "";
   const predictionWindowEnd = nextPeriod ? addDays(nextPeriod, predictionModel.predictionWindowAfter) : "";
@@ -1784,7 +1793,7 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
   const hasOutliers = predictionModel.outlierCycles.length > 0;
   const hasGentleContextNudge = predictionModel.currentCycleAdjustmentDays > 0;
 
-  const dataConfidence = chronological.length >= 6 && !hasOutliers && !hasGentleContextNudge
+  const dataConfidence = unrecordedCycleCount > 0 ? "Limited (older logs)" : chronological.length >= 6 && !hasOutliers && !hasGentleContextNudge
     ? "Strong"
     : chronological.length >= 3
     ? hasOutliers || hasGentleContextNudge ? "Good, with timing notes" : "Good"
@@ -1792,7 +1801,9 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
     ? "Limited"
     : "No data";
 
-  const confidenceNote = chronological.length >= 6 && !hasOutliers && !hasGentleContextNudge
+  const confidenceNote = unrecordedCycleCount > 0
+    ? `${unrecordedCycleCount} predicted cycle${unrecordedCycleCount === 1 ? "" : "s"} passed without a period log. These are unconfirmed predictions, not recorded periods. Dates may be less reliable until you log a recent period.`
+    : chronological.length >= 6 && !hasOutliers && !hasGentleContextNudge
     ? "Predictions are stronger because several cycles are logged and recent timing looks consistent."
     : chronological.length >= 3 && hasOutliers
     ? "Predictions are using a typical cycle estimate while discounting unusual cycle lengths."
@@ -1810,6 +1821,7 @@ function calculateStatsForEntries(sourceEntries, sourceSettings) {
     averagePeriod,
     predictionCycleLength,
     currentCycleAdjustmentDays,
+    unrecordedCycleCount,
     nextPeriod,
     predictedEnd,
     predictionWindowStart,
@@ -6013,6 +6025,8 @@ function Insights({ stats, settings, setLocked, isSupportView = false }) {
 
   const currentStatusText = isTodayInPredictedMenstruation
     ? `${formatDate(stats.nextPeriod)} - ${formatDate(stats.predictedEnd)} predicted window`
+    : stats.unrecordedCycleCount > 0
+    ? `${stats.unrecordedCycleCount} predicted cycle${stats.unrecordedCycleCount === 1 ? "" : "s"} unrecorded; current phase is an estimate`
     : stats.currentCycleDay
     ? `Cycle day ${stats.currentCycleDay}`
     : "Add a menstruation entry to start building insights.";

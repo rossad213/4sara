@@ -2218,34 +2218,40 @@ function App() {
     refreshCloudBackups();
   }, [authUser, activeTab]);
 
-  const handleAuthSubmit = async () => {
+  const handleAuthSubmit = async (submittedCredentials) => {
+    // Browser autofill may update fields without firing React change events.
+    // Use the actual submitted form values as the source of truth.
+    const email = String(submittedCredentials?.get?.("email") ?? authEmail).trim();
+    const password = String(submittedCredentials?.get?.("password") ?? authPassword);
+    setAuthEmail(email);
+    setAuthPassword(password);
     setAuthError("");
     setAuthNotice("");
 
-    if (!authEmail.trim()) {
+    if (!email) {
       setAuthError("Enter an email address.");
       return;
     }
 
     if (authMode === "signup") {
-      const passwordCheck = validateStrongPassword(authPassword || "");
+      const passwordCheck = validateStrongPassword(password || "");
       if (!passwordCheck.valid) {
         setAuthError(passwordRequirementMessage());
         return;
       }
-    } else if (!authPassword) {
+    } else if (!password) {
       setAuthError("Enter your password.");
       return;
     }
 
     try {
       if (authMode === "signup") {
-        const credential = await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
         await sendEmailVerification(credential.user);
         setAuthNotice("Account created. A verification email was sent. Please check your inbox.");
         showMessage("Account created. Verification email sent.");
       } else {
-        await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+        await signInWithEmailAndPassword(auth, email, password);
         setAuthNotice("Signed in successfully.");
         showMessage("Signed in.");
       }
@@ -4335,10 +4341,10 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
               <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>Create account</button>
             </div>
 
-            <div className="form">
+            <form className="form" autoComplete="on" onSubmit={(event) => { event.preventDefault(); handleAuthSubmit(new FormData(event.currentTarget)); }}>
               <label>
                 <span>Email</span>
-                <input type="email" name="email" autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} onInput={(event) => setAuthEmail(event.currentTarget.value)} placeholder="you@example.com" />
+                <input type="email" name="email" autoComplete="username" defaultValue={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
               </label>
 
               <label>
@@ -4354,10 +4360,10 @@ function AccountPage({ authUser, authLoading, authMode, setAuthMode, authEmail, 
                 <button type="button" className="link-button" onClick={handlePasswordReset}>Forgot password?</button>
               )}
 
-              <Button onClick={handleAuthSubmit} className="full">
+              <button type="submit" className="btn full">
                 {authMode === "signup" ? "Create account" : "Log in"}
-              </Button>
-            </div>
+              </button>
+            </form>
 
             <p className="auth-note">Create an account or log in here. Cloud syncing for entries and settings is available after login.</p>
 
@@ -5121,11 +5127,11 @@ function PasswordInput({ value, onChange, placeholder, className = "", onKeyDown
     <div className={`password-input-wrap ${className}`}>
       <input
         type={visible ? "text" : "password"}
-        name={autoComplete === "current-password" ? "current-password" : autoComplete === "new-password" ? "new-password" : undefined}
+        name={autoComplete ? "password" : undefined}
         autoComplete={autoComplete}
-        value={value}
+        value={autoComplete ? undefined : value}
+        defaultValue={autoComplete ? value : undefined}
         onChange={onChange}
-        onInput={onChange}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         aria-label={ariaLabel}
@@ -5182,10 +5188,10 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
               <button className={authMode === "signup" ? "active" : ""} onClick={() => setAuthMode("signup")}>Create account</button>
             </div>
 
-            <div className="form">
+            <form className="form" autoComplete="on" onSubmit={(event) => { event.preventDefault(); handleAuthSubmit(new FormData(event.currentTarget)); }}>
               <label>
                 <span>Email</span>
-                <input type="email" name="email" autoComplete="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} onInput={(event) => setAuthEmail(event.currentTarget.value)} placeholder="you@example.com" />
+                <input type="email" name="email" autoComplete="username" defaultValue={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
               </label>
 
               <label>
@@ -5203,13 +5209,13 @@ function AccountPromptScreen({ authUser, authLoading, authMode, setAuthMode, aut
               )}
 
               <div className="welcome-actions">
-                <Button onClick={handleAuthSubmit}>
+                <button type="submit" className="btn">
                   {authMode === "signup" ? "Create account" : "Log in"}
-                </Button>
+                </button>
                 <Button onClick={onContinue} variant="secondary">Continue without account</Button>
                 <Button onClick={onBackHome} variant="secondary" className="full account-back-home">Back to home page</Button>
               </div>
-            </div>
+            </form>
 
             <p className="auth-note">
               This step is optional. Cloud sync will be added next; for now, your tracking data still saves locally on this device.
